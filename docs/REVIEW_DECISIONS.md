@@ -78,3 +78,7 @@ G0通过最多允许按G1数据资格和明确的基础任务启动工作。各P
 已执行 [G1协议](qualification/G1_PROTOCOL.md)：BaoStock 五组固定匿名请求成功，通达信公开历史文件经独立实现复算；具体结论见 [探测报告](qualification/baostock-probe.md) 与 [样本审计](qualification/tdx-public-samples.md)。新增 `qualification/` 只读探测工具，未扩展冻结原型。已批准的总方案、架构和首轮验收表哈希保持不变；002/005仅追加后续证据入口。
 
 本阶段的工具审查与源资格分开记录，见 [G1工具复审](reviews/004-g1-probe-review.md)。接口返回成功不能关闭当前客户端兼容、单位/阶段完整性、分页、连续更新、盘中或PIT门槛；总体G1和G2发布均未获通过。国内外高级功能矩阵补充了已读官方证据和候选有限任务，未增加任何已通过的产品对标或策略结论。
+
+## 2026-10-04 · 首批证据内核有限放行
+
+[首批合同实施决定](contracts/IMPLEMENTATION_DECISIONS.md) 已完成005设计复审、原型校验存档和明确文件解冻。[006实现反方](reviews/006-evidence-core-review.md) 的事务、恢复及字段语义问题修正后，[产品测试](qualification/evidence-core.md) 为218项通过、无跳过。当前可发布固定格式导入/精确源值查询/JSON与Parquet导出/离线备份恢复及CLI；当前客户端、生产自动取数、图形和交易分析继续未验收。以上G0历史记录保留，完整目标未完成。

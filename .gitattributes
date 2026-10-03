@@ -1,4 +1,6 @@
 # Preserve the bytes used by document and qualification review fingerprints.
+.gitattributes text eol=lf
 *.md text eol=lf
-qualification/*.py text eol=lf
+*.py text eol=lf
+*.toml text eol=lf
 qualification/requirements.txt text eol=lf

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anatrading"
+version = "0.1.0.dev1"
+description = "A local market-data evidence workbench with exact source values"
+requires-python = ">=3.14,<3.15"
+dependencies = ["duckdb==1.5.6", "pyarrow==25.0.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10"]
+
+[project.scripts]
+anatrading = "anatrading.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
