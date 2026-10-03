@@ -1,0 +1,4 @@
+# Preserve the bytes used by document and qualification review fingerprints.
+*.md text eol=lf
+qualification/*.py text eol=lf
+qualification/requirements.txt text eol=lf
