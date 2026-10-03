@@ -18,6 +18,8 @@
 - [首批数据合同](docs/contracts/INITIAL_DATA_CONTRACT.md) / [实施决定](docs/contracts/IMPLEMENTATION_DECISIONS.md) / [内核验收报告](docs/qualification/evidence-core.md)。
 - [当前客户端调查](docs/qualification/current-client-paths.md)：通达信安装包已下载并核验签名；尚未安装、登录或完成新导出对账。
 - [只读小样本探测工具](qualification/README.md)：固定案例、超时和私有证据目录，不构成生产采集器。
+- [自动取数接口验证](docs/qualification/baostock-acquisition-results.md) / [通达信本地SDK静态核查](docs/qualification/tdx-client-static.md) / [历史修订研究](docs/research/008-acquisition-and-revisions.md)。
+- [图形工作台合同](docs/contracts/WORKBENCH_CONTRACT.md) / [反方与实施范围](docs/reviews/008-workbench-review.md)：先单快照精确查看与导出，再日线／分钟联动。
 
 用户已确定：Windows 本地优先；全市场日线 + 自选股票分钟；同花顺与通达信优先；真实软件数据验收；公开 GitHub 仓库。
 
@@ -68,4 +70,4 @@ $imported
 
 公开测试含合成异常输入；真实样本原件保持私有，缺少原件时相应回归会明确跳过。不能用干净克隆中的跳过结果替代本机真实样本验收，细项和当前计数见[内核验收报告](docs/qualification/evidence-core.md)。
 
-旧原型已经校验存档，Python内核按新合同重写；`web/`仍冻结且未发布。首批内核不代表G1/G2整体完成。下一步仍包括当前同花顺/通达信实际导出、受测接口自动更新、主数据与交易语义、日线/分钟联动界面，再按研究合同推进指标和策略评价。
+旧原型已经校验存档，Python内核按新合同重写；跨格式控制载荷预检修正后251项产品测试通过。图形合同已通过反方，单快照实施已获准，界面尚未交付。首批内核不代表G1/G2整体完成。下一步仍包括当前同花顺/通达信实际导出、受测接口自动更新、主数据与交易语义、日线/分钟联动界面，再按研究合同推进指标和策略评价。

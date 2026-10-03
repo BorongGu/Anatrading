@@ -52,6 +52,7 @@ def check(row, name):
     return next(item for item in row.checks if item.name == name)
 
 
+@pytest.mark.parametrize("format_id", FORMAT_IDS)
 @pytest.mark.parametrize("changes", [
     {"message_type": "01"}, {"message_type": "03"},
     {"method": "login"}, {"method": "logout"},
@@ -59,10 +60,10 @@ def check(row, name):
     {"user": "PRIVATE_MARKER_7"}, {"fields": [*DAILY_FIELDS, "api_key"]},
     {"fields": ["date", "date"]},
 ])
-def test_control_payload_rejected_before_persistence_without_echo(changes):
+def test_control_payload_rejected_before_persistence_without_echo(changes, format_id):
     payload = bao_payload(**changes)
     with pytest.raises(NonMarketPayload) as caught:
-        preflight(payload, BAO)
+        preflight(payload, format_id)
     message = str(caught.value).lower()
     assert message == "non_market_payload"
     assert all(word not in message for word in ("private_marker", "login", "logout", "api_key"))

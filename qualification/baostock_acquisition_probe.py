@@ -18,6 +18,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "artifacts" / "qualification" / "baostock-acquisition"
 PROTOCOL_SHA256 = "b63a57eb21a3a5ee57c8e7506363cee0b34e60989593f2bac3e1cd454ea87963"
+TRAILER_PROTOCOL_SHA256 = "a9092de5cca0613dfa77822ad8157526496440b17b78da051d08cd44c1867fa3"
 DAILY_FIELDS = "date,code,open,high,low,close,volume,amount,adjustflag".split(",")
 MINUTE_FIELDS = ["date", "time", *DAILY_FIELDS[1:]]
 ASTOCK_FIELDS = "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTM,pbMRQ,psTTM,pcfNcfTTM,isST".split(",")
@@ -199,8 +200,11 @@ def worker(case_name, destination):
     case = CASES[case_name]
     status = dict(case=case_name, status="running", phase="login", started_at=utcnow(),
                   sdk=importlib.metadata.version("baostock"), python=platform.python_version(), protocol_sha256=PROTOCOL_SHA256,
+                  trailer_protocol_sha256=TRAILER_PROTOCOL_SHA256,
                   endpoint=[constants.BAOSTOCK_SERVER_IP, constants.BAOSTOCK_SERVER_PORT],
                   evidence_kind="decoded_response_bounded_transport_not_wire", requests=0, pages=[])
+    status["code_sha256"] = {path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+                             for path in (Path(__file__), Path(__file__).with_name("baostock_transport.py"))}
     sdk_root = Path(sdk.__file__).parent
     status["sdk_hashes"] = {relative: hashlib.sha256((sdk_root / relative).read_bytes()).hexdigest()
                             for relative in ("security/history.py", "data/resultset.py", "util/socketutil.py", "login/loginout.py",
@@ -283,6 +287,9 @@ def run(cases):
     protocol = ROOT / "docs" / "qualification" / "AUTOMATIC_ACQUISITION_PROTOCOL.md"
     if hashlib.sha256(protocol.read_bytes()).hexdigest() != PROTOCOL_SHA256:
         raise SystemExit("The reviewed acquisition protocol fingerprint changed.")
+    amendment = ROOT / "docs" / "qualification" / "BOUNDED_TRAILER_AMENDMENT.md"
+    if hashlib.sha256(amendment.read_bytes()).hexdigest() != TRAILER_PROTOCOL_SHA256:
+        raise SystemExit("The reviewed trailer protocol fingerprint changed.")
     folder = RUNS / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     folder.mkdir(parents=True)
     for case_name in cases:

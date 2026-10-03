@@ -19,6 +19,7 @@ import duckdb
 import pytest
 
 from anatrading.store import EvidenceStore, StoreError
+from anatrading.formats import FORMAT_IDS
 
 
 pytestmark = pytest.mark.skipif(os.name != "nt", reason="The v1 store targets Windows OS locks")
@@ -346,13 +347,14 @@ def rejected_envelope(case):
     return (header + body).encode("utf-8")
 
 
+@pytest.mark.parametrize("format_id", FORMAT_IDS)
 @pytest.mark.parametrize("case", ["login", "logout", "method", "user", "business_error", "fields"])
-def test_non_market_payload_is_never_archived(tmp_path, case, capsys, caplog):
+def test_non_market_payload_is_never_archived(tmp_path, case, capsys, caplog, format_id):
     root = tmp_path / "evidence"
     raw = rejected_envelope(case)
     reached = []
     with EvidenceStore(root, checkpoint=reached.append) as store:
-        result = store.import_bytes(raw, "baostock-decoded-v0.9.4", filename="response.txt")
+        result = store.import_bytes(raw, format_id, filename="response.txt")
         assert result["status"] == "rejected"
         assert result["raw_sha256"] is None
         assert result["batch_id"] is None

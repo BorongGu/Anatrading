@@ -18,9 +18,9 @@ def header(kind, length):
     return f"00.9.10\x01{kind}\x01{length:010d}".encode("ascii")
 
 
-def compressed(body=b"sample", kind="96"):
+def compressed(body=b"sample", kind="96", *, trailer=b""):
     packed = zlib.compress(body)
-    return header(kind, len(packed)) + packed + END
+    return header(kind, len(packed)) + packed + trailer + END
 
 
 def control(body=b"ok", declared=None):
@@ -94,7 +94,7 @@ class BoundedTransportTests(unittest.TestCase):
     def test_eof_during_frame_does_not_spin(self):
         sock = FakeSocket([compressed()[:-1], b""])
         self.fails("unexpected_eof", sock)
-        self.assertEqual(sock.recv_calls, 2)
+        self.assertEqual(sock.recv_calls, 3)
 
     def test_bad_header_shape_is_rejected(self):
         valid = compressed()
@@ -104,11 +104,11 @@ class BoundedTransportTests(unittest.TestCase):
                 self.fails("invalid_header", FakeSocket([bad + valid[21:]]))
 
     def test_invalid_compressed_terminator_is_rejected(self):
-        self.fails("invalid_frame", FakeSocket([compressed()[:-13] + b"<![CDATA[]]X\n"]))
+        self.fails("unexpected_eof", FakeSocket([compressed()[:-13] + b"<![CDATA[]]X\n"]))
 
     def test_short_declared_length_is_rejected(self):
         packed = zlib.compress(b"sample")
-        self.fails("invalid_frame", FakeSocket([header("96", len(packed) - 1) + packed + END]))
+        self.fails("incomplete_compressed_body", FakeSocket([header("96", len(packed) - 1) + packed + END]))
 
     def test_long_declared_length_cannot_complete_at_early_marker(self):
         packed = zlib.compress(b"sample")
@@ -117,6 +117,118 @@ class BoundedTransportTests(unittest.TestCase):
 
     def test_bytes_after_compressed_frame_are_rejected(self):
         self.fails("invalid_frame", FakeSocket([compressed() + b"extra"]))
+
+    def test_trailer_prefix_above_51_bytes_is_rejected(self):
+        for kind in ("96", "99"):
+            with self.subTest(kind=kind):
+                self.fails("invalid_frame", FakeSocket([compressed(kind=kind, trailer=b"x" * 52)]))
+
+    def test_marker_missing_at_64_byte_trailer_limit_stops_without_another_read(self):
+        sock = FakeSocket([compressed()[:-len(END)], b"x" * 64, END])
+        self.fails("invalid_frame", sock)
+        self.assertEqual(sock.recv_calls, 3)
+        self.assertEqual(list(sock.chunks), [END])
+
+    def test_incomplete_marker_at_trailer_limit_does_not_read_remaining_marker(self):
+        sock = FakeSocket([compressed()[:-len(END)], b"x" * 52 + END[:-1], END[-1:]])
+        self.fails("invalid_frame", sock)
+        self.assertEqual(sock.recv_calls, 3)
+        self.assertEqual(list(sock.chunks), [END[-1:]])
+
+    def test_next_read_is_capped_at_declared_body_plus_64_trailer_bytes(self):
+        sock = FakeSocket([compressed()[:-len(END)], b"x" * 100])
+        self.fails("invalid_frame", sock)
+        self.assertEqual(list(sock.chunks), [b"x" * 36])
+
+    def test_coalesced_header_cannot_read_more_than_64_trailer_bytes(self):
+        wire = compressed(trailer=b"x" * 1000)
+        body_end = 21 + len(zlib.compress(b"sample"))
+        sock = FakeSocket([wire])
+        self.fails("invalid_frame", sock)
+        unread = b"".join(sock.chunks)
+        self.assertEqual(len(wire) - len(unread), body_end + 64)
+        self.assertEqual(unread, wire[body_end + 64:])
+
+    def test_partial_header_cannot_prefetch_an_oversized_trailer(self):
+        wire = compressed(trailer=b"x" * 1000)
+        body_end = 21 + len(zlib.compress(b"sample"))
+        for split in range(1, 21):
+            with self.subTest(split=split):
+                sock = FakeSocket([wire[:split], wire[split:]])
+                self.fails("invalid_frame", sock)
+                unread = b"".join(sock.chunks)
+                self.assertEqual(len(wire) - len(unread), body_end + 64)
+                self.assertEqual(unread, wire[body_end + 64:])
+
+    def test_already_buffered_bytes_after_marker_with_opaque_trailer_are_rejected(self):
+        self.fails("invalid_frame", FakeSocket([compressed(trailer=b"x" * 12) + b"extra"]))
+
+    def test_opaque_trailer_prefix_boundaries_match_sdk_shape(self):
+        body = "0\x01中文\x013".encode("utf-8")
+        for kind in ("96", "99"):
+            for prefix in (b"", b"\xffSECRET_TAIL", b"x" * 51):
+                with self.subTest(kind=kind, prefix_length=len(prefix)):
+                    wire = compressed(body, kind, trailer=prefix)
+                    self.assertEqual(bounded_send(FakeSocket([wire]), "request"),
+                                     wire[:21].decode("ascii") + body.decode("utf-8"))
+
+    def test_marker_every_split_after_12_byte_opaque_prefix(self):
+        for kind in ("96", "99"):
+            wire = compressed(kind=kind, trailer=b"\xffSECRET_TAIL")
+            for split in range(len(END) + 1):
+                with self.subTest(kind=kind, split=split):
+                    at = len(wire) - len(END) + split
+                    sock = FakeSocket([wire[:at], wire[at:]])
+                    self.assertEqual(bounded_send(sock, "request"), wire[:21].decode("ascii") + "sample")
+
+    def test_opaque_trailer_is_excluded_from_zlib_input(self):
+        make_decoder = zlib.decompressobj
+        inputs = []
+
+        class TrackingDecoder:
+            def __init__(self):
+                self.decoder = make_decoder()
+
+            def decompress(self, data, max_length):
+                inputs.append(bytes(data))
+                return self.decoder.decompress(data, max_length)
+
+            def __getattr__(self, name):
+                return getattr(self.decoder, name)
+
+        with patch.object(transport.zlib, "decompressobj", TrackingDecoder):
+            bounded_send(FakeSocket([compressed(trailer=b"\xffSECRET_TAIL")]), "request")
+        self.assertEqual(inputs, [zlib.compress(b"sample")])
+
+    def test_opaque_trailer_counts_towards_cumulative_wire_budget(self):
+        wire = compressed(trailer=b"x" * 51)
+        sock = FakeSocket([wire[:21], wire[21:-30], wire[-30:]])
+        self.fails("wire_limit", sock, max_wire=len(b"request\n") + len(wire) - 1)
+
+    def test_opaque_trailer_does_not_count_as_decoded_text(self):
+        wire = compressed(trailer=b"x" * 51)
+        self.assertEqual(bounded_send(FakeSocket([wire]), "request", max_decoded=27)[21:], "sample")
+
+    def test_opaque_trailer_keeps_absolute_deadline(self):
+        wire = compressed(trailer=b"x" * 12)
+        sock = FakeSocket([wire[:-25]] + [wire[index:index + 1] for index in range(len(wire) - 25, len(wire))],
+                          clock=self.clock, recv_delays=[0] + [1] * 25)
+        self.fails("deadline_exceeded", sock)
+        self.assertEqual(sock.recv_calls, 11)
+
+    def test_opaque_trailer_never_enters_output_or_safe_error(self):
+        for extra in (b"", b"extra"):
+            with self.subTest(extra=bool(extra)):
+                output = io.StringIO()
+                wire = compressed(trailer=b"\xffSECRET_TAIL") + extra
+                with contextlib.redirect_stdout(output), contextlib.redirect_stderr(output):
+                    if extra:
+                        error = self.fails("invalid_frame", FakeSocket([wire]))
+                        result = "".join(traceback.format_exception(error))
+                    else:
+                        result = bounded_send(FakeSocket([wire]), "request")
+                self.assertEqual(output.getvalue(), "")
+                self.assertNotIn("SECRET_TAIL", result)
 
     def test_bytes_after_control_terminator_are_rejected(self):
         self.fails("invalid_frame", FakeSocket([control() + b"extra"]))
@@ -216,7 +328,7 @@ class BoundedTransportTests(unittest.TestCase):
         self.assertEqual(sock.recv_calls, 0)
 
     def test_complete_response_received_after_deadline_is_rejected(self):
-        sock = FakeSocket([compressed()], clock=self.clock, recv_delays=[10])
+        sock = FakeSocket([compressed()], clock=self.clock, recv_delays=[0, 10])
         self.fails("deadline_exceeded", sock)
 
     def test_decompression_time_is_inside_deadline(self):

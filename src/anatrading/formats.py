@@ -47,7 +47,8 @@ def preflight(raw: bytes, format_id: str) -> None:
     """Reject non-market BaoStock material before its bytes may be persisted."""
     if format_id not in FORMAT_IDS:
         raise DecodeError("unsupported_format")
-    if format_id == FORMAT_IDS[2]:
+    if (format_id == FORMAT_IDS[2]
+            or isinstance(raw, bytes) and re.match(rb"[0-9]{2}\.[0-9]\.[0-9]{2}\x01", raw)):
         _bao_envelope(raw)
 
 

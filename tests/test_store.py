@@ -191,6 +191,32 @@ def test_structural_rejection_preserves_original_without_creating_snapshot(tmp_p
         assert store.list_snapshots() == []
 
 
+@pytest.mark.parametrize("format_id", module.FORMAT_IDS)
+def test_recognizable_control_file_cannot_bypass_preflight_with_another_format(tmp_path, capsys, format_id):
+    marker = b"SYNTHETIC_LOGIN_CONTROL_DO_NOT_PERSIST"
+    body = b"0\x01success\x01login\x01anonymous\x01" + marker
+    raw = f"00.9.10\x0101\x01{len(body):010d}".encode("ascii") + body
+    root = tmp_path / "root"
+    stages = []
+    source = tmp_path / "source.txt"
+    source.write_bytes(raw)
+    with EvidenceStore(root, checkpoint=stages.append) as store:
+        result = store.import_file(source, format_id)
+        assert result["status"] == "rejected"
+        assert result["error_code"] == "non_market_payload"
+        assert result["raw_sha256"] is None
+        assert store.list_snapshots() == []
+        assert "raw_published" not in stages
+        assert store.attempts()[0]["error_code"] == "non_market_payload"
+    assert not (root / "raw").exists()
+    assert not (root / "staging").exists()
+    for path in root.rglob("*"):
+        if path.is_file():
+            assert marker not in path.read_bytes()
+    captured = capsys.readouterr()
+    assert marker.decode("ascii") not in captured.out + captured.err
+
+
 def test_export_does_not_overwrite_different_existing_file(tmp_path):
     with EvidenceStore(tmp_path / "root") as store:
         snapshot = imported(store, [record()])

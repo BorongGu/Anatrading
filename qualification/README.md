@@ -1,6 +1,6 @@
 # 小样本数据资格探测
 
-当前状态：[自动取数探测](../docs/qualification/baostock-acquisition-results.md) 的139项本地测试和50个子用例通过，但首个真实跨页请求在帧结构校验处停止，后续空首屏和批量日线案例未执行。[D01结构诊断](../docs/qualification/FRAME_DIAGNOSTIC_PROTOCOL.md) 的57项测试通过，单次实测发现声明正文后另有12字节；尚未取得跨页行情，自动采集尚未放行。以下五组小样本工具保留为第一轮G1证据路径。
+当前状态：[自动取数验证](../docs/qualification/baostock-acquisition-results.md)经真实帧诊断和反方修正，P01取得2,784条5m数据（2页）；P02在record结构预检处停止，P03批量日线未执行。资格工具共218项测试及112子用例通过，生产自动采集尚未放行。以下五组小样本工具保留为第一轮G1证据路径。
 
 依据 [G1 协议](../docs/qualification/G1_PROTOCOL.md)，只读访问 BaoStock 官方匿名公共服务，固定五组小查询，每组独立进程、8 秒 socket 超时、35 秒总时限。成功取得数据仅记作 `captured_sample_not_qualified`，随后需独立对账；这是 G1 工具，未构成生产采集器。
 
@@ -24,7 +24,7 @@ python -m venv .venv
 
 捕获检查覆盖错误码、空结果、字段顺序、非字符串/残缺行和分页上限。它不验证全市场覆盖、交易日历、区间完整性、行情真值、可持续更新、授权再分发或历史可得性。SDK 元数据与逐行字段的差异必须交给独立审计处理，不自动修正。
 
-首批正式数据内核已按[独立合同](../docs/contracts/IMPLEMENTATION_DECISIONS.md)完成限定验收；本目录工具不写产品数据库。旧原型已存档，`web`仍冻结。
+首批正式数据内核已按[独立合同](../docs/contracts/IMPLEMENTATION_DECISIONS.md)完成限定验收；本目录工具不写产品数据库。旧原型已存档；图形单快照实施按[008评审](../docs/reviews/008-workbench-review.md)限定放行，界面仍待交付。
 
 第二轮离线边界测试使用项目开发依赖中的pytest（含子进程和fake socket，不发出行情请求）：
 

@@ -6,6 +6,7 @@ import zlib
 
 
 _END = b"<![CDATA[]]>\n"
+_MAX_TRAILER = 64
 _HEADER = re.compile(rb"[0-9]{2}\.[0-9]\.[0-9]{2}\x01([0-9A-F]{2})\x01([0-9]{10})")
 _CODES = {
     "invalid_limits", "invalid_message", "wire_limit", "decoded_limit", "deadline_exceeded",
@@ -46,11 +47,16 @@ def _exchange(sock, message, exchange_timeout, socket_timeout, max_wire, max_dec
     remaining()
     received = bytearray()
     kind = None
-    frame_length = None
+    body_end = None
     while True:
         sock.settimeout(remaining())
         # One extra byte detects a breached budget without reading an unbounded chunk.
-        chunk = sock.recv(min(8192, max_wire - len(outgoing) - len(received) + 1))
+        read_size = min(8192, max_wire - len(outgoing) - len(received) + 1)
+        if kind is None:
+            read_size = min(read_size, 21 - len(received))
+        elif body_end is not None:
+            read_size = min(read_size, body_end + _MAX_TRAILER - len(received))
+        chunk = sock.recv(read_size)
         remaining()
         if not chunk:
             raise BoundedTransportError("unexpected_eof")
@@ -65,16 +71,17 @@ def _exchange(sock, message, exchange_timeout, socket_timeout, max_wire, max_dec
             if kind in (b"9B", b"9D"):
                 raise BoundedTransportError("unsupported_compressed_type")
             if kind in (b"96", b"99"):
-                frame_length = 21 + int(match[2]) + len(_END)
-                if len(outgoing) + frame_length > max_wire:
+                body_end = 21 + int(match[2])
+                if len(outgoing) + body_end + len(_END) > max_wire:
                     raise BoundedTransportError("wire_limit")
-        if frame_length is not None:
-            if len(received) > frame_length:
-                raise BoundedTransportError("invalid_frame")
-            if len(received) == frame_length:
-                if not received.endswith(_END):
+        if body_end is not None:
+            terminator = received.find(_END, body_end, body_end + _MAX_TRAILER)
+            if terminator >= 0:
+                if terminator + len(_END) != len(received):
                     raise BoundedTransportError("invalid_frame")
                 break
+            if len(received) >= body_end + _MAX_TRAILER:
+                raise BoundedTransportError("invalid_frame")
         elif kind is not None:
             if len(received) > max_decoded:
                 raise BoundedTransportError("decoded_limit")
@@ -84,12 +91,12 @@ def _exchange(sock, message, exchange_timeout, socket_timeout, max_wire, max_dec
                     raise BoundedTransportError("invalid_frame")
                 break
     remaining()
-    if frame_length is not None:
+    if body_end is not None:
         body_budget = max_decoded - 21
         if body_budget < 0:
             raise BoundedTransportError("decoded_limit")
         decoder = zlib.decompressobj()
-        body = decoder.decompress(received[21:-len(_END)], body_budget + 1)
+        body = decoder.decompress(received[21:body_end], body_budget + 1)
         remaining()
         if len(body) > body_budget or decoder.unconsumed_tail:
             raise BoundedTransportError("decoded_limit")

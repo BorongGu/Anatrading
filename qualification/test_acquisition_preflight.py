@@ -41,6 +41,17 @@ def test_an_empty_valid_response_preserves_unknown_coverage():
     assert response["response_page"] == 1
 
 
+def test_changed_trailer_protocol_stops_before_any_worker_or_run_directory(tmp_path, monkeypatch):
+    from qualification import baostock_acquisition_probe as probe
+
+    monkeypatch.setattr(probe, "TRAILER_PROTOCOL_SHA256", "0" * 64)
+    monkeypatch.setattr(probe, "RUNS", tmp_path / "runs")
+    monkeypatch.setattr(probe.subprocess, "Popen", lambda *a, **k: pytest.fail("must not launch"))
+    with pytest.raises(SystemExit, match="trailer protocol fingerprint changed"):
+        probe.run(["P01"])
+    assert not probe.RUNS.exists()
+
+
 @pytest.mark.parametrize("channel", ["login", "logout", "history", "batch"])
 def test_worker_never_persists_control_payload_or_sdk_console_text(tmp_path, monkeypatch, capsys, channel):
     import baostock as sdk
@@ -89,6 +100,8 @@ def test_worker_never_persists_control_payload_or_sdk_console_text(tmp_path, mon
     monkeypatch.setattr(sdk, "query_daily_history_k_AStock", batch)
     probe.worker("P03" if channel == "batch" else "P02", tmp_path)
     status = json.loads((tmp_path / "status.json").read_bytes())
+    assert status["trailer_protocol_sha256"] == probe.TRAILER_PROTOCOL_SHA256
+    assert set(status["code_sha256"]) == {"baostock_acquisition_probe.py", "baostock_transport.py"}
     assert status["status"] == ("incomplete" if channel in {"history", "batch"} else "captured")
     assert len(list(tmp_path.glob("page-*-decoded.txt"))) == (0 if channel in {"history", "batch"} else 1)
     output = capsys.readouterr()
