@@ -344,6 +344,40 @@ class EvidenceStore:
         with self._mutex:
             return [dict(snapshot_id=s, batch_id=b, row_count=n) for s, b, n in self.db.execute("SELECT s.snapshot_id,s.batch_id,b.row_count FROM snapshots s JOIN batches b USING(batch_id) ORDER BY s.snapshot_id").fetchall()]
 
+    def snapshot_catalog(self, snapshot_id=None):
+        """Read stored directory metadata without loading observations or verifying raw files."""
+        if snapshot_id is not None and (not isinstance(snapshot_id, str) or not re.fullmatch("[0-9a-f]{64}", snapshot_id)):
+            raise StoreError("invalid_snapshot_id")
+        with self._mutex:
+            sql = "SELECT s.snapshot_id,s.batch_id,b.row_count,b.manifest_json,b.metadata_json FROM snapshots s JOIN batches b USING(batch_id)"
+            rows = self.db.execute(sql + (" WHERE s.snapshot_id=?" if snapshot_id is not None else " ORDER BY s.snapshot_id"),
+                                   [snapshot_id] if snapshot_id is not None else []).fetchall()
+            if snapshot_id is not None and not rows:
+                raise StoreError("snapshot_not_found")
+            return [dict(snapshot_id=s, batch_id=b, row_count=n, manifest=json.loads(manifest), metadata=json.loads(metadata))
+                    for s, b, n, manifest, metadata in rows]
+
+    def label_navigation(self, batch_id, cutoff=None, ordinal_start=None, ordinal_end=None):
+        """Label-only navigation after the caller has validated and verified its query."""
+        # Query bounds are Python integers; SQL ordinal storage is signed BIGINT.
+        if ordinal_start is not None and ordinal_start > 9223372036854775807:
+            return dict(previous_label=None, next_label=None)
+        if ordinal_end is not None:
+            ordinal_end = min(ordinal_end, 9223372036854775807)
+        where, parameters = "batch_id=? AND label IS NOT NULL", [batch_id]
+        for comparison, value in ((">=", ordinal_start), ("<=", ordinal_end)):
+            if value is not None:
+                where += f" AND ordinal{comparison}?"
+                parameters.append(value)
+        with self._mutex:
+            anchor = cutoff
+            if anchor is None:
+                anchor = self.db.execute("SELECT MAX(label) FROM observations WHERE " + where, parameters).fetchone()[0]
+            previous, following = self.db.execute(
+                "SELECT MAX(label) FILTER(WHERE label<?),MIN(label) FILTER(WHERE label>?) FROM observations WHERE " + where,
+                [anchor, anchor, *parameters]).fetchone()
+            return dict(previous_label=previous, next_label=following)
+
     @staticmethod
     def _quality(rows):
         counts = defaultdict(lambda: Counter(pass_=0, fail=0, not_evaluated=0))

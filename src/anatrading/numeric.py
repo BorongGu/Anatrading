@@ -24,7 +24,7 @@ def _number(value: str | Decimal | int, *, allow_text: bool) -> Decimal:
     if isinstance(value, bool) or not isinstance(value, allowed):
         raise NumericError("numeric_type")
     try:
-        number = Decimal(value, context=Context(traps=[InvalidOperation]))
+        number = value if type(value) is Decimal else Decimal(value, context=Context(traps=[InvalidOperation]))
     except InvalidOperation as error:
         raise NumericError("invalid_decimal") from error
     if not number.is_finite():

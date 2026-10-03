@@ -13,10 +13,19 @@ from .numeric import NumericError
 from .store import EvidenceStore, StoreError
 
 
+def _port(value):
+    number = int(value)
+    if not 1 <= number <= 65535:
+        raise argparse.ArgumentTypeError("端口须介于1与65535之间")
+    return number
+
+
 def _parser():
     parser = argparse.ArgumentParser(description="Anatrading 本地源值证据工作台")
     parser.add_argument("--root", type=Path, default=Path("data/local"), help="私有数据目录（默认 data/local）")
     commands = parser.add_subparsers(dest="command", required=True)
+    serve = commands.add_parser("serve", help="启动本机图形工作台")
+    serve.add_argument("--port", type=_port, default=8765, help="仅监听127.0.0.1（默认8765）")
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -43,6 +52,15 @@ def _parser():
 
 
 def _run(arguments):
+    if arguments.command == "serve":
+        import uvicorn
+        from .workbench import create_app
+
+        app = create_app(arguments.root, port=arguments.port)
+        print(f"准备启动 Anatrading：http://127.0.0.1:{arguments.port}", flush=True)
+        uvicorn.run(app, host="127.0.0.1", port=arguments.port, workers=1, loop="asyncio", http="h11",
+                    access_log=False, log_level="warning")
+        return {"status": "stopped"}
     if arguments.command == "restore":
         return EvidenceStore.restore(arguments.backup, arguments.destination)
     with EvidenceStore(arguments.root) as store:

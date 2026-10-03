@@ -2,7 +2,7 @@
 
 个人 A 股交易数据研究工具。优先**日线判断波段、分钟选择时机与复盘**，完整范围包括日内研究、中长期择时与组合。
 
-**总体方案、架构和首批数据合同已通过子 agent 反驳评审。** 当前实现 Windows 本地数据证据内核：保存原件、精确解码、冻结快照、按源标签查询、JSON/Parquet 导出、离线备份恢复。通达信公开历史文件和五份 BaoStock 响应已经过真实样本回归；当前客户端兼容、自动取数、图形界面和交易研究仍在后续验收范围内。
+**总体方案、架构和首批数据合同已通过子 agent 反驳评审。** 当前实现 Windows 本地数据证据内核及单快照浏览器工作台：保存原件、精确解码、冻结快照、源 OHLC／数量图、按源标签查询、JSON/Parquet 导出、离线备份恢复。通达信公开历史文件和五份 BaoStock 响应已经过真实样本回归；图形切片仍有性能与浏览器验收缺口，当前客户端兼容、自动取数和交易研究继续待验。
 
 - [总体方案](docs/MASTER_PLAN.md)：目标、功能全景、竞品对标、研究门禁、实施阶段、容量与验收。
 - [架构设计](docs/ARCHITECTURE.md)：模块职责、数据/时间/精度契约、自动接入、版本与研究可复现性。
@@ -20,6 +20,7 @@
 - [只读小样本探测工具](qualification/README.md)：固定案例、超时和私有证据目录，不构成生产采集器。
 - [自动取数接口验证](docs/qualification/baostock-acquisition-results.md) / [通达信本地SDK静态核查](docs/qualification/tdx-client-static.md) / [历史修订研究](docs/research/008-acquisition-and-revisions.md)。
 - [图形工作台合同](docs/contracts/WORKBENCH_CONTRACT.md) / [反方与实施范围](docs/reviews/008-workbench-review.md)：先单快照精确查看与导出，再日线／分钟联动。
+- [工作台集成验收](docs/qualification/workbench.md) / [独立实现复审](docs/reviews/009-workbench-implementation-review.md) / [HTTP 约定](docs/contracts/WORKBENCH_HTTP.md)：已测行为、失败路径及未通过项。
 
 用户已确定：Windows 本地优先；全市场日线 + 自选股票分钟；同花顺与通达信优先；真实软件数据验收；公开 GitHub 仓库。
 
@@ -27,13 +28,27 @@
 
 ## 本地运行
 
-已测环境：Windows 64位、Python 3.14.0、DuckDB 1.5.6、PyArrow 25.0.1。当前命令行只开放源值历史查询；数据单位、证券身份和历史可得性保留各自证据等级。
+已测环境：Windows 64位、Python 3.14.0、DuckDB 1.5.6、PyArrow 25.0.1。工作台使用 Node 24.15.0、npm 11.12.1 构建。当前只开放源值历史回顾；数据单位、证券身份和历史可得性保留各自证据等级。
 
 ```powershell
 py -3.14 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -c requirements-workbench.lock -e ".[dev]"
 .\.venv\Scripts\anatrading.exe --help
 ```
+
+构建后启动同源本地工作台，访问 `http://127.0.0.1:8765/`：
+
+```powershell
+Push-Location web
+npm ci
+npm run build
+Pop-Location
+.\.venv\Scripts\anatrading.exe --root .\data\local serve --port 8765
+```
+
+浏览器入口只接收现有三类格式，单文件最多 16 MiB；一次选择最多 20,000 条定位与无法定位记录。超过预算须明确设置源序号窗口。数值表、十字线与下载保留精确字符串；画布缩放只改变可视区域。服务持有数据根锁，运行期间同一根的 CLI 命令会被拒绝；退出服务后再使用 CLI。
+
+当前浏览器选文件尚未完成本机验收。可以先用下面的 CLI 导入，再启动工作台查看；勿同时对同一数据根启动两个进程。构建版 API 和页面均由 `serve` 提供，`npm run dev` 的独立 Vite 页面没有配置 API 代理。
 
 下面的源文件路径应替换为自己的文件。`tdx-public-text-v1` 仅接受已审计的1m/5m标题、列与页脚形状，不接受任意CSV。当前可选格式还有 `tdx-public-day-v1` 和 `baostock-decoded-v0.9.4`；后者读取已经捕获的行情解码响应，不会自动请求网络。
 
@@ -66,8 +81,14 @@ $imported
 
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 -m pytest tests -q
+Push-Location web
+node --test tests/*.test.mjs
+npm run build
+Pop-Location
 ```
 
 公开测试含合成异常输入；真实样本原件保持私有，缺少原件时相应回归会明确跳过。不能用干净克隆中的跳过结果替代本机真实样本验收，细项和当前计数见[内核验收报告](docs/qualification/evidence-core.md)。
 
-旧原型已经校验存档，Python内核按新合同重写；跨格式控制载荷预检修正后251项产品测试通过。图形合同已通过反方，单快照实施已获准，界面尚未交付。首批内核不代表G1/G2整体完成。下一步仍包括当前同花顺/通达信实际导出、受测接口自动更新、主数据与交易语义、日线/分钟联动界面，再按研究合同推进指标和策略评价。
+本轮 290 项 Python 产品测试全部通过，24 项前端测试与构建通过。真实浏览器已核日线／分钟源值、截止、JSON／Parquet 下载、异常记录和部分竞态／坏原件路径。七次顺序真实 HTTP 查询的 p95：4,995 行日线 0.464 秒、15,840 行分钟 1.373 秒、20,000 行人工输入 1.833 秒；后两组超过 500 毫秒目标。选文件、完整显示缩放、首次可交互与断网运行仍待补验，单快照切片尚未整体通过。
+
+旧原型已校验存档，当前实现按新合同推进。首批内核与图形实现不代表 G1/G2 整体完成。后续保留当前同花顺／通达信实际导出、受测接口自动更新、主数据与交易语义、日线／分钟联动，再按研究合同推进指标和策略评价。
