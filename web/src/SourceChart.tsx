@@ -17,7 +17,7 @@ export function recordStatusMarkers(status: string[][]): SeriesMarker<number>[] 
   });
 }
 
-export function SourceChart({ reply, onChoose, onError }: { reply: Reply; onChoose: (row: Row) => void; onError: () => void }) {
+export function SourceChart({ reply, onChoose, onError, visibleBars }: { reply: Reply; onChoose: (row: Row) => void; onError: () => void; visibleBars?: number }) {
   const host = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApiBase<number> | null>(null);
   const [hover, setHover] = useState<number | null>(null);
@@ -58,7 +58,9 @@ export function SourceChart({ reply, onChoose, onError }: { reply: Reply; onChoo
       };
       chart.subscribeCrosshairMove(event => setHover(event.point ? rowFor(event) : null));
       chart.subscribeClick(event => { const index = rowFor(event); if (index !== null) onChoose(reply.query.rows[index]); });
-      chart.timeScale().fitContent();
+      if (visibleBars && reply.query.rows.length > visibleBars) {
+        chart.timeScale().setVisibleLogicalRange({ from: reply.query.rows.length - visibleBars - 0.5, to: reply.query.rows.length - 0.5 });
+      } else chart.timeScale().fitContent();
     } catch {
       chart?.remove();
       chartRef.current = null;
@@ -66,7 +68,7 @@ export function SourceChart({ reply, onChoose, onError }: { reply: Reply; onChoo
       return;
     }
     return () => { chart?.remove(); chartRef.current = null; };
-  }, [reply, plot, onChoose, onError]);
+  }, [reply, plot, onChoose, onError, visibleBars]);
 
   return <section className="panel chart-panel" aria-label="源 OHLC 与源数量图">
     <div className="section-heading"><div><h2>源 OHLC <span className="muted">/ 源数量</span></h2><p>源记录序列 · 等距不代表时间间隔 · 坐标为近似显示</p></div>

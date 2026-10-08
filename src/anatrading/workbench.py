@@ -2,6 +2,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from datetime import date, timedelta
 from decimal import Decimal
 import hashlib
 import inspect
@@ -22,7 +23,7 @@ from .formats import FORMAT_IDS
 from .candle_geometry import geometry_report
 from .models import DecodeError
 from .numeric import NumericError
-from .store import EvidenceStore, StoreError
+from .store import EvidenceStore, StoreError, _identity
 from .tdx_acquisition import AcquireError, data_root_id
 from .tdx_market import read_minutes
 from .volume_at_time import volume_report
@@ -232,6 +233,65 @@ def _query_view(store, snapshot_id, selection):
     query = _bounded_query(store, snapshot_id, selection)
     navigation = store.label_navigation(query["batch_id"], **{key: selection.get(key) for key in ("cutoff", "ordinal_start", "ordinal_end")})
     return dict(query=query, geometry=geometry_report(query), display=[_display(row) for row in query["rows"]], navigation=navigation)
+
+
+def _pair_claim(metadata):
+    interpretation = metadata.get("interpretation", {})
+    codes, venues = set(), set()
+    for token in (metadata.get("source_code"), interpretation.get("instrument")):
+        if token is None:
+            continue
+        match = re.fullmatch(r"(?:(SH|SZ|BJ)\.)?([0-9]{6})(?:\.(SH|SZ|BJ))?", token.upper())
+        if match is None:
+            raise _RequestError("background_symbol_unavailable", 409)
+        codes.add(match[2])
+        venues.update(value for value in (match[1], match[3]) if value)
+    venues.update(str(value).upper() for value in (metadata.get("source_venue"), interpretation.get("venue")) if value)
+    if len(codes) > 1 or len(venues) > 1:
+        raise _RequestError("background_symbol_mismatch", 409)
+    if len(codes) != 1 or len(venues) != 1 or not venues <= {"SH", "SZ", "BJ"}:
+        raise _RequestError("background_symbol_unavailable", 409)
+    return next(iter(codes)), next(iter(venues))
+
+
+def _daily_background(store, minute_snapshot, daily_snapshot, ordinal, window=60):
+    if type(ordinal) is not int or ordinal < 1:
+        raise _RequestError("invalid_request")
+    if window is not None and (type(window) is not int or not 1 <= window <= _MAX_ROWS):
+        raise _RequestError("invalid_request")
+    minute_meta = store.snapshot_catalog(minute_snapshot)[0]["metadata"]
+    daily_meta = store.snapshot_catalog(daily_snapshot)[0]["metadata"]
+    if minute_meta.get("period") != "1m" or daily_meta.get("period") != "1d":
+        raise _RequestError("background_period_mismatch", 409)
+    if _pair_claim(minute_meta) != _pair_claim(daily_meta):
+        raise _RequestError("background_symbol_mismatch", 409)
+    if (minute_meta.get("instrument_id") and daily_meta.get("instrument_id")
+            and minute_meta["instrument_id"] != daily_meta["instrument_id"]):
+        raise _RequestError("background_symbol_mismatch", 409)
+    assets = {meta.get("interpretation", {}).get("asset_type") for meta in (minute_meta, daily_meta)} - {None}
+    if len(assets) > 1:
+        raise _RequestError("background_symbol_mismatch", 409)
+    anchor_query = _bounded_query(store, minute_snapshot, dict(ordinal_start=ordinal, ordinal_end=ordinal))
+    if not anchor_query["rows"]:
+        raise _RequestError("background_anchor_unlocated")
+    anchor_row = anchor_query["rows"][0]
+    anchor_date = date.fromisoformat(anchor_row["label"][:10])
+    cutoff = (anchor_date - timedelta(days=1)).isoformat()
+    selection = dict(cutoff=cutoff)
+    context = _bounded_query(store, daily_snapshot, selection)
+    if window is not None and len(context["rows"]) > window:
+        first_date = context["rows"][-window]["label"]
+        ordinals = [row["ordinal"] for row in context["rows"] if row["label"] >= first_date]
+        selection.update(ordinal_start=min(ordinals), ordinal_end=max(ordinals))
+    daily = _query_view(store, daily_snapshot, selection)
+    latest = daily["query"]["rows"][-1]["label"] if daily["query"]["rows"] else None
+    anchor = dict(snapshot_id=minute_snapshot, ordinal=ordinal, label=anchor_row["label"])
+    identity = dict(method_id="prior-source-date-background-v1", anchor=anchor, daily_query_id=daily["query"]["query_id"])
+    return dict(**identity, background_id=_identity(identity), daily=daily,
+                pairing_status="assumed_text_match", qualification="source_date_retrospective_only",
+                requested_rows=window, context_unlocated_rows=len(context["unlocated"]),
+                latest_source_date=latest,
+                calendar_gap_days=None if latest is None else (anchor_date - date.fromisoformat(latest)).days)
 
 
 def _geometry_export(store, snapshot_id, selection, expected_query, expected_geometry):
@@ -454,6 +514,16 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
             return volume_report(query, context, lookback)
 
         return JSONResponse(await owner.call(calculate))
+
+    @app.get("/api/daily-background/{snapshot_id}")
+    async def daily_background(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {"daily_snapshot", "ordinal", "window"}, ("daily_snapshot", "ordinal"))
+        try:
+            ordinal = int(parameters["ordinal"])
+            window = None if parameters.get("window") == "all" else int(parameters.get("window", "60"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+        return JSONResponse(await owner.call(lambda store: _daily_background(store, snapshot_id, parameters["daily_snapshot"], ordinal, window)))
 
     @app.post("/api/export/{snapshot_id}")
     async def export(snapshot_id: str, request: Request):

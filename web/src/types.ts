@@ -72,5 +72,12 @@ export interface VolumeReport {
   rows: VolumeRow[]; unlocated: VolumeRow[];
 }
 export interface Reply extends GeometryEnvelope { display: Display[]; navigation: { previous_label: string | null; next_label: string | null } }
+export interface DailyBackgroundReport {
+  method_id: 'prior-source-date-background-v1'; background_id: string; daily_query_id: string;
+  anchor: { snapshot_id: string; ordinal: number; label: string };
+  pairing_status: 'assumed_text_match'; qualification: 'source_date_retrospective_only';
+  latest_source_date: string | null; calendar_gap_days: number | null; daily: Reply;
+  requested_rows: number | null; context_unlocated_rows: number;
+}
 export interface Config { csrf_token: string; formats: string[]; max_upload_bytes: number; max_query_rows: number; mode: string }
 export interface Attempt { attempt_id: string; status: string; snapshot_id?: string | null; error_code?: string | null; filename?: string; started_at?: string; format_id?: string }
