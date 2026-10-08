@@ -23,7 +23,8 @@ from .candle_geometry import geometry_report
 from .models import DecodeError
 from .numeric import NumericError
 from .store import EvidenceStore, StoreError
-from .tdx_acquisition import data_root_id
+from .tdx_acquisition import AcquireError, data_root_id
+from .tdx_market import read_minutes
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -44,6 +45,8 @@ _STORE_CODES = {
     "integer_range", "sum_precision", "sum_range", "storage_io_error", "database_error", "internal_error",
     "process_interrupted",
     "invalid_tdx_http_capture", "invalid_tdx_http_response", "invalid_tdx_http_rows",
+    "client_fingerprint_changed", "client_architecture_changed", "client_identity_unavailable",
+    "source_path_outside_client", "source_file_limit", "http_result_unknown", "response_limit", "invalid_response",
 }
 
 
@@ -58,7 +61,7 @@ def _safe_store_call(operation):
         return operation()
     except _RequestError:
         raise
-    except (StoreError, DecodeError, NumericError) as error:
+    except (StoreError, DecodeError, NumericError, AcquireError) as error:
         code = error.code if error.code in _STORE_CODES else "internal_error"
     except OSError:
         code = "storage_io_error"
@@ -385,6 +388,44 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
             if attempt.get("error_code") is not None and attempt["error_code"] not in _STORE_CODES:
                 attempt = {**attempt, "error_code": "internal_error"}
             return {"attempt": attempt}
+        finally:
+            if not submitted:
+                upload_busy = False
+
+    @app.post("/api/read-tdx-minutes")
+    async def read_tdx_minutes(request: Request):
+        nonlocal upload_busy
+        parameters = _parameters(request, {"symbol", "count", "end_time"}, ("symbol",))
+        try:
+            count = int(parameters.get("count", "720"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+        if not 1 <= count <= _MAX_ROWS:
+            raise _RequestError("invalid_request")
+        async for chunk in request.stream():
+            if chunk:
+                raise _RequestError("invalid_request")
+        if not owner.accepting:
+            raise _RequestError("service_closing", 503)
+        if upload_busy:
+            raise _RequestError("upload_in_progress", 409)
+        symbol = parameters["symbol"]
+
+        def operation(store):
+            raw = read_minutes(Path(r"D:\tdx_64"), symbol, count=count, end_time=parameters.get("end_time", ""))
+            return store.import_bytes(raw, "tdx-http-market-v1", filename=f"{symbol}.http.json",
+                                      interpretation={"instrument": symbol, "venue": symbol[-2:], "asset_type": "stock"})
+
+        def finished(future):
+            nonlocal upload_busy
+            upload_busy = False
+
+        upload_busy, submitted = True, False
+        try:
+            future = owner.submit(operation)
+            future.add_done_callback(finished)
+            submitted = True
+            return {"attempt": await asyncio.shield(future)}
         finally:
             if not submitted:
                 upload_busy = False

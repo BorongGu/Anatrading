@@ -35,6 +35,10 @@ export default function App() {
   const [file, setFile] = useState<File | null>(null);
   const [format, setFormat] = useState('tdx-public-text-v1');
   const [declarations, setDeclarations] = useState<Record<string, string>>({});
+  const [minuteCode, setMinuteCode] = useState('600059');
+  const [minuteMarket, setMinuteMarket] = useState('SH');
+  const [minuteCount, setMinuteCount] = useState('720');
+  const [minuteEnd, setMinuteEnd] = useState('');
   const gate = useRef(new Generation());
   const abort = useRef<AbortController | null>(null);
 
@@ -126,6 +130,27 @@ export default function App() {
     } finally { setImporting(false); }
   }
 
+  async function readMinuteData(event: FormEvent) {
+    event.preventDefault();
+    if (!config || importing) return;
+    const generation = invalidate(); setImporting(true); setNotice('正在读取通达信分钟数据…');
+    const parameters = new URLSearchParams({ symbol: `${minuteCode.trim()}.${minuteMarket}`, count: minuteCount });
+    if (minuteEnd) parameters.set('end_time', minuteEnd.replaceAll('-', '') + '150000');
+    try {
+      const result = await jsonRequest<{ attempt: Attempt }>(`/api/read-tdx-minutes?${parameters}`, {
+        method: 'POST', headers: { 'X-Anatrading-Token': config.csrf_token },
+      });
+      const attempt = result.attempt;
+      setNotice(`分钟数据${statusNames[attempt.status] ?? attempt.status}${attempt.error_code ? ` · ${explain(new Error(attempt.error_code))}` : ''}`);
+      const catalog = await refreshCatalog();
+      if (attempt.status === 'committed' && attempt.snapshot_id && catalog && gate.current.isCurrent(generation)) {
+        await loadQuery({ ...emptySelection, snapshot: attempt.snapshot_id }, catalog);
+      }
+    } catch (error) {
+      setNotice(`${explain(error)} 若连接中断，请刷新尝试账本核对读取结果。`);
+    } finally { setImporting(false); }
+  }
+
   async function exportSelection(format: 'json' | 'parquet' | 'geometry') {
     if (!reply || replyRef.current !== reply || !config || exporting || phase !== 'ready') return;
     const generation = gate.current.current();
@@ -184,6 +209,18 @@ export default function App() {
           </button>)}
           {!snapshots.length && <div className="sidebar-empty">尚无已提交快照。<br />先导入一份支持的原始文件。</div>}
         </div>
+        <details className="import-panel" open><summary>读取通达信分钟数据</summary>
+          <form onSubmit={readMinuteData}>
+            <label>股票代码<input value={minuteCode} onChange={event => setMinuteCode(event.target.value)} pattern="[0-9]{6}" maxLength={6} required disabled={!config || importing} /></label>
+            <label>市场<select value={minuteMarket} onChange={event => setMinuteMarket(event.target.value)} disabled={!config || importing}>
+              <option value="SH">上海</option><option value="SZ">深圳</option><option value="BJ">北京</option>
+            </select></label>
+            <label>分钟条数<input type="number" min="1" max={config?.max_query_rows ?? 20000} value={minuteCount} onChange={event => setMinuteCount(event.target.value)} required disabled={!config || importing} /></label>
+            <label>截止日期（留空取最新）<input type="date" value={minuteEnd} onChange={event => setMinuteEnd(event.target.value)} disabled={!config || importing} /></label>
+            <p className="subtle">先打开并登录通达信。读取1分钟数据，原值独立保存。</p>
+            <button className="primary" disabled={!config || importing}>{importing ? '处理中…' : '读取并查看K线'}</button>
+          </form>
+        </details>
         <details className="import-panel" open={!snapshots.length}><summary>导入原始文件</summary>
           <form onSubmit={importFile}>
             <label>文件格式<select value={format} disabled={!config || importing} onChange={event => setFormat(event.target.value)}>
