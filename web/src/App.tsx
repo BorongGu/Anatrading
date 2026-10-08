@@ -4,6 +4,7 @@ import { checkedFetch, explain, jsonRequest, verifiedExportBlob, verifiedGeometr
 import { assertReply, Generation, queryParameters } from './model.ts';
 import { SourceChart } from './SourceChart.tsx';
 import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
+import { VolumeAnalysis } from './VolumeAnalysis.tsx';
 import { fields, fieldNames } from './types.ts';
 import type { Attempt, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
 
@@ -286,6 +287,7 @@ export default function App() {
           </section>
           <section className="panel detail-panel"><div className="section-heading"><h2>固定记录详情</h2>{selected && <button className="quiet" onClick={() => setSelected(null)}>清除</button>}</div>
             {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
+          {q.metadata.period === '1m' && <VolumeAnalysis query={q} selected={selected} />}
           <QualityDetails query={q} />
         </>}
         <footer>本地研究工具 · 单快照证据切片<span>图表由 <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a> 提供 · <a href="/licenses/lightweight-charts.LICENSE.txt" target="_blank" rel="noreferrer">Apache 2.0</a> · <a href="/licenses/lightweight-charts.NOTICE.txt" target="_blank" rel="noreferrer">NOTICE</a></span></footer>

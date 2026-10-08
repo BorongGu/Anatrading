@@ -25,6 +25,7 @@ from .numeric import NumericError
 from .store import EvidenceStore, StoreError
 from .tdx_acquisition import AcquireError, data_root_id
 from .tdx_market import read_minutes
+from .volume_at_time import volume_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -434,6 +435,25 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
     async def query(snapshot_id: str, request: Request):
         selection = _selection(_parameters(request, _SELECTION))
         return JSONResponse(await owner.call(lambda store: _query_view(store, snapshot_id, selection)))
+
+    @app.get("/api/volume/{snapshot_id}")
+    async def volume(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "lookback"})
+        selection = _selection(parameters)
+        try:
+            lookback = int(parameters.get("lookback", "20"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+        if not 2 <= lookback <= 252:
+            raise _RequestError("invalid_request")
+
+        def calculate(store):
+            query = _bounded_query(store, snapshot_id, selection)
+            context = _bounded_query(store, snapshot_id, {key: value for key, value in selection.items()
+                                                        if key in {"cutoff", "mode"}})
+            return volume_report(query, context, lookback)
+
+        return JSONResponse(await owner.call(calculate))
 
     @app.post("/api/export/{snapshot_id}")
     async def export(snapshot_id: str, request: Request):

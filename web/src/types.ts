@@ -55,6 +55,22 @@ export interface GeometryReport {
   rows: GeometryRow[]; unlocated: GeometryRow[];
 }
 export interface GeometryEnvelope { query: Query; geometry: GeometryReport }
+export interface VolumeFraction { numerator: string; denominator: string; display: string }
+export interface VolumeComparison {
+  current: string | null; baseline_sum: string | null; baseline_mean: VolumeFraction | null;
+  ratio: VolumeFraction | null; reason: string | null;
+  members: { date: string; value: string | null; reason: string | null }[];
+}
+export interface VolumeRow {
+  ordinal: number; history_dates: string[]; regular: VolumeComparison | null;
+  cumulative: VolumeComparison | null; reason: string | null;
+}
+export interface VolumeReport {
+  method_id: 'source-volume-at-time-v1'; query_id: string; context_query_id: string; volume_id: string;
+  qualification: 'conditional_source_values'; lookback: number;
+  excluded_unlocated_rows: number; outside_template_rows: number;
+  rows: VolumeRow[]; unlocated: VolumeRow[];
+}
 export interface Reply extends GeometryEnvelope { display: Display[]; navigation: { previous_label: string | null; next_label: string | null } }
 export interface Config { csrf_token: string; formats: string[]; max_upload_bytes: number; max_query_rows: number; mode: string }
 export interface Attempt { attempt_id: string; status: string; snapshot_id?: string | null; error_code?: string | null; filename?: string; started_at?: string; format_id?: string }
