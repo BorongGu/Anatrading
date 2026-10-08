@@ -34,6 +34,8 @@ def _parser():
     acquire.add_argument("--port", type=_port, default=8765)
     due = commands.add_parser("acquire-tdx-due", help="执行有限日线计划的到期槽或只读恢复")
     due.add_argument("--plan", type=Path, required=True, help="已核验的私有计划绝对路径")
+    recovery = commands.add_parser("recover-tdx", help="核证原客户端会话终态并只封结旧刷新，不下载")
+    recovery.add_argument("--client-directory", type=Path, required=True)
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -61,6 +63,10 @@ def _parser():
 
 
 def _run(arguments):
+    if arguments.command == "recover-tdx":
+        from .tdx_recovery import recover
+
+        return recover(arguments.client_directory)
     if arguments.command == "acquire-tdx-due":
         from .tdx_schedule import due
 
@@ -72,7 +78,7 @@ def _run(arguments):
                          arguments.target_date, port=arguments.port)
         return {key: result[key] for key in ("status", "error_code", "evidence_directory", "capture_state",
                 "target_observed", "coverage", "units", "raw_sha256", "snapshot_id", "attempt_id",
-                "reconciled", "reused") if key in result}
+                "reconciled", "reused", "run_id", "recovery_version", "source_status", "client_task_cancelled") if key in result}
     if arguments.command == "serve":
         import uvicorn
         from .workbench import create_app

@@ -156,6 +156,7 @@ def _file_hash(path, limit):
     total, digest = 0, hashlib.sha256()
     with path.open("rb") as source:
         while chunk := source.read(65536):
+            _remaining()
             total += len(chunk)
             if total > limit:
                 raise AcquireError("source_file_limit")
@@ -444,6 +445,11 @@ def acquire(root, client_directory, symbol, target_date, *, port=8765):
         control = _read_control(state, client_directory)
         if control is not None and control["active"] is not None:
             raise AcquireError("schedule_dispatch_unresolved")
+        from .tdx_recovery import recovery_gate
+
+        recovered = recovery_gate(state, client_directory)
+        if recovered is not None:
+            return recovered
         current = state / "current.json"
         if current.exists():
             old = _journal(current, client_directory)
@@ -452,10 +458,7 @@ def acquire(root, client_directory, symbol, target_date, *, port=8765):
                     if old["data_root_id"] != data_root_id(root) or old["port"] != port:
                         raise AcquireError("acquisition_target_mismatch")
                     return _recover_locked(old, state)
-                if _client_identity(client_directory) == old["identity"]:
-                    raise AcquireError("client_task_unresolved")
-                old.update(status="failed", error_code="prior_listener_session_changed", client_task_cancelled="not_proven")
-                _save(old, state)
+                raise AcquireError("client_task_unresolved")
         return _collect_locked(root, client_directory, symbol, target_date, port, state)
 
 

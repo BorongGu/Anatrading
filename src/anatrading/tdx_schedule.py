@@ -297,6 +297,17 @@ def due(plan_path, *, now=None):
         state.mkdir(parents=True, exist_ok=True)
         with _DirectoryLock(state):
             control = _read_control(state, client)
+            if control is not None:
+                if control["plan_hash"] != _identity(plan):
+                    raise AcquireError("schedule_plan_mismatch")
+                if control["active"] is not None:
+                    observed = _observe(control, state, clock)
+                    return _summary(control, observed, _recover_active(control, state, client))
+            from .tdx_recovery import recovery_gate
+
+            recovered = recovery_gate(state, client)
+            if recovered is not None:
+                return {**recovered, "plan_hash": _identity(plan)}
             if control is None:
                 _host_clock(observed)
                 control = dict(schema=1, plan=plan, plan_hash=_identity(plan), last_observed_utc=observed.isoformat(),

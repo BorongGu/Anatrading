@@ -1,6 +1,6 @@
-# 客户端未知刷新恢复方案 v0.1
+# 客户端未知刷新恢复方案 v0.2
 
-2026-10-08。用户要求持续免手工下载。此文仅提出恢复设计，不解冻产品代码、生产状态修改或新行情请求；须另经独立子 agent rebuttal、修订及根方决定。恢复通过后仍需正式日线任务、长期日历、工作台生命周期和全市场/自选分钟资格，不能把一次恢复称为持续自动更新完成。
+2026-10-08。用户要求持续免手工下载。根据[036反方](../reviews/036-tdx-acquisition-recovery-plan-review.md)三项 P1 修订；具体状态、原生证据和大小/路径边界见[实现合同](TDX_ACQUISITION_RECOVERY_IMPLEMENTATION.md)。两份文档待独立复审与根方决定，不解冻产品代码、生产状态修改或新行情请求。恢复通过后仍需正式日线任务、长期日历、工作台生命周期和全市场/自选分钟资格，不能把一次恢复称为持续自动更新完成。
 
 ## 当前只读事实
 
@@ -28,18 +28,20 @@
 
 ## 最小安全路线
 
-首切片仅恢复**无调度 active 的旧 preparing/refresh_unknown**，适用于当前真实分钟 unknown。不恢复 publication_unknown，不删除控制标记，不关闭 reserved/linked/dispatch_unknown，不自动终止/重启客户端，不增行情方法，不运行 SDK，不打开数据库。当前 client-global 锁、journal、原 run 证据目录和唯一写者保持。
+首切片仅恢复**无调度 active、无 dispatch_id/plan_hash/slot_id 字段的旧 preparing/refresh_unknown**，适用于当前真实分钟 unknown。原身份必须完整；scheduled 空 identity preparing 拒绝。不恢复 publication_unknown，不删除控制标记，不关闭 reserved/linked/dispatch_unknown，不自动终止/重启客户端，不增行情方法，不运行 SDK，不打开数据库。当前 client-global 锁、journal、原 run 证据目录和唯一写者保持。
 
-新增显式 `recover-tdx --client-directory <绝对路径>`，不接收新的 root、股票或日期，不开始采集；旧目标完全从严格已验 journal 获取。恢复成功只封结旧运行，本次行情/工作台 HTTP 均为零。后续一次 due 才可保留并采集新的日线槽。正式自动任务应先执行同一恢复门禁：无法证明则返回具体阻断；证明后本次结束，下次调度才新派发，避免一次恢复混入新业务。
+新增显式 `recover-tdx --client-directory <绝对路径>`，不接收新的 root、股票或日期，不开始采集；旧目标完全从严格已验 journal 获取。三入口共用锁内 early gate，早于 acquire 新 run，以及 due 初始化控制、更新时钟、reserve 槽。发现未完成恢复时，本次无论完成/未就绪/异常立即结束，行情/工作台 HTTP、新 run、新槽和 control 写入均为零。已有合法无 active control 原样保留。
 
-同一门禁也应在普通 acquire 的旧 unknown 分支复用，关闭当前“身份不等即封结并立即采集”的旁路；这属于有意收紧旧行为，需负例与反方批准，不能只给新命令增加严格检查而保留旧旁路。
+恢复已完成时，recover 幂等返回；acquire/due 通过完整 checkpoint/tag 验证后可继续原正常路径。检查点只属于 current 引用的 run；新 run 替换 current 后不扫描历史恢复文件。这样下一次 due 可以采集，不形成每次恢复均提前返回的永久零请求循环。
+
+关闭普通 acquire 当前“身份不等即封结并立即采集”的旁路。此合同获准后覆盖 U1 的这一宽松规则和 U4 的“due 永远不核会话终态”规则；scheduled active 和发布核账保护保持。变化须经负例及反方批准。
 
 ### 允许的会话终态证据
 
 锁内先核 marker/dispatch 合法且无 active，current/receipt 严格相同、原目录合法且同 run、原身份与已验指纹有效。再检查原 PID 与当前唯一监听：
 
-1. 通过有界原生进程查询独立证明**保存 PID/启动时刻对应的原进程已终态**。可接受成功查询的原进程句柄 signaled；或明确的进程不存在；或保存 PID 已重用且原生 creation FILETIME 对应另一启动时刻。拒绝仅 Get-Process 无输出、权限不足、观测异常、超时或路径变化等不明确情况。对保存的 UTC 时刻保留 100ns 精度转换，禁止浮点/微秒截断把同进程误判为 PID 重用。
-2. 当前监听必须是已验路径、EXE/SDK 指纹、AMD64 的唯一 127.0.0.1:17709 拥有者，且与原会话不同；恢复前后两次核其 PID/原生启动 FILETIME/路径与指纹一致。新监听缺失、原进程仍活、多个监听或身份变化一律保留未知。
+1. 通过有界原生查询独立证明**保存 PID/启动时刻对应的原进程已终态**。PID 须为正 DWORD 整数；OpenProcess 使用 SYNCHRONIZE|PROCESS_QUERY_LIMITED_INFORMATION，GetProcessTimes、WaitForSingleObject(0)，每路径 CloseHandle。OpenProcess 错误87单独不证明不存在，须再成功创建 Toolhelp 全进程快照并完整枚举至 ERROR_NO_MORE_FILES=18，1—16384项且不含原PID，才接受 absence。成功打开且 creation FILETIME 不同支持 PID 重用；相同 creation 且 WAIT_OBJECT_0 支持终态；其它错误停止。原 started 按整数日期/时区/最多7位小数转换为 100ns FILETIME，禁止浮点 timestamp 或微秒截断。
+2. 当前监听必须是已验路径、EXE/SDK 指纹、AMD64 的唯一 127.0.0.1:17709 拥有者，且与原会话不同；**修改 journal 前**两次核其 PID/原生启动 FILETIME/路径与指纹一致。两次各独立核原会话终态，新监听缺失、原进程仍活、多个监听或身份变化一律保留未知。两份证据先封存 checkpoint，才可写 journal；没有 journal 已终态但第二核证尚未完成的路径。
 3. 保存本次原进程终态证据和新监听身份、UTC 观测时间、旧 current/receipt 哈希。仅将旧 run 置 failed，建议 error_code=`prior_listener_session_ended`，保留 `client_task_cancelled="not_proven"`；含义是旧客户端进程终态后不再由该原进程继续任务，**不证明分钟下载完成、已成功取消请求或外部结果回滚**。原分钟响应、缓存观察、coverage 和单位原样保留。
 
 没有新监听时可只报告“原进程已终态、客户端尚未就绪”，本切片不修改生产状态；在下次自然登录后重新核证。持续使用时仅需通常的首次/失效登录，不能把反复手工下载、每周编辑计划或重启客户端列为长期自动化流程。
@@ -50,18 +52,15 @@ U3 已审接口没有任务状态查询、取消确认或可关联到 run 的权
 
 ## 落盘、崩溃与重复调用
 
-复用 `_save` 的 receipt→current 顺序，必须正视两文件之间中止。方案建议先在**原 run 证据目录**持久一个有界 `recovery.json`，包含完整原 unknown 记录、其原字节哈希、完整拟封结记录和终态观察；一次只关联该 run，不建新全局状态库。具体字段与大小须在实现合同冻结。
+先在**原 run 证据目录**原子封存一个 immutable `recovery.json`，再按 receipt→current 顺序分别临时写入/fsync/replace。journal 各最大64KiB，checkpoint 最大256KiB；保存原始字节 base64/SHA、新字节 SHA 和两次原生证据。strict UTF-8、所有层级重复键和非有限数拒绝。原始字节严格解码及非终态旧身份有效；new 机械生成，只允许 status/error_code/client_task_cancelled/recovery_version 四字段变更。root/run/client/state/全部证据路径均须规范绝对并严格绑定。
 
-- 写 recovery 前 current/receipt 必须字节哈希和严格解码记录相符。先 fsync recovery，再写原 receipt/current；不创建新 run 或槽。
-- 重复调用有 recovery 时，仅接受两份记录各自等于已保存的原记录或拟封结记录；重新核原进程已终态及新监听就绪，再完成同一封结。其它差异、缺失、损坏或关联错误拒绝，绝不覆盖成新的任务。
-- 两文件均为拟封结记录时返回同一恢复结果，零 POST。旧记录/原字节留在 recovery 中，旧运行编号、证据和失败语义保留。
-- 不允许单独靠 recovery 文件存在解锁；缺少当前独立终态证据仍停止。恢复文件损坏不得删除重试。
+检查点已存在不得覆盖。重新进入时两个 journal 必须分别为 exact old 或机械生成的 exact new；O/O、N/O、O/N 为未完成，三入口重新核原终态/新监听，只完成原 run，并立即返回。N/N 为完成，不额外写完成标记；recover 幂等，acquire/due 下次可正常继续。缺失/第三种字节/损坏拒绝；terminal 带 recovery_version 但丢 checkpoint 仍阻断。候选 new 必须精确等于由已验 old 机械生成结果，不能依赖终态 validator 放宽旧身份。
 
-该检查点是建议，独立反方需重点审查是否可进一步直接复用既有收据且仍覆盖双写中止。root 决定前不增加文件或修改状态。
+checkpoint 临时写入中止、receipt/current 两次 replace 前后中止、期限耗尽的全部状态与三入口行为在实现合同列明。只保存临时文件不会完成恢复；不按超时推定外部任务终结。不改旧来源字段、原件或记录编号，不建状态数据库。
 
 ## 验收与后续真实执行门禁
 
-先写异常输入与故障用例，至少覆盖：同 PID/时刻仍活、旧进程活而监听已转移、PID 重用、原进程 query 权限拒绝/超时、100ns 启动精度、监听重复/消失/前后变化、指纹/路径错误、current/receipt 损坏或不一致、active/单边 marker、跨 run 伪关联、recovery 写入及两次 journal 写入各断点、重复恢复零请求、旧字段不改、恢复不消耗新槽，普通 acquire 无旧旁路。所有注入用临时目录，不修改当前生产 state。
+先写异常输入与故障用例，覆盖036全部三P1：三入口各持久断点、missing checkpoint+terminal tag、old/new各组合、root/run/state绑定、非白名单差异、scheduled 字段残留、严格字节/JSON大小、PID/DWORD/100ns/原生错误、句柄释放和总60秒恢复预算；再验恢复当次零HTTP/新run/槽/control修改，以及下次due可派发、recover幂等、历史checkpoint不阻断新run。所有注入用临时目录，不修改当前生产 state。
 
 独立代码反方通过后，真实恢复资格先只读重新核现场。仍为原活跃会话就明确阻断，不能为取得绿色结果强停客户端。只有自然会话更换或之后获授权并有独立终态证据的确切操作，才能在已审预算下执行一次恢复；前后检查全部原件、旧记录与零 HTTP 计数。再另审生产计划精确注册及一次日线新采集；U1/U2 的历史成功不能替代这次实际资格。
 

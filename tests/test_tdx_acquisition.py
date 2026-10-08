@@ -93,10 +93,13 @@ def test_wrong_workbench_root_stops_before_refresh(module, tmp_path, monkeypatch
 
 @pytest.fixture
 def environment(module, tmp_path, monkeypatch):
-    root, client_directory, state = tmp_path / "root", tmp_path / "client", tmp_path / "state"
+    root, client_directory = tmp_path / "root", tmp_path / "client"
+    local_appdata = tmp_path / "local-appdata"
+    monkeypatch.setenv("LOCALAPPDATA", str(local_appdata))
+    state = local_appdata / "Anatrading" / "acquisition" / module.data_root_id(client_directory)
     cache = client_directory / "vipdoc" / "sh" / "lday" / "sh600059.day"
     cache.parent.mkdir(parents=True)
-    state.mkdir()
+    state.mkdir(parents=True)
     web = tmp_path / "web"
     web.mkdir()
     (web / "index.html").write_text("<title>Synthetic acquisition</title>", encoding="utf-8")
@@ -106,6 +109,11 @@ def environment(module, tmp_path, monkeypatch):
                 "sdk_sha256": "241358919fd394751a46bb51d64374eb0216f7c22bfa47bc13c48418ba26b1b0"}
     monkeypatch.setattr(module, "_state_directory", lambda directory: state)
     monkeypatch.setattr(module, "_client_identity", lambda directory: dict(identity))
+    session = importlib.import_module("anatrading.tdx_session")
+    started_filetime = session.creation_filetime(identity["started"])
+    monkeypatch.setattr(session, "process_observation", lambda pid: {
+        "state": "alive", "creation_filetime": started_filetime,
+        "census_count": None, "census_complete": None, "open_error": None})
     app = create_app(root, web_directory=web)
     with TestClient(app, base_url="http://127.0.0.1:8765") as client:
         class Environment:
@@ -220,14 +228,17 @@ def test_uncertain_refresh_blocks_same_and_other_root_without_new_post(environme
     assert env.posts(8765) == []
 
 
-def test_refresh_identity_change_stops_then_allows_proven_new_session(environment):
+def test_listener_identity_change_with_old_process_alive_keeps_refresh_unknown(environment):
     env = environment
     env.refresh_fault = "session"
     assert env.acquire()["status"] == "refresh_unknown"
     assert len(env.posts(17709)) == 1 and env.posts(8765) == []
     env.refresh_fault = None
-    assert env.acquire()["status"] == "committed"
-    assert len(env.posts(17709)) == 2 and len(env.posts(8765)) == 1
+    before = (env.state / "current.json").read_bytes()
+    env.calls.clear()
+    assert env.acquire()["status"] == "refresh_unknown"
+    assert env.calls == []
+    assert (env.state / "current.json").read_bytes() == before
 
 
 def test_client_global_lock_blocks_cross_root_before_network(environment):
