@@ -1,4 +1,5 @@
 """Bounded local daily capture; publication uses the workbench's existing writer."""
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 import hashlib
@@ -27,12 +28,31 @@ _EXE_SHA = "4c822464613fabe4b4235edf171b031d8b209ef68bd7d06dea403e1cd54c1fad"
 _SDK_SHA = "241358919fd394751a46bb51d64374eb0216f7c22bfa47bc13c48418ba26b1b0"
 _SYMBOLS = {"600059.SH", "000001.SZ"}
 _TERMINAL = {"committed", "failed", "not_covered"}
+_deadline = ContextVar("tdx_acquisition_deadline", default=None)
+_post_guard = ContextVar("tdx_acquisition_post_guard", default=None)
 
 
 class AcquireError(ValueError):
     def __init__(self, code, raw=b""):
         self.code, self.raw = code, raw
         super().__init__(code)
+
+
+def _remaining(limit=None):
+    deadline = _deadline.get()
+    if deadline is None:
+        return limit
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise AcquireError("acquisition_deadline")
+    return remaining if limit is None else min(limit, remaining)
+
+
+def _request(port, method, path, body=b"", headers=None, *, budget=15):
+    _remaining()
+    if method == "POST" and _post_guard.get() is not None:
+        _post_guard.get()()
+    return _http(port, method, path, body, headers, budget=_remaining(budget))
 
 
 def data_root_id(root):
@@ -95,6 +115,9 @@ def _http(port, method, path, body=b"", headers=None, *, budget=15):
             active_socket.settimeout(duration)
 
         remaining()
+        if method == "POST" and _post_guard.get() is not None:
+            _post_guard.get()()
+            remaining()
         connection.request(method, path, body=body, headers=headers or {})
         remaining()
         response = connection.getresponse()
@@ -166,7 +189,7 @@ $probeOwner=Get-Process -Id $probeListeners[0].OwningProcess
     try:
         observed = subprocess.run([r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
                                    "-NoProfile", "-NonInteractive", "-Command", command],
-                                  capture_output=True, timeout=8, creationflags=subprocess.CREATE_NO_WINDOW)
+                                  capture_output=True, timeout=_remaining(8), creationflags=subprocess.CREATE_NO_WINDOW)
     except subprocess.TimeoutExpired:
         raise AcquireError("client_identity_unavailable") from None
     if observed.returncode:
@@ -180,6 +203,7 @@ $probeOwner=Get-Process -Id $probeListeners[0].OwningProcess
 
 
 def _capture(path):
+    _remaining()
     def read():
         before = path.stat()
         if not 0 < before.st_size <= _MAX_BYTES or before.st_size % 32:
@@ -204,6 +228,7 @@ def _capture(path):
         raise AcquireError("cache_unstable") from None
     if first != second or signature != next_signature:
         raise AcquireError("cache_unstable")
+    _remaining()
     return first
 
 
@@ -242,7 +267,7 @@ def _parameters(symbol, target_date, port):
 
 
 def _config(root, port):
-    status, raw = _http(port, "GET", "/api/config")
+    status, raw = _request(port, "GET", "/api/config")
     value = _decode_json(raw)
     if (status != 200 or type(value) is not dict or value.get("data_root_id") != data_root_id(root)
             or type(value.get("csrf_token")) is not str or not value["csrf_token"]
@@ -283,7 +308,7 @@ def _verify_publication(record, raw, config, acknowledgement=None):
         raise AcquireError("publication_unverified")
 
     def get(path, name):
-        status, content = _http(port, "GET", path)
+        status, content = _request(port, "GET", path)
         _write(Path(record["evidence_directory"]) / (name + ".json"), content)
         if status != 200:
             raise AcquireError("publication_unverified")
@@ -334,7 +359,7 @@ def _verify_failure(record, acknowledgement, config):
     attempt_id = acknowledgement.get("attempt_id")
     if type(attempt_id) is not str or not re.fullmatch(r"[0-9a-f]{32}", attempt_id):
         raise AcquireError("publication_unverified")
-    status, content = _http(record["port"], "GET", "/api/attempts")
+    status, content = _request(record["port"], "GET", "/api/attempts")
     _write(Path(record["evidence_directory"]) / "attempts.json", content)
     ledger = _decode_json(content)
     if status != 200 or type(ledger) is not dict or type(ledger.get("attempts")) is not list:
@@ -350,6 +375,10 @@ def _verify_failure(record, acknowledgement, config):
 def _journal(path, client_directory):
     with path.open("rb") as source:
         record = _decode_json(source.read(_MAX_BYTES + 1))
+    return _validate_journal(record, client_directory)
+
+
+def _validate_journal(record, client_directory):
     required = {"run_id", "root", "data_root_id", "client_directory", "symbol", "target_date", "port",
                 "status", "identity", "evidence_directory"}
     if (type(record) is not dict or not required <= record.keys()
@@ -383,12 +412,38 @@ def _journal(path, client_directory):
     return record
 
 
+def _recover_locked(old, state):
+    """Read-only publication recovery; never starts a new acquisition."""
+    try:
+        saved = Path(old["evidence_directory"]).resolve()
+        with _inside(saved / "after.day", saved).open("rb") as source:
+            raw = source.read(_MAX_BYTES + 1)
+        if len(raw) > _MAX_BYTES or hashlib.sha256(raw).hexdigest() != old.get("raw_sha256"):
+            raise AcquireError("captured_raw_corrupt")
+        config = _config(old["root"], old["port"])
+        if hashlib.sha256(config["csrf_token"].encode()).hexdigest() != old.get("workbench_session_id"):
+            raise AcquireError("workbench_session_changed")
+        _verify_publication(old, raw, config)
+    except (AcquireError, OSError) as error:
+        old["error_code"] = getattr(error, "code", "captured_raw_unavailable")
+        if old["status"] == "committed":
+            # A saved terminal receipt is not current proof of readable publication.
+            return None
+    _save(old, state)
+    return old
+
+
 def acquire(root, client_directory, symbol, target_date, *, port=8765):
     _parameters(symbol, target_date, port)
     root, client_directory = Path(root).resolve(), Path(client_directory).resolve()
     state = _state_directory(client_directory)
     state.mkdir(parents=True, exist_ok=True)
     with _DirectoryLock(state):
+        from .tdx_schedule import _read_control
+
+        control = _read_control(state, client_directory)
+        if control is not None and control["active"] is not None:
+            raise AcquireError("schedule_dispatch_unresolved")
         current = state / "current.json"
         if current.exists():
             old = _journal(current, client_directory)
@@ -396,116 +451,113 @@ def acquire(root, client_directory, symbol, target_date, *, port=8765):
                 if old["status"] == "publication_unknown":
                     if old["data_root_id"] != data_root_id(root) or old["port"] != port:
                         raise AcquireError("acquisition_target_mismatch")
-                    try:
-                        saved = Path(old["evidence_directory"]).resolve()
-                        with _inside(saved / "after.day", saved).open("rb") as source:
-                            raw = source.read(_MAX_BYTES + 1)
-                        if len(raw) > _MAX_BYTES or hashlib.sha256(raw).hexdigest() != old.get("raw_sha256"):
-                            raise AcquireError("captured_raw_corrupt")
-                        config = _config(root, port)
-                        if hashlib.sha256(config["csrf_token"].encode()).hexdigest() != old["workbench_session_id"]:
-                            raise AcquireError("workbench_session_changed")
-                        _verify_publication(old, raw, config)
-                    except (AcquireError, OSError) as error:
-                        old["error_code"] = getattr(error, "code", "captured_raw_unavailable")
-                    _save(old, state)
-                    return old
+                    return _recover_locked(old, state)
                 if _client_identity(client_directory) == old["identity"]:
                     raise AcquireError("client_task_unresolved")
                 old.update(status="failed", error_code="prior_listener_session_changed", client_task_cancelled="not_proven")
                 _save(old, state)
+        return _collect_locked(root, client_directory, symbol, target_date, port, state)
 
-        run_id = uuid.uuid4().hex
-        directory = root / "acquisition" / run_id
-        directory.mkdir(parents=True, exist_ok=False)
-        record = dict(run_id=run_id, root=str(root), data_root_id=data_root_id(root),
-                      client_directory=str(client_directory), symbol=symbol, target_date=target_date, port=port,
-                      status="preparing", identity={}, evidence_directory=str(directory),
-                      started_at_utc=datetime.now(timezone.utc).isoformat(), observations=[],
-                      coverage="unknown", units="unknown", target_observed=False)
+
+def _collect_locked(root, client_directory, symbol, target_date, port, state, *,
+                    run_id=None, association=None, on_prepared=None):
+    run_id = run_id or uuid.uuid4().hex
+    directory = root / "acquisition" / run_id
+    directory.mkdir(parents=True, exist_ok=False)
+    record = dict(run_id=run_id, root=str(root), data_root_id=data_root_id(root),
+                  client_directory=str(client_directory), symbol=symbol, target_date=target_date, port=port,
+                  status="preparing", identity={}, evidence_directory=str(directory),
+                  started_at_utc=datetime.now(timezone.utc).isoformat(), observations=[],
+                  coverage="unknown", units="unknown", target_observed=False)
+    if association is not None:
+        record.update(association)
+        _save(record, state)
+        on_prepared(record)
+    try:
+        _remaining()
+        config = _config(root, port)
+        record["workbench_session_id"] = hashlib.sha256(config["csrf_token"].encode()).hexdigest()
+        identity = _client_identity(client_directory)
+        record["identity"] = identity
+        venue, code = symbol[-2:].lower(), symbol[:6]
+        path = _inside(client_directory / f"vipdoc/{venue}/lday/{venue}{code}.day", client_directory)
+        before = _capture(path)
+        record["cache_before"] = "absent" if before is None else hashlib.sha256(before).hexdigest()
+        if before is not None:
+            _write(directory / "before.day", before)
+        request_id = int(run_id[:8], 16)
+        payload = json.dumps({"id": request_id, "method": "refresh_kline",
+                              "params": {"stock_list": [symbol], "period": "1d"}}, separators=(",", ":")).encode()
+        _write(directory / "refresh-request.json", payload)
+        observed = _client_identity(client_directory)
+        record["observations"].append(observed)
+        if observed != identity:
+            raise AcquireError("client_session_changed")
+        record.update(status="refresh_unknown", request_sha256=hashlib.sha256(payload).hexdigest())
+        _save(record, state)
         try:
-            config = _config(root, port)
-            record["workbench_session_id"] = hashlib.sha256(config["csrf_token"].encode()).hexdigest()
-            identity = _client_identity(client_directory)
-            record["identity"] = identity
-            venue, code = symbol[-2:].lower(), symbol[:6]
-            path = _inside(client_directory / f"vipdoc/{venue}/lday/{venue}{code}.day", client_directory)
-            before = _capture(path)
-            record["cache_before"] = "absent" if before is None else hashlib.sha256(before).hexdigest()
-            if before is not None:
-                _write(directory / "before.day", before)
-            request_id = int(run_id[:8], 16)
-            payload = json.dumps({"id": request_id, "method": "refresh_kline",
-                                  "params": {"stock_list": [symbol], "period": "1d"}}, separators=(",", ":")).encode()
-            _write(directory / "refresh-request.json", payload)
+            status, response = _request(17709, "POST", "/", payload, {"Content-Type": "application/json"}, budget=45)
+        except (AcquireError, OSError) as error:
+            _write(directory / "refresh-response.bin", getattr(error, "raw", b""))
+            try:
+                record["observations"].append(_client_identity(client_directory))
+            except (AcquireError, OSError) as identity_error:
+                record["identity_after_error"] = getattr(identity_error, "code", "client_identity_unavailable")
+            _save(record, state)
+            raise
+        _write(directory / "refresh-response.bin", response)
+        record.update(http_status=status, response_sha256=hashlib.sha256(response).hexdigest())
+        observed = _client_identity(client_directory)
+        record["observations"].append(observed)
+        _save(record, state)
+        if observed != identity or status != 200:
+            raise AcquireError("refresh_result_unknown")
+        _refresh_result(response, request_id)
+        raw = _capture(_inside(path, client_directory))
+        if raw is None:
+            record.update(status="not_covered", capture_state="not_covered")
+        else:
+            _write(directory / "after.day", raw)
             observed = _client_identity(client_directory)
             record["observations"].append(observed)
             if observed != identity:
                 raise AcquireError("client_session_changed")
-            record.update(status="refresh_unknown", request_sha256=hashlib.sha256(payload).hexdigest())
-            _save(record, state)
-            try:
-                status, response = _http(17709, "POST", "/", payload, {"Content-Type": "application/json"}, budget=45)
-            except (AcquireError, OSError) as error:
-                _write(directory / "refresh-response.bin", getattr(error, "raw", b""))
-                try:
-                    record["observations"].append(_client_identity(client_directory))
-                except (AcquireError, OSError) as identity_error:
-                    record["identity_after_error"] = getattr(identity_error, "code", "client_identity_unavailable")
-                _save(record, state)
-                raise
-            _write(directory / "refresh-response.bin", response)
-            record.update(http_status=status, response_sha256=hashlib.sha256(response).hexdigest())
-            observed = _client_identity(client_directory)
-            record["observations"].append(observed)
-            _save(record, state)
-            if observed != identity or status != 200:
-                raise AcquireError("refresh_result_unknown")
-            _refresh_result(response, request_id)
-            raw = _capture(_inside(path, client_directory))
-            if raw is None:
-                record.update(status="not_covered", capture_state="not_covered")
+            _remaining()
+            manifest, _, _, target = _expected(raw, record)
+            record.update(raw_sha256=manifest["raw_sha256"], target_observed=target is not None)
+            record["capture_state"] = ("not_covered" if target is None else
+                                       "unchanged_target_observed" if raw == before else "new_content")
+            if target is None:
+                record["status"] = "not_covered"
             else:
-                _write(directory / "after.day", raw)
-                observed = _client_identity(client_directory)
-                record["observations"].append(observed)
-                if observed != identity:
-                    raise AcquireError("client_session_changed")
-                manifest, _, _, target = _expected(raw, record)
-                record.update(raw_sha256=manifest["raw_sha256"], target_observed=target is not None)
-                record["capture_state"] = ("not_covered" if target is None else
-                                           "unchanged_target_observed" if raw == before else "new_content")
-                if target is None:
-                    record["status"] = "not_covered"
+                record["status"] = "publication_unknown"
+                _save(record, state)
+                parameters = urlencode(dict(format_id=_FORMAT, filename=path.name, **manifest["interpretation"]))
+                headers = {"Origin": f"http://127.0.0.1:{port}", "X-Anatrading-Token": config["csrf_token"],
+                           "Content-Type": "application/octet-stream"}
+                acknowledgement = None
+                failure = None
+                try:
+                    status, reply = _request(port, "POST", f"/api/import?{parameters}", raw, headers)
+                    _write(directory / "import-response.json", reply)
+                    parsed = _decode_json(reply)
+                    if status == 200 and type(parsed) is dict and type(parsed.get("attempt")) is dict:
+                        attempt = parsed["attempt"]
+                        if type(attempt.get("status")) is not str:
+                            raise AcquireError("publication_unverified")
+                        if attempt.get("status") == "committed":
+                            acknowledgement = attempt
+                        elif attempt.get("status") in {"failed", "rejected", "cancelled"}:
+                            failure = attempt
+                except (AcquireError, OSError) as error:
+                    _write(directory / "import-response.json", getattr(error, "raw", b""))
+                if failure is not None:
+                    _verify_failure(record, failure, config)
                 else:
-                    record["status"] = "publication_unknown"
-                    _save(record, state)
-                    parameters = urlencode(dict(format_id=_FORMAT, filename=path.name, **manifest["interpretation"]))
-                    headers = {"Origin": f"http://127.0.0.1:{port}", "X-Anatrading-Token": config["csrf_token"],
-                               "Content-Type": "application/octet-stream"}
-                    acknowledgement = None
-                    failure = None
-                    try:
-                        status, reply = _http(port, "POST", f"/api/import?{parameters}", raw, headers)
-                        _write(directory / "import-response.json", reply)
-                        parsed = _decode_json(reply)
-                        if status == 200 and type(parsed) is dict and type(parsed.get("attempt")) is dict:
-                            attempt = parsed["attempt"]
-                            if type(attempt.get("status")) is not str:
-                                raise AcquireError("publication_unverified")
-                            if attempt.get("status") == "committed":
-                                acknowledgement = attempt
-                            elif attempt.get("status") in {"failed", "rejected", "cancelled"}:
-                                failure = attempt
-                    except (AcquireError, OSError) as error:
-                        _write(directory / "import-response.json", getattr(error, "raw", b""))
-                    if failure is not None:
-                        _verify_failure(record, failure, config)
-                    else:
-                        _verify_publication(record, raw, config, acknowledgement)
-        except (AcquireError, OSError, ValueError) as error:
-            record["error_code"] = getattr(error, "code", "acquisition_io_error")
-            if record["status"] == "preparing":
-                record["status"] = "failed"
-        _save(record, state)
-        return record
+                    _verify_publication(record, raw, config, acknowledgement)
+    except (AcquireError, OSError, ValueError) as error:
+        record["error_code"] = getattr(error, "code", "acquisition_io_error")
+        if record["status"] == "preparing":
+            record["status"] = "failed"
+    _save(record, state)
+    return record

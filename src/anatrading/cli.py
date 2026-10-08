@@ -31,6 +31,8 @@ def _parser():
     acquire.add_argument("--symbol", choices=["600059.SH", "000001.SZ"], required=True)
     acquire.add_argument("--target-date", required=True, help="需要实际观察的源日期 YYYY-MM-DD")
     acquire.add_argument("--port", type=_port, default=8765)
+    due = commands.add_parser("acquire-tdx-due", help="执行有限日线计划的到期槽或只读恢复")
+    due.add_argument("--plan", type=Path, required=True, help="已核验的私有计划绝对路径")
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -57,6 +59,10 @@ def _parser():
 
 
 def _run(arguments):
+    if arguments.command == "acquire-tdx-due":
+        from .tdx_schedule import due
+
+        return due(arguments.plan)
     if arguments.command == "acquire-tdx":
         from .tdx_acquisition import acquire
 
@@ -129,7 +135,7 @@ def main(argv=None):
     print(json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":")))
     status = result.get("status") if isinstance(result, dict) else None
     return 130 if status in {"cancelled", "interrupted"} else 2 if status in {
-        "error", "failed", "rejected", "not_covered", "refresh_unknown", "publication_unknown"} else 0
+        "error", "failed", "rejected", "not_covered", "refresh_unknown", "publication_unknown", "dispatch_unknown"} else 0
 
 
 if __name__ == "__main__":

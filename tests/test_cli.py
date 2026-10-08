@@ -83,3 +83,13 @@ def test_acquisition_help_describes_explicit_daily_task(tmp_path):
     result = run_cli("acquire-tdx", "--help")
     assert result.returncode == 0
     assert all(option in result.stdout for option in ("--client-directory", "--symbol", "--target-date", "--port"))
+
+
+def test_schedule_rejects_duplicate_plan_without_opening_store(tmp_path):
+    plan = tmp_path / "ambiguous-plan.json"
+    plan.write_bytes(b'{"schema":1,"schema":1}')
+    root = tmp_path / "unused"
+    result = run_cli("--root", root, "acquire-tdx-due", "--plan", plan)
+    assert result.returncode == 2
+    assert json.loads(result.stdout) == {"status": "error", "error_code": "invalid_response"}
+    assert not root.exists() and not result.stderr
