@@ -1,4 +1,4 @@
-"""Decode three audited source shapes without granting market-data qualification."""
+"""Decode audited source shapes without granting market-data qualification."""
 from collections import Counter
 from datetime import date, datetime
 from decimal import Context, Decimal, Inexact, InvalidOperation, Overflow, ROUND_HALF_EVEN, Rounded, localcontext
@@ -10,7 +10,7 @@ import struct
 from .models import Check, Decoded, DecodeError, NonMarketPayload, SourceRow, VALUE_FIELDS
 from .numeric import NumericError, decimal_value, integer_value
 
-FORMAT_IDS = ("tdx-public-text-v1", "tdx-public-day-v1", "baostock-decoded-v0.9.4")
+FORMAT_IDS = ("tdx-public-text-v1", "tdx-public-day-v1", "baostock-decoded-v0.9.4", "tdx-http-market-v1")
 _DECLARATIONS = {"instrument", "venue", "asset_type", "volume_unit", "amount_unit"}
 _BAO_FIELDS = {"date", "time", "code", *VALUE_FIELDS, "adjustflag"}
 _NEGATIVE_DAY = "aa27dfce8bd24a75f4d07697c4c787f905a26b7a3999a3c76cf30b24ef9c2357"
@@ -50,6 +50,107 @@ def preflight(raw: bytes, format_id: str) -> None:
     if (format_id == FORMAT_IDS[2]
             or isinstance(raw, bytes) and re.match(rb"[0-9]{2}\.[0-9]\.[0-9]{2}\x01", raw)):
         _bao_envelope(raw)
+    if format_id == FORMAT_IDS[3]:
+        _tdx_http_envelope(raw)
+
+
+def _http_json(raw):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("duplicate_key")
+            result[key] = value
+        return result
+
+    def constant(value):
+        raise ValueError("nonfinite")
+
+    try:
+        result = json.loads(raw.decode("utf-8"), object_pairs_hook=pairs, parse_float=Decimal,
+                            parse_constant=constant)
+        if type(result) is not dict:
+            raise ValueError("object_required")
+        return result
+    except (ValueError, UnicodeError, AttributeError, RecursionError, ArithmeticError):
+        raise DecodeError("invalid_tdx_http_capture") from None
+
+
+def _tdx_http_request(request):
+    if request.get("method") != "get_market_data":
+        raise NonMarketPayload("non_market_payload")
+    params = request.get("params")
+    if (type(request.get("id")) is not int or type(params) is not dict
+            or type(params.get("stock_list")) is not list or len(params["stock_list"]) != 1
+            or type(params["stock_list"][0]) is not str
+            or not re.fullmatch(r"[0-9]{6}\.(?:SH|SZ|BJ)", params["stock_list"][0])
+            or params.get("period") != "1m" or params.get("dividend_type") != "none"
+            or params.get("fill_data") is not False or type(params.get("count")) is not int
+            or not 1 <= params["count"] <= 24000 or type(params.get("end_time")) is not str):
+        raise DecodeError("invalid_tdx_http_capture")
+    if params["end_time"]:
+        try:
+            if not re.fullmatch(r"[0-9]{14}", params["end_time"]):
+                raise ValueError
+            datetime.strptime(params["end_time"], "%Y%m%d%H%M%S")
+        except ValueError:
+            raise DecodeError("invalid_tdx_http_capture") from None
+    return params
+
+
+def _tdx_http_envelope(raw):
+    bundle = _http_json(raw)
+    if set(bundle) != {"request_utf8", "response_utf8"} or any(type(v) is not str for v in bundle.values()):
+        raise DecodeError("invalid_tdx_http_capture")
+    request = _http_json(bundle["request_utf8"].encode("utf-8"))
+    params = _tdx_http_request(request)
+    response = _http_json(bundle["response_utf8"].encode("utf-8"))
+    result = response.get("result")
+    symbol = params["stock_list"][0]
+    if (type(response.get("id")) is not int or response["id"] != request["id"]
+            or type(result) is not dict or result.get("ErrorId") != "0"
+            or type(result.get("Value")) is not dict or set(result["Value"]) != {symbol}
+            or type(result["Value"][symbol]) is not dict or result["Value"][symbol].get("ErrorId") != "0"):
+        raise DecodeError("invalid_tdx_http_response")
+    return bundle, params, result["Value"][symbol]
+
+
+def _tdx_http(raw):
+    bundle, params, stock = _tdx_http_envelope(raw)
+    fields = ("Date", "Time", "Open", "High", "Low", "Close", "Volume", "Amount")
+    if ("Value" in stock or any(type(stock.get(f)) is not list for f in fields)
+            or not 1 <= len(stock["Date"]) <= params["count"]
+            or any(len(stock[f]) != len(stock["Date"]) for f in fields)
+            or any(type(v) is not str for f in fields for v in stock[f])):
+        raise DecodeError("invalid_tdx_http_rows")
+    symbol, rows = params["stock_list"][0], []
+    for index in range(len(stock["Date"])):
+        source_date, source_time = stock["Date"][index], stock["Time"][index]
+        label = None
+        if re.fullmatch(r"[0-9]{8}", source_date) and re.fullmatch(r"[0-9]{5,6}", source_time):
+            clock = int(source_time)
+            try:
+                moment = datetime(int(source_date[:4]), int(source_date[4:6]), int(source_date[6:]),
+                                  clock // 10000, clock // 100 % 100, clock % 100)
+                if moment.second == 0:
+                    label = moment.isoformat(timespec="minutes")
+            except ValueError:
+                pass
+        tokens = {field.lower(): stock[field][index] for field in fields[2:]}
+        tokens.update(source_date=source_date, source_time=source_time)
+        row = _row(index + 1, f"response:$.result.Value.{symbol}:index:{index}",
+                   f"{source_date} {source_time}", label, tokens)
+        if params["end_time"]:
+            row.checks.append(Check("source_date_range", "not_evaluated", "invalid_source_label")
+                              if label is None else Check("source_date_range", "pass" if
+                                  label.replace("-", "").replace(":", "").replace("T", "") + "00"
+                                  <= params["end_time"] else "fail"))
+        rows.append(row)
+    return dict(period="1m", source_code=symbol, source_venue=symbol[-2:],
+                source_adjustment=params["dividend_type"], source_end_time=params["end_time"],
+                source_requested_count=params["count"], price_representation="received_http_decimal_strings",
+                request_sha256=hashlib.sha256(bundle["request_utf8"].encode("utf-8")).hexdigest(),
+                response_sha256=hashlib.sha256(bundle["response_utf8"].encode("utf-8")).hexdigest()), rows
 
 
 def _date_label(token, separator="-"):
@@ -245,7 +346,8 @@ def _source_semantics(format_id, metadata):
     }
     fields = {name: {"value": None, "status": "unknown", "reason": reason, "evidence": []}
               for name, reason in reasons.items()}
-    adjustment = {FORMAT_IDS[0]: "source_adjustment", FORMAT_IDS[2]: "source_adjustflag"}.get(format_id)
+    adjustment = {FORMAT_IDS[0]: "source_adjustment", FORMAT_IDS[2]: "source_adjustflag",
+                  FORMAT_IDS[3]: "source_adjustment"}.get(format_id)
     if adjustment is not None:
         fields["adjustment"] = {"value": metadata[adjustment], "status": "assumed",
                                 "reason": "source_claim_unverified", "evidence": [f"metadata.{adjustment}"]}
@@ -275,7 +377,8 @@ def decode(raw: bytes, format_id: str, interpretation: dict | None = None) -> De
         raise DecodeError("invalid_interpretation")
     if type(raw) is not bytes:
         raise DecodeError("invalid_raw_type")
-    metadata, rows = {FORMAT_IDS[0]: _text, FORMAT_IDS[1]: _day, FORMAT_IDS[2]: _bao}[format_id](raw)
+    metadata, rows = {FORMAT_IDS[0]: _text, FORMAT_IDS[1]: _day, FORMAT_IDS[2]: _bao,
+                      FORMAT_IDS[3]: _tdx_http}[format_id](raw)
     raw_hash = hashlib.sha256(raw).hexdigest()
     metadata.update(instrument_id=None, interpretation=dict(interpretation), interpretation_status="assumed",
                     source_claims_status="assumed", raw_sha256=raw_hash, quarantined=raw_hash == _NEGATIVE_DAY)
@@ -304,7 +407,8 @@ def decode(raw: bytes, format_id: str, interpretation: dict | None = None) -> De
             ])
             previous = row.label
     contract = dict(format_id=format_id, version="2",
-                    raw_kind="sdk_decoded_text" if format_id == FORMAT_IDS[2] else "original_file",
+                    raw_kind="http_capture_bundle" if format_id == FORMAT_IDS[3] else
+                             "sdk_decoded_text" if format_id == FORMAT_IDS[2] else "original_file",
                     interpretation_evidence="assumed", source_claims_evidence="assumed",
                     standard_units={"status": "unknown", "reason": "security_master_and_applicable_units_unverified"},
                     temporal_semantics={"status": "unknown", "reason": "bar_boundaries_closure_and_known_at_unverified"},

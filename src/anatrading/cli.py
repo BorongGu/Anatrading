@@ -38,6 +38,11 @@ def _parser():
     due.add_argument("--plan", type=Path, required=True, help="已核验的私有计划绝对路径")
     recovery = commands.add_parser("recover-tdx", help="核证原客户端会话终态并只封结旧刷新，不下载")
     recovery.add_argument("--client-directory", type=Path, required=True)
+    minutes = commands.add_parser("read-tdx-minutes", help="读取通达信分钟数据并直接入库，无需手动导出")
+    minutes.add_argument("--client-directory", type=Path, default=Path(r"D:\tdx_64"))
+    minutes.add_argument("--symbol", required=True, help="证券代码，例如600059.SH")
+    minutes.add_argument("--count", type=int, default=720)
+    minutes.add_argument("--end-time", default="", help="历史截止YYYYMMDDHHMMSS，留空取最新")
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -92,6 +97,14 @@ def _run(arguments):
     if arguments.command == "restore":
         return EvidenceStore.restore(arguments.backup, arguments.destination)
     with EvidenceStore(arguments.root) as store:
+        if arguments.command == "read-tdx-minutes":
+            from .tdx_market import read_minutes
+
+            raw = read_minutes(arguments.client_directory, arguments.symbol,
+                               count=arguments.count, end_time=arguments.end_time)
+            return store.import_bytes(raw, "tdx-http-market-v1", filename=f"{arguments.symbol}.http.json",
+                                      interpretation={"instrument": arguments.symbol, "venue": arguments.symbol[-2:],
+                                                      "asset_type": "stock"})
         if arguments.command == "import":
             requested = False
 

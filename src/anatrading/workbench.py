@@ -43,6 +43,7 @@ _STORE_CODES = {
     "numeric_type", "invalid_decimal", "nonfinite", "decimal_scale", "decimal_range", "integer_fraction",
     "integer_range", "sum_precision", "sum_range", "storage_io_error", "database_error", "internal_error",
     "process_interrupted",
+    "invalid_tdx_http_capture", "invalid_tdx_http_response", "invalid_tdx_http_rows",
 }
 
 

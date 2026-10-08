@@ -79,7 +79,7 @@ def test_unrecognized_bao_envelope_is_non_market(raw):
 
 
 def test_fixed_formats_and_safe_interpretation_keys():
-    assert FORMAT_IDS == (TEXT, DAY, BAO)
+    assert FORMAT_IDS == (TEXT, DAY, BAO, "tdx-http-market-v1")
     with pytest.raises(DecodeError, match="^unsupported_format$"):
         decode(b"", "csv")
     for declaration in ({"qualified": True}, {"instrument": 601577}, ["instrument"],

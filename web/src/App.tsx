@@ -7,7 +7,7 @@ import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
 import { fields, fieldNames } from './types.ts';
 import type { Attempt, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
 
-const formatNames: Record<string, string> = { 'tdx-public-text-v1': '通达信 · 已审文本', 'tdx-public-day-v1': '通达信 · 日线 .day', 'baostock-decoded-v0.9.4': 'BaoStock · 已审解码正文' };
+const formatNames: Record<string, string> = { 'tdx-public-text-v1': '通达信 · 已审文本', 'tdx-public-day-v1': '通达信 · 日线 .day', 'baostock-decoded-v0.9.4': 'BaoStock · 已审解码正文', 'tdx-http-market-v1': '通达信 · 分钟接口记录' };
 const emptySelection: SelectionDraft = { snapshot: '', cutoff: '', start: '', end: '' };
 const declarationNames = { instrument: '证券代码', venue: '市场', asset_type: '品类', volume_unit: '数量单位', amount_unit: '金额单位' };
 const statusNames: Record<string, string> = { committed: '已提交', rejected: '已拒绝', failed: '失败', interrupted: '曾中断', running: '进行中', cancelled: '已取消' };
@@ -190,7 +190,7 @@ export default function App() {
               {(config?.formats ?? Object.keys(formatNames)).map(value => <option value={value} key={value}>{formatNames[value] ?? value}</option>)}
             </select></label>
             <label className="file-picker">选择本地文件<input type="file" disabled={importing || !config} onChange={event => setFile(event.target.files?.[0] ?? null)} /></label>
-            <p className="subtle">单文件 ≤16 MiB；只使用现行三类格式。文件名仅用于显示。</p>
+            <p className="subtle">单文件 ≤16 MiB；请选择对应来源格式。文件名仅用于显示。</p>
             <details><summary>可选解释声明 · assumed</summary><div className="declarations">
               {Object.entries(declarationNames).map(([key, name]) => <label key={key}>{name}<input value={declarations[key] ?? ''} disabled={importing} onChange={event => setDeclarations({ ...declarations, [key]: event.target.value })} /></label>)}
             </div><p className="subtle">声明不能验证永久身份或覆盖来源证据。</p></details>

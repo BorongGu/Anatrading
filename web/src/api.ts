@@ -4,6 +4,9 @@ import type { GeometryEnvelope, SelectionDraft } from './types.ts';
 const explanations: Record<string, string> = {
   connection_error: '连接中断，请确认本地服务仍在运行。',
   invalid_response: '服务返回格式无法识别。',
+  invalid_tdx_http_capture: '通达信分钟记录的请求或原文无法识别。',
+  invalid_tdx_http_response: '通达信返回的证券、请求编号或状态不匹配。',
+  invalid_tdx_http_rows: '通达信分钟数据为空或字段不齐，请核对客户端数据。',
   invalid_query_response: '响应与当前选择或显示映射不一致，已清空结果。',
   invalid_ordinal_range: '源序号须为正整数，起点不大于终点，闭区间最多 20,000 条。',
   explicit_window_required: '该批次超过显示预算，请填写两端源序号（最多 20,000 条）。',
