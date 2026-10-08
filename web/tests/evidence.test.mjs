@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
+import { entry, sourceRow } from './geometry-fixtures.mjs';
 
 const server = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', optimizeDeps: { noDiscovery: true, include: [] } });
 after(() => server.close());
@@ -65,4 +66,30 @@ test('compact tooltip and fixed details show the same query contract qualificati
     assert.match(result, /规范单位\s*unknown/);
     assert.ok(result.includes('9007199254740993'));
   }
+});
+
+test('fixed geometry details show backend strings, approximation and fractions; compact stays short', () => {
+  const geometry = entry(1);
+  geometry.body = '99999999999999999999.000000000000000001';
+  geometry.ratios.body = { numerator: '1', denominator: '3', percent_display: '33.33' };
+  const props = { row: sourceRow(1), geometry };
+  const result = renderToStaticMarkup(createElement(RecordDetails, props)).replace(/<[^>]+>/g, '');
+  assert.match(result, /单根源结构，未检验预测效力/);
+  assert.ok(result.includes(geometry.body));
+  assert.match(result, /≈33\.33%/);
+  assert.match(result, /1\/3/);
+  assert.match(result, /同根 OHLC 价格尺度相同/);
+  assert.match(result, /规范单位\s*unknown/);
+  const compact = renderToStaticMarkup(createElement(RecordDetails, { ...props, compact: true }));
+  assert.doesNotMatch(compact, /单根源结构|33\.33%|权威分数/);
+});
+test('geometry states expose zero-range reason, invalid reason and unlocated limitation', () => {
+  const geometry = entry(1);
+  Object.assign(geometry, { direction: 'equal', range: '0', body: '0', upper_shadow: '0', lower_shadow: '0', ratios: { body: null, upper_shadow: null, lower_shadow: null, close_location: null }, ratio_reason: 'zero_range' });
+  const render = () => renderToStaticMarkup(createElement(RecordDetails, { row: sourceRow(1, null), geometry })).replace(/<[^>]+>/g, '');
+  assert.match(render(), /零区间.*比例未定义/);
+  assert.match(render(), /无法定位.*时点指标/);
+  Object.assign(geometry, { status: 'not_evaluated', reason: 'invalid_ohlc', direction: null, range: null, body: null, upper_shadow: null, lower_shadow: null, ratio_reason: null });
+  assert.match(render(), /OHLC 边界不一致/);
+  assert.doesNotMatch(render(), /≈0\.00%/);
 });

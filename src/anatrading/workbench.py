@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from decimal import Decimal
 import hashlib
+import json
 from pathlib import Path
 import re
 import secrets
@@ -17,6 +18,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.staticfiles import StaticFiles
 
 from .formats import FORMAT_IDS
+from .candle_geometry import geometry_report
 from .models import DecodeError
 from .numeric import NumericError
 from .store import EvidenceStore, StoreError
@@ -223,7 +225,19 @@ def _display(row):
 def _query_view(store, snapshot_id, selection):
     query = _bounded_query(store, snapshot_id, selection)
     navigation = store.label_navigation(query["batch_id"], **{key: selection.get(key) for key in ("cutoff", "ordinal_start", "ordinal_end")})
-    return dict(query=query, display=[_display(row) for row in query["rows"]], navigation=navigation)
+    return dict(query=query, geometry=geometry_report(query), display=[_display(row) for row in query["rows"]], navigation=navigation)
+
+
+def _geometry_export(store, snapshot_id, selection, expected_query, expected_geometry):
+    query = _bounded_query(store, snapshot_id, selection)
+    if query["query_id"] != expected_query:
+        raise _RequestError("query_id_mismatch", 409)
+    geometry = geometry_report(query)
+    if geometry["geometry_id"] != expected_geometry:
+        raise _RequestError("geometry_id_mismatch", 409)
+    content = json.dumps(dict(query=query, geometry=geometry), ensure_ascii=False,
+                         allow_nan=False, separators=(",", ":")).encode("utf-8")
+    return content, hashlib.sha256(content).hexdigest()
 
 
 def _export(store, snapshot_id, selection, kind, expected_id):
@@ -358,6 +372,24 @@ def create_app(root, *, port=8765, web_directory=None):
         return Response(content, media_type="application/json" if kind == "json" else "application/vnd.apache.parquet",
                         headers={"X-Query-Id": expected, "X-Content-SHA256": digest,
                                  "Content-Disposition": f'attachment; filename="anatrading-{expected}.{kind}"'})
+
+    @app.post("/api/geometry-export/{snapshot_id}")
+    async def geometry_export(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "query_id", "geometry_id"}, ("query_id", "geometry_id"))
+        query_id, geometry_id = parameters["query_id"], parameters["geometry_id"]
+        if any(not re.fullmatch("[0-9a-f]{64}", value) for value in (query_id, geometry_id)):
+            raise _RequestError("invalid_request")
+        selection = _selection(parameters)
+        try:
+            async for chunk in request.stream():
+                if chunk:
+                    raise _RequestError("invalid_request")
+        except ClientDisconnect:
+            raise _RequestError("upload_incomplete") from None
+        content, digest = await owner.call(lambda store: _geometry_export(store, snapshot_id, selection, query_id, geometry_id))
+        return Response(content, media_type="application/json",
+                        headers={"X-Query-Id": query_id, "X-Geometry-Id": geometry_id, "X-Content-SHA256": digest,
+                                 "Content-Disposition": f'attachment; filename="anatrading-{geometry_id}.json"'})
 
     directory = Path(web_directory) if web_directory is not None else Path(__file__).resolve().parents[2] / "web/dist"
     if directory.is_dir():

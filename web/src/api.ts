@@ -1,3 +1,6 @@
+import { assertGeometryEnvelope } from './model.ts';
+import type { GeometryEnvelope, SelectionDraft } from './types.ts';
+
 const explanations: Record<string, string> = {
   connection_error: '连接中断，请确认本地服务仍在运行。',
   invalid_response: '服务返回格式无法识别。',
@@ -6,6 +9,7 @@ const explanations: Record<string, string> = {
   explicit_window_required: '该批次超过显示预算，请填写两端源序号（最多 20,000 条）。',
   invalid_label_cutoff: '截止标签格式无效，请使用源日期或完整分钟标签。',
   query_id_mismatch: '导出身份与当前查询不一致，请重新查询。',
+  geometry_id_mismatch: 'K线结构身份与当前查询不一致，请重新查询。',
   raw_object_corrupt: '原件哈希或长度不一致，结果已清空；请恢复正确原件再查询。',
   raw_object_missing: '原件缺失，结果已清空；请恢复正确原件再查询。',
   chart_render_failed: '图层无法绘制，当前结果已清空。可重新查询并核对原字段。',
@@ -77,4 +81,17 @@ export async function verifiedExportBlob(response: Response, queryId: string): P
   const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', await blob.arrayBuffer()))].map(byte => byte.toString(16).padStart(2, '0')).join('');
   if (response.headers.get('X-Content-SHA256') !== digest) throw new Error('invalid_export_response');
   return { blob, digest };
+}
+
+export async function verifiedGeometryExportBlob(response: Response, queryId: string, geometryId: string, draft: SelectionDraft, limit: number): Promise<{ blob: Blob; digest: string }> {
+  const verified = await verifiedExportBlob(response, queryId);
+  if (response.headers.get('X-Geometry-Id') !== geometryId) throw new Error('invalid_export_response');
+  try {
+    const envelope = JSON.parse(await verified.blob.text()) as GeometryEnvelope;
+    if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)
+      || Object.keys(envelope).length !== 2 || !Object.hasOwn(envelope, 'query') || !Object.hasOwn(envelope, 'geometry')) throw new Error();
+    assertGeometryEnvelope(envelope, draft, limit);
+    if (envelope.query.query_id !== queryId || envelope.geometry.geometry_id !== geometryId) throw new Error();
+  } catch { throw new Error('invalid_export_response'); }
+  return verified;
 }

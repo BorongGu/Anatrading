@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildPlot, Generation, queryParameters, assertReply } from '../src/model.ts';
+import { geometry, queryId } from './geometry-fixtures.mjs';
 
 // Artificial records prove UI boundaries only; they are not market evidence.
 const row = (ordinal, label, values = {}) => ({
@@ -10,10 +11,10 @@ const row = (ordinal, label, values = {}) => ({
 });
 const display = (ordinal, extra = {}) => ({ ordinal, direction: 'up', ohlc_drawable: true, precision_lost: false, ...extra });
 const reply = (rows, displays) => ({
-  query: { snapshot_id: 's', query_id: 'q', rows, unlocated: [],
+  query: { snapshot_id: 's', query_id: queryId, rows, unlocated: [], manifest: { qualification: 'source_evidence_retrospective_only' },
     selection: { snapshot_id: 's', cutoff: null, ordinal_start: null, ordinal_end: null, mode: 'retrospective' },
     counts: { selected_rows: rows.length, unlocated_rows: 0 } },
-  display: displays, navigation: { previous_label: null, next_label: null },
+  geometry: geometry(rows), display: displays, navigation: { previous_label: null, next_label: null },
 });
 
 test('duplicate labels retain independent sequence positions and exact strings', () => {
@@ -94,6 +95,7 @@ test('selected plus unlocated budget is checked, including an empty located resu
   const r = reply([], []);
   r.query.unlocated = [row(1, null), row(2, null)];
   r.query.counts.unlocated_rows = 2;
+  r.geometry.unlocated = geometry(r.query.unlocated).rows;
   assert.throws(() => assertReply(r, { snapshot: 's', cutoff: '', start: '', end: '' }, 1));
   assert.doesNotThrow(() => assertReply(r, { snapshot: 's', cutoff: '', start: '', end: '' }, 2));
 });

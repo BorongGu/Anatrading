@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { checkedFetch, explain, jsonRequest, verifiedExportBlob } from './api.ts';
+import { checkedFetch, explain, jsonRequest, verifiedExportBlob, verifiedGeometryExportBlob } from './api.ts';
 import { assertReply, Generation, queryParameters } from './model.ts';
 import { SourceChart } from './SourceChart.tsx';
 import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
@@ -126,25 +126,31 @@ export default function App() {
     } finally { setImporting(false); }
   }
 
-  async function exportSelection(format: 'json' | 'parquet') {
+  async function exportSelection(format: 'json' | 'parquet' | 'geometry') {
     if (!reply || replyRef.current !== reply || !config || exporting || phase !== 'ready') return;
     const generation = gate.current.current();
     const queryId = reply.query.query_id;
+    const geometryId = reply.geometry.geometry_id;
     const draft = { ...selectionRef.current };
     setExporting(format);
     try {
       const parameters = queryParameters(draft, reply.query.counts.batch_rows, config.max_query_rows);
-      parameters.set('format', format); parameters.set('query_id', queryId);
-      const response = await checkedFetch(`/api/export/${encodeURIComponent(draft.snapshot)}?${parameters}`, {
+      parameters.set('query_id', queryId);
+      if (format === 'geometry') parameters.set('geometry_id', geometryId);
+      else parameters.set('format', format);
+      const route = format === 'geometry' ? 'geometry-export' : 'export';
+      const response = await checkedFetch(`/api/${route}/${encodeURIComponent(draft.snapshot)}?${parameters}`, {
         method: 'POST', headers: { 'X-Anatrading-Token': config.csrf_token },
       });
       if (!gate.current.isCurrent(generation)) return;
-      const { blob, digest } = await verifiedExportBlob(response, queryId);
+      const { blob, digest } = format === 'geometry'
+        ? await verifiedGeometryExportBlob(response, queryId, geometryId, draft, config.max_query_rows)
+        : await verifiedExportBlob(response, queryId);
       if (!gate.current.isCurrent(generation)) return;
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a'); link.href = url; link.download = `anatrading-${queryId}.${format}`;
+      const link = document.createElement('a'); link.href = url; link.download = format === 'geometry' ? `anatrading-geometry-${geometryId}.json` : `anatrading-${queryId}.${format}`;
       document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setNotice(`已发起 ${format.toUpperCase()} 下载；内容 SHA-256 ${digest}`);
+      setNotice(`已发起 ${format === 'geometry' ? 'K线结构 JSON' : format.toUpperCase()} 下载；内容 SHA-256 ${digest}`);
     } catch (error) {
       if (gate.current.isCurrent(generation)) { invalidate(); setIssue(explain(error)); setPhase('error'); }
     } finally { if (gate.current.isCurrent(generation)) setExporting(null); }
@@ -152,6 +158,8 @@ export default function App() {
 
   const snapshot = snapshots.find(item => item.snapshot_id === selection.snapshot);
   const q = reply?.query;
+  const selectedGeometry = selected && reply ? reply.geometry.rows.find(row => row.ordinal === selected.ordinal)
+    ?? reply.geometry.unlocated.find(row => row.ordinal === selected.ordinal) : undefined;
   const tableRows = q ? (scope === 'located' ? q.rows : q.unlocated) : [];
   const pageSize = 50;
   const pageCount = Math.max(1, Math.ceil(tableRows.length / pageSize));
@@ -224,7 +232,7 @@ export default function App() {
           </section>
           <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} />
           <section className="panel export-panel"><div><strong>导出当前选择</strong><p>{q.counts.selected_rows} 条定位 ＋ {q.counts.unlocated_rows} 条无法定位 · 保留原字段、质量与版本</p><code title={q.query_id}>Q {q.query_id}</code></div>
-            <div className="button-group"><button disabled={!!exporting} onClick={() => void exportSelection('json')}>{exporting === 'json' ? '校验中…' : '下载 JSON'}</button><button disabled={!!exporting} onClick={() => void exportSelection('parquet')}>{exporting === 'parquet' ? '校验中…' : '下载 Parquet'}</button></div>
+            <div className="button-group"><button disabled={!!exporting} onClick={() => void exportSelection('json')}>{exporting === 'json' ? '校验中…' : '下载 JSON'}</button><button disabled={!!exporting} onClick={() => void exportSelection('parquet')}>{exporting === 'parquet' ? '校验中…' : '下载 Parquet'}</button><button disabled={!!exporting} onClick={() => void exportSelection('geometry')}>{exporting === 'geometry' ? '校验中…' : '导出K线结构JSON'}</button></div>
           </section>
           <section className="panel records-panel">
             <div className="section-heading"><h2>精确字段</h2><span className="subtle">字符串原值 · 点击行或使用键盘查看</span></div>
@@ -240,7 +248,7 @@ export default function App() {
             <div className="pagination"><span>表格每页 {pageSize} 条；完整选择仍为 {tableRows.length} 条</span><div className="button-group"><button className="quiet" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>{page + 1} / {pageCount}</span><button className="quiet" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>下一页</button></div></div>
           </section>
           <section className="panel detail-panel"><div className="section-heading"><h2>固定记录详情</h2>{selected && <button className="quiet" onClick={() => setSelected(null)}>清除</button>}</div>
-            {selected ? <RecordDetails row={selected} contract={q.manifest.contract} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
+            {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
           <QualityDetails query={q} />
         </>}
         <footer>本地研究工具 · 单快照证据切片<span>图表由 <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a> 提供 · <a href="/licenses/lightweight-charts.LICENSE.txt" target="_blank" rel="noreferrer">Apache 2.0</a> · <a href="/licenses/lightweight-charts.NOTICE.txt" target="_blank" rel="noreferrer">NOTICE</a></span></footer>

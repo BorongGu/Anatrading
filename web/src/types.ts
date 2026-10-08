@@ -39,6 +39,22 @@ export interface Query {
   unlocated_quality: Query['quality']; batch_checks: Check[];
   totals: Record<string, { known_sum: string; available_rows: number; unavailable_rows: number; meaning: string }>;
 }
-export interface Reply { query: Query; display: Display[]; navigation: { previous_label: string | null; next_label: string | null } }
+export interface GeometryRatio { numerator: string; denominator: string; percent_display: string }
+export interface GeometryRow {
+  ordinal: number; status: 'computed' | 'not_evaluated';
+  reason: 'missing_ohlc' | 'invalid_price' | 'negative_price' | 'invalid_ohlc' | null;
+  direction: 'up' | 'down' | 'equal' | null;
+  range: string | null; body: string | null; upper_shadow: string | null; lower_shadow: string | null;
+  ratios: Record<'body' | 'upper_shadow' | 'lower_shadow' | 'close_location', GeometryRatio | null>;
+  ratio_reason: 'zero_range' | null;
+}
+export interface GeometryReport {
+  method_id: 'source-candle-geometry-v1'; query_id: string; geometry_id: string;
+  qualification: 'source_observation_description'; source_qualification: string;
+  assumption: 'same_price_scale_within_row'; display_policy: { percent_places: 2; rounding: 'half_even' };
+  rows: GeometryRow[]; unlocated: GeometryRow[];
+}
+export interface GeometryEnvelope { query: Query; geometry: GeometryReport }
+export interface Reply extends GeometryEnvelope { display: Display[]; navigation: { previous_label: string | null; next_label: string | null } }
 export interface Config { csrf_token: string; formats: string[]; max_upload_bytes: number; max_query_rows: number; mode: string }
 export interface Attempt { attempt_id: string; status: string; snapshot_id?: string | null; error_code?: string | null; filename?: string; started_at?: string; format_id?: string }

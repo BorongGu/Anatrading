@@ -1,4 +1,5 @@
-import type { Display, Reply, Row, SelectionDraft } from './types.ts';
+import { fields } from './types.ts';
+import type { Display, GeometryEnvelope, GeometryRow, Reply, Row, SelectionDraft } from './types.ts';
 
 export class Generation {
   private value = 0;
@@ -62,24 +63,76 @@ export function queryParameters(draft: SelectionDraft, batchRows: number, limit:
   return parameters;
 }
 
-export function assertReply(reply: Reply, draft: SelectionDraft, limit: number): void {
-  const q = reply?.query;
+const hexId = /^[a-f0-9]{64}$/;
+const lengthText = /^(?:0|[1-9]\d{0,19})(?:\.\d{0,17}[1-9])?$/;
+const numeratorText = /^(?:0|[1-9]\d{0,37})$/;
+const denominatorText = /^[1-9]\d{0,37}$/;
+const percentText = /^(?:(?:0|[1-9]\d?)\.\d{2}|100\.00)$/;
+const ratioKeys = ['body', 'upper_shadow', 'lower_shadow', 'close_location'] as const;
+const lengthKeys = ['range', 'body', 'upper_shadow', 'lower_shadow'] as const;
+function fixedKeys(value: unknown, keys: readonly string[]): boolean {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value, key));
+}
+function validGeometryRow(g: GeometryRow): boolean {
+  if (!fixedKeys(g, ['ordinal', 'status', 'reason', 'direction', ...lengthKeys, 'ratios', 'ratio_reason'])
+    || !fixedKeys(g.ratios, ratioKeys)) return false;
+  if (g.status === 'not_evaluated') return ['missing_ohlc', 'invalid_price', 'negative_price', 'invalid_ohlc'].includes(g.reason ?? '')
+    && g.direction === null && lengthKeys.every(key => g[key] === null)
+    && ratioKeys.every(key => g.ratios[key] === null) && g.ratio_reason === null;
+  if (g.status !== 'computed' || g.reason !== null || !['up', 'down', 'equal'].includes(g.direction ?? '')
+    || !lengthKeys.every(key => typeof g[key] === 'string' && lengthText.test(g[key]))) return false;
+  if (g.range === '0') return g.direction === 'equal' && lengthKeys.every(key => g[key] === '0')
+    && ratioKeys.every(key => g.ratios[key] === null) && g.ratio_reason === 'zero_range';
+  return g.ratio_reason === null && ratioKeys.every(key => {
+    const r = g.ratios[key];
+    return fixedKeys(r, ['numerator', 'denominator', 'percent_display']) && r !== null
+      && typeof r.numerator === 'string' && numeratorText.test(r.numerator)
+      && typeof r.denominator === 'string' && denominatorText.test(r.denominator)
+      && (r.numerator !== '0' || r.denominator === '1')
+      && typeof r.percent_display === 'string' && percentText.test(r.percent_display);
+  });
+}
+
+export function assertGeometryEnvelope(envelope: GeometryEnvelope, draft: SelectionDraft, limit: number): void {
+  const q = envelope?.query;
+  const g = envelope?.geometry;
   const selection = q?.selection;
-  if (!q || !Array.isArray(q.rows) || !Array.isArray(q.unlocated) || !Array.isArray(reply.display)
-    || typeof q.query_id !== 'string' || !q.query_id || q.snapshot_id !== draft.snapshot
+  if (!q || !Array.isArray(q.rows) || !Array.isArray(q.unlocated)
+    || typeof q.query_id !== 'string' || !hexId.test(q.query_id) || q.snapshot_id !== draft.snapshot
     || selection?.snapshot_id !== draft.snapshot || selection.mode !== 'retrospective'
     || selection.cutoff !== (draft.cutoff || null)
     || selection.ordinal_start !== (draft.start === '' ? null : Number(draft.start))
     || selection.ordinal_end !== (draft.end === '' ? null : Number(draft.end))
     || q.rows.length + q.unlocated.length > limit
-    || q.counts.selected_rows !== q.rows.length || q.counts.unlocated_rows !== q.unlocated.length
-    || reply.display.length !== q.rows.length || !reply.navigation) throw new Error('invalid_query_response');
+    || q.counts?.selected_rows !== q.rows.length || q.counts.unlocated_rows !== q.unlocated.length
+    || !fixedKeys(g, ['method_id', 'query_id', 'geometry_id', 'qualification', 'source_qualification', 'assumption', 'display_policy', 'rows', 'unlocated'])
+    || typeof g.geometry_id !== 'string' || !hexId.test(g.geometry_id) || g.query_id !== q.query_id
+    || g.method_id !== 'source-candle-geometry-v1' || g.qualification !== 'source_observation_description'
+    || typeof q.manifest?.qualification !== 'string' || g.source_qualification !== q.manifest.qualification
+    || g.assumption !== 'same_price_scale_within_row'
+    || !fixedKeys(g.display_policy, ['percent_places', 'rounding'])
+    || g.display_policy.percent_places !== 2 || g.display_policy.rounding !== 'half_even'
+    || !Array.isArray(g.rows) || !Array.isArray(g.unlocated)
+    || g.rows.length !== q.rows.length || g.unlocated.length !== q.unlocated.length) throw new Error('invalid_query_response');
   const ordinals = new Set<number>();
+  for (const scope of ['rows', 'unlocated'] as const) q[scope].forEach((row, index) => {
+    const derived = g[scope][index];
+    if (!row || !Number.isSafeInteger(row.ordinal) || row.ordinal < 1 || ordinals.has(row.ordinal)
+      || (scope === 'rows' ? typeof row.label !== 'string' || !row.label : row.label !== null)
+      || !row.values || !fields.every(field => row.values[field] === null || typeof row.values[field] === 'string')
+      || !derived || derived.ordinal !== row.ordinal || !validGeometryRow(derived)) throw new Error('invalid_query_response');
+    ordinals.add(row.ordinal);
+  });
+}
+
+export function assertReply(reply: Reply, draft: SelectionDraft, limit: number): void {
+  assertGeometryEnvelope(reply, draft, limit);
+  const q = reply.query;
+  if (!Array.isArray(reply.display) || reply.display.length !== q.rows.length || !reply.navigation) throw new Error('invalid_query_response');
   q.rows.forEach((row, index) => {
     const d = reply.display[index];
-    if (typeof row.label !== 'string' || !row.label || ordinals.has(row.ordinal)
-      || d.ordinal !== row.ordinal || !(d.direction in directionColors)
+    if (!d || d.ordinal !== row.ordinal || !Object.hasOwn(directionColors, d.direction)
       || typeof d.ohlc_drawable !== 'boolean' || typeof d.precision_lost !== 'boolean') throw new Error('invalid_query_response');
-    ordinals.add(row.ordinal);
   });
 }
