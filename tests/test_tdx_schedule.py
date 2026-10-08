@@ -417,9 +417,10 @@ def test_task_xml_rejects_ambiguous_actions_or_system_identity(schedule, module,
 
 
 def test_task_xml_is_finite_interactive_nonretrying_and_does_not_register(schedule, plan, tmp_path):
-    python = tmp_path / "Python & tools" / "python.exe"
+    python = tmp_path / "中文 & tools" / "python.exe"
     working = tmp_path / "repo & work"
     xml = schedule.task_xml(plan[0], python, working, "S-1-5-21-1-2-3-1001")
+    assert not xml.lstrip().startswith("<?xml")
     root = ET.fromstring(xml)
     ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
     def text(path):

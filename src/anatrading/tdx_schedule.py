@@ -390,4 +390,4 @@ def task_xml(plan_path, python, working_directory, user_sid):
     element(action, "Arguments", subprocess.list2cmdline(["-X", "utf8", "-m", "anatrading.cli", "acquire-tdx-due",
                                                          "--plan", str(Path(plan_path))]))
     element(action, "WorkingDirectory", str(working_directory))
-    return ET.tostring(task, encoding="unicode", xml_declaration=True)
+    return ET.tostring(task, encoding="unicode", xml_declaration=False)
