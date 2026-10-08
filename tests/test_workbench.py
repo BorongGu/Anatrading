@@ -176,7 +176,8 @@ def test_config_and_static_are_local_and_api_is_uncached(tmp_path):
             response = await client.get("/api/config")
             assert response.headers["cache-control"] == "no-store"
             assert response.json() == {"csrf_token": auth["X-Anatrading-Token"], "formats": list(FORMAT_IDS),
-                                       "max_upload_bytes": 16777216, "max_query_rows": 20000, "mode": "retrospective"}
+                                       "max_upload_bytes": 16777216, "max_query_rows": 20000, "mode": "retrospective",
+                                       "data_root_id": hashlib.sha256(str((tmp_path / "root").resolve()).casefold().encode()).hexdigest()}
             assert (await client.get("/")).status_code == 200
             assert (await client.get("/docs")).status_code == 404
             assert (await client.get("/openapi.json")).status_code == 404

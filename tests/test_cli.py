@@ -68,3 +68,18 @@ def test_unknown_snapshot_is_a_typed_error_without_traceback(tmp_path):
     assert result.returncode == 2
     assert json.loads(result.stdout) == {"status": "error", "error_code": "snapshot_not_found"}
     assert "Traceback" not in result.stdout + result.stderr
+
+
+def test_acquisition_rejects_future_target_before_creating_data_root(tmp_path):
+    root = tmp_path / "unused"
+    result = run_cli("--root", root, "acquire-tdx", "--client-directory", tmp_path / "no-client",
+                     "--symbol", "600059.SH", "--target-date", "2999-01-01")
+    assert result.returncode == 2
+    assert json.loads(result.stdout) == {"status": "error", "error_code": "invalid_target_date"}
+    assert not root.exists() and not result.stderr
+
+
+def test_acquisition_help_describes_explicit_daily_task(tmp_path):
+    result = run_cli("acquire-tdx", "--help")
+    assert result.returncode == 0
+    assert all(option in result.stdout for option in ("--client-directory", "--symbol", "--target-date", "--port"))

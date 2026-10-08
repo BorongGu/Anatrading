@@ -26,6 +26,11 @@ def _parser():
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve", help="启动本机图形工作台")
     serve.add_argument("--port", type=_port, default=8765, help="仅监听127.0.0.1（默认8765）")
+    acquire = commands.add_parser("acquire-tdx", help="自动获取已验客户端日线并发布到运行中的工作台")
+    acquire.add_argument("--client-directory", type=Path, required=True)
+    acquire.add_argument("--symbol", choices=["600059.SH", "000001.SZ"], required=True)
+    acquire.add_argument("--target-date", required=True, help="需要实际观察的源日期 YYYY-MM-DD")
+    acquire.add_argument("--port", type=_port, default=8765)
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -52,6 +57,14 @@ def _parser():
 
 
 def _run(arguments):
+    if arguments.command == "acquire-tdx":
+        from .tdx_acquisition import acquire
+
+        result = acquire(arguments.root, arguments.client_directory, arguments.symbol,
+                         arguments.target_date, port=arguments.port)
+        return {key: result[key] for key in ("status", "error_code", "evidence_directory", "capture_state",
+                "target_observed", "coverage", "units", "raw_sha256", "snapshot_id", "attempt_id",
+                "reconciled", "reused") if key in result}
     if arguments.command == "serve":
         import uvicorn
         from .workbench import create_app
@@ -96,13 +109,15 @@ def _run(arguments):
 
 
 def main(argv=None):
+    from .tdx_acquisition import AcquireError
+
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8")
     arguments = _parser().parse_args(argv)
     try:
         result = _run(arguments)
-    except (StoreError, DecodeError, NumericError) as error:
+    except (StoreError, DecodeError, NumericError, AcquireError) as error:
         result = {"status": "error", "error_code": error.code}
     except OSError:
         result = {"status": "error", "error_code": "storage_io_error"}
@@ -113,7 +128,8 @@ def main(argv=None):
         result = {"status": "interrupted", "error_code": "process_interrupted"}
     print(json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":")))
     status = result.get("status") if isinstance(result, dict) else None
-    return 130 if status in {"cancelled", "interrupted"} else 2 if status in {"error", "failed", "rejected"} else 0
+    return 130 if status in {"cancelled", "interrupted"} else 2 if status in {
+        "error", "failed", "rejected", "not_covered", "refresh_unknown", "publication_unknown"} else 0
 
 
 if __name__ == "__main__":

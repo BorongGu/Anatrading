@@ -20,6 +20,7 @@ from .formats import FORMAT_IDS
 from .models import DecodeError
 from .numeric import NumericError
 from .store import EvidenceStore, StoreError
+from .tdx_acquisition import data_root_id
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -273,7 +274,7 @@ def create_app(root, *, port=8765, web_directory=None):
     async def config(request: Request):
         _parameters(request, set())
         return dict(csrf_token=token, formats=list(FORMAT_IDS), max_upload_bytes=_MAX_UPLOAD,
-                    max_query_rows=_MAX_ROWS, mode="retrospective")
+                    max_query_rows=_MAX_ROWS, mode="retrospective", data_root_id=data_root_id(root))
 
     @app.get("/api/snapshots")
     async def snapshots(request: Request):
