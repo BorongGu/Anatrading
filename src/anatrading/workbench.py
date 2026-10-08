@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from decimal import Decimal
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import re
@@ -252,12 +253,34 @@ def _export(store, snapshot_id, selection, kind, expected_id):
     return content, result["sha256"]
 
 
-def create_app(root, *, port=8765, web_directory=None):
+class _ShutdownResponse(JSONResponse):
+    def __init__(self, content, callback):
+        super().__init__(content, status_code=202)
+        self.callback = callback
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.callback()
+
+
+def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
     if type(port) is not int or not 1 <= port <= 65535:
         raise ValueError("invalid_port")
+    if on_shutdown is not None and (not callable(on_shutdown) or inspect.iscoroutinefunction(on_shutdown)
+                                   or inspect.iscoroutinefunction(getattr(on_shutdown, "__call__", None))):
+        raise ValueError("invalid_shutdown_callback")
     token = secrets.token_urlsafe(32)
     owner = _StoreThread(root)
     upload_busy = False
+    callback_called = False
+
+    def request_exit():
+        nonlocal callback_called
+        if not callback_called:
+            callback_called = True
+            on_shutdown()
 
     @asynccontextmanager
     async def lifespan(app):
@@ -289,6 +312,21 @@ def create_app(root, *, port=8765, web_directory=None):
         _parameters(request, set())
         return dict(csrf_token=token, formats=list(FORMAT_IDS), max_upload_bytes=_MAX_UPLOAD,
                     max_query_rows=_MAX_ROWS, mode="retrospective", data_root_id=data_root_id(root))
+
+    @app.post("/api/shutdown")
+    async def shutdown(request: Request):
+        _parameters(request, set())
+        try:
+            async for chunk in request.stream():
+                if chunk:
+                    raise _RequestError("invalid_request")
+        except ClientDisconnect:
+            raise _RequestError("upload_incomplete") from None
+        if on_shutdown is None:
+            raise _RequestError("shutdown_unavailable", 503)
+        response = _ShutdownResponse(dict(status="shutdown_requested", data_root_id=data_root_id(root)), request_exit)
+        owner.accepting = False
+        return response
 
     @app.get("/api/snapshots")
     async def snapshots(request: Request):

@@ -267,8 +267,8 @@ def _parameters(symbol, target_date, port):
         raise AcquireError("invalid_target_date") from None
 
 
-def _config(root, port):
-    status, raw = _request(port, "GET", "/api/config")
+def _config(root, port, *, budget=15):
+    status, raw = _request(port, "GET", "/api/config", budget=budget)
     value = _decode_json(raw)
     if (status != 200 or type(value) is not dict or value.get("data_root_id") != data_root_id(root)
             or type(value.get("csrf_token")) is not str or not value["csrf_token"]

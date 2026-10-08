@@ -27,6 +27,8 @@ def _parser():
     commands = parser.add_subparsers(dest="command", required=True)
     serve = commands.add_parser("serve", help="启动本机图形工作台")
     serve.add_argument("--port", type=_port, default=8765, help="仅监听127.0.0.1（默认8765）")
+    stop = commands.add_parser("stop-workbench", help="请求指定本机工作台正常关闭，等待在途工作完成")
+    stop.add_argument("--port", type=_port, default=8765)
     acquire = commands.add_parser("acquire-tdx", help="自动获取已验客户端日线并发布到运行中的工作台")
     acquire.add_argument("--client-directory", type=Path, required=True)
     acquire.add_argument("--symbol", choices=["600059.SH", "000001.SZ"], required=True)
@@ -80,14 +82,13 @@ def _run(arguments):
                 "target_observed", "coverage", "units", "raw_sha256", "snapshot_id", "attempt_id",
                 "reconciled", "reused", "run_id", "recovery_version", "source_status", "client_task_cancelled") if key in result}
     if arguments.command == "serve":
-        import uvicorn
-        from .workbench import create_app
+        from .workbench_lifecycle import serve
 
-        app = create_app(arguments.root, port=arguments.port)
-        print(f"准备启动 Anatrading：http://127.0.0.1:{arguments.port}", flush=True)
-        uvicorn.run(app, host="127.0.0.1", port=arguments.port, workers=1, loop="asyncio", http="h11",
-                    access_log=False, log_level="warning")
-        return {"status": "stopped"}
+        return serve(arguments.root, port=arguments.port)
+    if arguments.command == "stop-workbench":
+        from .workbench_lifecycle import stop
+
+        return stop(arguments.root, port=arguments.port)
     if arguments.command == "restore":
         return EvidenceStore.restore(arguments.backup, arguments.destination)
     with EvidenceStore(arguments.root) as store:
@@ -146,7 +147,8 @@ def main(argv=None):
     print(json.dumps(result, ensure_ascii=False, allow_nan=False, separators=(",", ":")))
     status = result.get("status") if isinstance(result, dict) else None
     return 130 if status in {"cancelled", "interrupted"} else 2 if status in {
-        "error", "failed", "rejected", "not_covered", "refresh_unknown", "publication_unknown", "dispatch_unknown"} else 0
+        "error", "failed", "rejected", "not_covered", "refresh_unknown", "publication_unknown", "dispatch_unknown",
+        "shutdown_unknown"} else 0
 
 
 if __name__ == "__main__":
