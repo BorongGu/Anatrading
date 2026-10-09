@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { checkedFetch, explain, jsonRequest, verifiedExportBlob, verifiedGeometryExportBlob } from './api.ts';
-import { assertReply, Generation, queryParameters } from './model.ts';
+import { assertReply, Generation, minuteReadNotice, queryParameters } from './model.ts';
 import { SourceChart } from './SourceChart.tsx';
 import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
 import { VolumeAnalysis } from './VolumeAnalysis.tsx';
@@ -118,6 +118,7 @@ export default function App() {
       if (!gate.current.isCurrent(generation)) return;
       assertReply(result, next, config.max_query_rows);
       replyRef.current = result; setReply(result); setPhase('ready');
+      return result;
     } catch (error) {
       if (!gate.current.isCurrent(generation)) return;
       invalidate(); setIssue(explain(error)); setPhase('error');
@@ -166,7 +167,8 @@ export default function App() {
       setNotice(`${daily ? '日线缓存' : '分钟数据'}${statusNames[attempt.status] ?? attempt.status}${attempt.error_code ? ` · ${explain(new Error(attempt.error_code))}` : ''}`);
       const catalog = await refreshCatalog();
       if (attempt.status === 'committed' && attempt.snapshot_id && catalog && gate.current.isCurrent(generation)) {
-        await loadQuery({ ...emptySelection, snapshot: attempt.snapshot_id }, catalog);
+        const received = await loadQuery({ ...emptySelection, snapshot: attempt.snapshot_id }, catalog);
+        if (!daily && received && replyRef.current === received) setNotice(minuteReadNotice(received.query));
       }
     } catch (error) {
       setNotice(`${explain(error)} 若连接中断，请刷新尝试账本核对读取结果。`);

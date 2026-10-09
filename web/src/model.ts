@@ -8,6 +8,23 @@ export class Generation {
   isCurrent(value: number): boolean { return value === this.value; }
 }
 
+export function minuteReadNotice(query: Pick<Query, 'metadata' | 'rows' | 'unlocated'>): string {
+  const labels = query.rows.map(row => row.label).filter((label): label is string => label !== null);
+  let first: string | null = null, last: string | null = null;
+  for (const label of labels) {
+    if (first === null || label < first) first = label;
+    if (last === null || label > last) last = label;
+  }
+  const end = query.metadata.source_end_time;
+  const target = typeof end === 'string' && /^[0-9]{14}$/.test(end)
+    ? `${end.slice(0, 4)}-${end.slice(4, 6)}-${end.slice(6, 8)}` : null;
+  const observed = target !== null && labels.some(label => label.slice(0, 10) === target);
+  const range = first === null ? '没有可定位分钟标签' : `实际源标签 ${first}～${last}`;
+  const requested = target === null ? '最新交易日覆盖未核' : `请求截止日期 ${target} · ${observed ? '已出现该日期' : '可定位记录未出现该日期'}`;
+  const beyond = target !== null && last !== null && last.slice(0, 10) > target ? ' · 包含请求日期之后的标签，时间范围待核' : '';
+  return `分钟数据已保存 · 返回${query.rows.length + query.unlocated.length}条 · ${range} · 标签无法定位 ${query.unlocated.length}条 · ${requested}${beyond} · 完整性与闭合未核`;
+}
+
 export const directionColors = { up: '#c64d57', down: '#16836d', equal: '#66758b', unknown: '#94a0af' };
 function coordinate(value: string | null): number | null {
   if (value === null || !/^-?\d+(?:\.\d+)?$/.test(value)) return null;
