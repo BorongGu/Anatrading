@@ -123,4 +123,14 @@ export interface DailyBackgroundReport {
   requested_rows: number | null; context_unlocated_rows: number;
 }
 export interface Config { csrf_token: string; formats: string[]; max_upload_bytes: number; max_query_rows: number; mode: string }
+export interface ReferenceReport {
+  method_id: 'tdx-reference-view-v1'; kind: 'calendar' | 'actions'; target: string; source_method: string;
+  selection: { start: string; end: string }; qualification: 'unverified_source_reference'; coverage: 'unverified';
+  returned_count: number; selected_count: number; before_start: number; after_end: number; duplicate_date_rows: number;
+  rows: { ordinal: number; date: string; source_date: string; source_type?: string; type_name?: string | null;
+    values?: Record<'Bonus' | 'AllotPrice' | 'ShareBonus' | 'Allotment', string> }[];
+  capture_id: string; captured_at: string; request_sha256: string; response_sha256: string;
+  historical_available_at: null; standard_units: 'unverified';
+  empty_shape: 'value_only_empty' | null;
+}
 export interface Attempt { attempt_id: string; status: string; snapshot_id?: string | null; error_code?: string | null; filename?: string; started_at?: string; format_id?: string }

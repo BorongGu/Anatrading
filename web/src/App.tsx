@@ -9,6 +9,7 @@ import { PriceChannel } from './PriceChannel.tsx';
 import { VolatilityAnalysis } from './VolatilityAnalysis.tsx';
 import { DailyVolume } from './DailyVolume.tsx';
 import { PathEfficiency } from './PathEfficiency.tsx';
+import { ReferenceData } from './ReferenceData.tsx';
 import { DailyBackground } from './DailyBackground.tsx';
 import { fields, fieldNames } from './types.ts';
 import type { Attempt, ChannelReport, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
@@ -321,6 +322,7 @@ export default function App() {
           {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} dailyVolumeLookback={dailyVolumeLookback} onDailyVolumeLookbackSelect={setDailyVolumeLookback} efficiencyLookback={efficiencyLookback} onEfficiencyLookbackSelect={setEfficiencyLookback} />}
           <QualityDetails query={q} />
         </>}
+        <ReferenceData config={config} />
         <footer>本地研究工具 · 单快照证据切片<span>图表由 <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a> 提供 · <a href="/licenses/lightweight-charts.LICENSE.txt" target="_blank" rel="noreferrer">Apache 2.0</a> · <a href="/licenses/lightweight-charts.NOTICE.txt" target="_blank" rel="noreferrer">NOTICE</a></span></footer>
       </main>
     </div>

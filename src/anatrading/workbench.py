@@ -32,6 +32,7 @@ from .price_channel import channel_report
 from .true_range import range_report
 from .daily_volume import daily_volume_report
 from .path_efficiency import efficiency_report
+from .tdx_reference import read_reference
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -55,6 +56,7 @@ _STORE_CODES = {
     "client_fingerprint_changed", "client_architecture_changed", "client_identity_unavailable",
     "source_path_outside_client", "source_file_limit", "http_result_unknown", "response_limit", "invalid_response",
     "invalid_tdx_symbol", "daily_cache_missing", "cache_unstable", "invalid_day_capture",
+    "invalid_tdx_reference_request", "invalid_tdx_reference_response", "tdx_reference_unavailable",
 }
 
 
@@ -528,6 +530,15 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
         finally:
             if not submitted:
                 upload_busy = False
+
+    @app.post("/api/read-tdx-reference")
+    async def read_tdx_reference(request: Request):
+        parameters = _parameters(request, {"kind", "target", "start", "end"}, ("kind", "target", "start", "end"))
+        async for chunk in request.stream():
+            if chunk:
+                raise _RequestError("invalid_request")
+        return {"reference": await owner.call(lambda store: read_reference(
+            root, Path(r"D:\tdx_64"), **parameters))}
 
     @app.get("/api/query/{snapshot_id}")
     async def query(snapshot_id: str, request: Request):
