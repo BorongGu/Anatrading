@@ -15,8 +15,9 @@ import { DailyBackground } from './DailyBackground.tsx';
 import { MinuteDailyReconciliation } from './MinuteDailyReconciliation.tsx';
 import { SourceActions } from './SourceActions.tsx';
 import { GapAnalysis } from './GapAnalysis.tsx';
+import { PivotAnalysis } from './PivotAnalysis.tsx';
 import { fields, fieldNames } from './types.ts';
-import type { Attempt, ChannelReport, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
+import type { Attempt, ChannelReport, Config, PivotReport, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
 
 const formatNames: Record<string, string> = { 'tdx-public-text-v1': '通达信 · 已审文本', 'tdx-public-day-v1': '通达信 · 日线 .day', 'baostock-decoded-v0.9.4': 'BaoStock · 已审解码正文', 'tdx-http-market-v1': '通达信 · 分钟接口记录' };
 const emptySelection: SelectionDraft = { snapshot: '', cutoff: '', start: '', end: '' };
@@ -56,6 +57,8 @@ export default function App() {
   const [backgroundWindow, setBackgroundWindow] = useState('60');
   const [channelLookback, setChannelLookback] = useState(20);
   const [channelReport, setChannelReport] = useState<ChannelReport | null>(null);
+  const [pivotRadius, setPivotRadius] = useState(2);
+  const [pivotReport, setPivotReport] = useState<PivotReport | null>(null);
   const [atrPeriod, setAtrPeriod] = useState(14);
   const [dailyVolumeLookback, setDailyVolumeLookback] = useState(20);
   const [efficiencyLookback, setEfficiencyLookback] = useState(10);
@@ -301,7 +304,7 @@ export default function App() {
             <div><span className="field-label">当前选择 · 无法定位</span><strong>{q.counts.unlocated_rows.toLocaleString()}<small> 条</small></strong></div>
             <div className="range-summary"><span className="field-label">选择内源标签范围</span><code>{q.rows[0]?.label ?? '空'} → {q.rows.at(-1)?.label ?? '空'}</code><small>缩放仅改变可视区域，不改变选择与导出</small></div>
           </section>
-          <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} />
+          <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} pivots={pivotReport?.radius === pivotRadius ? pivotReport : null} />
           <section className="panel export-panel"><div><strong>导出当前选择</strong><p>{q.counts.selected_rows} 条定位 ＋ {q.counts.unlocated_rows} 条无法定位 · 保留原字段、质量与版本</p><code title={q.query_id}>Q {q.query_id}</code></div>
             <div className="button-group"><button disabled={!!exporting} onClick={() => void exportSelection('json')}>{exporting === 'json' ? '校验中…' : '下载 JSON'}</button><button disabled={!!exporting} onClick={() => void exportSelection('parquet')}>{exporting === 'parquet' ? '校验中…' : '下载 Parquet'}</button><button disabled={!!exporting} onClick={() => void exportSelection('geometry')}>{exporting === 'geometry' ? '校验中…' : '导出K线结构JSON'}</button></div>
           </section>
@@ -326,6 +329,7 @@ export default function App() {
           {q.metadata.period === '1d' && <DailyVolume query={q} selected={selected} lookback={dailyVolumeLookback} onLookbackSelect={setDailyVolumeLookback} />}
           {q.metadata.period === '1d' && <PathEfficiency query={q} selected={selected} lookback={efficiencyLookback} onLookbackSelect={setEfficiencyLookback} />}
           {(q.metadata.period === '1d' || q.metadata.period === '1m') && <GapAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} />}
+          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <PivotAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} radius={pivotRadius} onRadiusSelect={setPivotRadius} report={pivotReport} onReport={setPivotReport} />}
           {q.metadata.period === '1d' && <SourceActions key={q.query_id} query={q} onChoose={chooseRow} />}
           {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} dailyVolumeLookback={dailyVolumeLookback} onDailyVolumeLookbackSelect={setDailyVolumeLookback} efficiencyLookback={efficiencyLookback} onEfficiencyLookbackSelect={setEfficiencyLookback} />}
           {q.metadata.period === '1m' && <MinuteDailyReconciliation query={q} dailySnapshot={backgroundSnapshot} />}

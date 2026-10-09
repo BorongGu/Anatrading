@@ -138,6 +138,24 @@ export interface GapReport {
   adjacency: 'adjacent_located_labels'; first_event_scope: 'first_unique_valid_located_before_interruption';
   context_unlocated_rows: number; coverage_reason: string | null; rows: GapRow[]; unlocated: GapRow[];
 }
+export interface PivotDecision { is_pivot: boolean | null; reason: string | null; pivot_id: string | null }
+export interface PivotRow {
+  ordinal: number; label: string | null; left_count: number; right_count: number; window_labels: string[];
+  confirmation_label: string | null; confirmation_ordinal: number | null; reason: string | null;
+  high: PivotDecision; low: PivotDecision;
+}
+export interface SourcePivot {
+  pivot_id: string; kind: 'high' | 'low'; price: string; anchor_ordinal: number; anchor_label: string;
+  confirmation_ordinal: number; confirmation_label: string; delay_source_labels: number;
+}
+export interface PivotReport {
+  method_id: 'source-window-pivots-v1'; query_id: string; context_query_id: string; pivots_id: string;
+  qualification: 'conditional_source_values'; radius: number; as_of_label: string | null;
+  anchor_scope: 'selected_source_rows'; window_unit: 'located_source_labels'; tie_policy: 'strict_no_ties';
+  confirmation_semantics: 'right_source_window_present'; context_unlocated_rows: number; coverage_reason: string | null;
+  members: { label: string; ordinals: number[]; high: string | null; low: string | null; reason: string | null }[];
+  rows: PivotRow[]; unlocated: PivotRow[]; events: SourcePivot[];
+}
 export interface RangeEstimate { value: string; lower: string; upper: string; display: string | null; display_reason: string | null }
 export interface RangeRow {
   ordinal: number; previous_date: string | null; previous_ordinals: number[];

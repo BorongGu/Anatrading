@@ -38,6 +38,7 @@ from .daily_screen import screen_report
 from .minute_daily_reconciliation import reconciliation_report
 from .source_actions import action_captures, action_window, captured_actions
 from .source_gaps import gap_report
+from .source_pivots import pivot_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -639,6 +640,27 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
             context = _bounded_query(store, snapshot_id, {key: value for key, value in selection.items()
                                                         if key in {"cutoff", "mode"}})
             return volume_report(query, context, lookback)
+
+        return JSONResponse(await owner.call(calculate))
+
+    @app.get("/api/source-pivots/{snapshot_id}")
+    async def source_pivots(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "query_id", "radius"}, ("query_id",))
+        selection = _selection(parameters)
+        try:
+            radius = int(parameters.get("radius", "2"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+        if not 1 <= radius <= 20:
+            raise _RequestError("invalid_request")
+
+        def calculate(store):
+            query = _bounded_query(store, snapshot_id, selection)
+            if query["query_id"] != parameters["query_id"]:
+                raise _RequestError("query_id_mismatch", 409)
+            context = (_bounded_query(store, snapshot_id, dict(cutoff=max(row["label"] for row in query["rows"])))
+                       if query["rows"] else query)
+            return pivot_report(query, context, radius)
 
         return JSONResponse(await owner.call(calculate))
 

@@ -1,5 +1,5 @@
 import { fields } from './types.ts';
-import type { ChannelReport, Display, GapReport, GeometryEnvelope, GeometryRow, Query, Reply, Row, SelectionDraft } from './types.ts';
+import type { ChannelReport, Display, GapReport, GeometryEnvelope, GeometryRow, PivotReport, Query, Reply, Row, SelectionDraft } from './types.ts';
 
 export class Generation {
   private value = 0;
@@ -201,4 +201,56 @@ export function assertGapReport(query: Query, report: GapReport): void {
         || [gap.near_event, gap.far_event].some(event => event && event.label >= gap.interrupted_at!.label))) throw new Error('invalid_query_response');
     });
   }
+}
+
+export function assertPivotReport(query: Query, report: PivotReport, radius: number): void {
+  let asof = query.rows.reduce<string | null>((value, row) => value === null || row.label! > value ? row.label : value, null);
+  if (asof !== null && query.selection.cutoff !== null && query.selection.cutoff < asof) asof = query.selection.cutoff;
+  if (!report || report.method_id !== 'source-window-pivots-v1' || report.query_id !== query.query_id
+    || report.qualification !== 'conditional_source_values' || report.radius !== radius || !Number.isInteger(radius) || radius < 1 || radius > 20
+    || report.as_of_label !== asof || report.anchor_scope !== 'selected_source_rows' || report.window_unit !== 'located_source_labels'
+    || report.tie_policy !== 'strict_no_ties' || report.confirmation_semantics !== 'right_source_window_present'
+    || !hexId.test(report.pivots_id) || !hexId.test(report.context_query_id) || !Array.isArray(report.events)
+    || !Array.isArray(report.members)) throw new Error('invalid_query_response');
+  const expected = new Map<string, { ordinal: number; kind: string; label: string; confirmation: string; confirmationOrdinal: number }>();
+  for (const scope of ['rows', 'unlocated'] as const) {
+    if (!Array.isArray(report[scope]) || report[scope].length !== query[scope].length) throw new Error('invalid_query_response');
+    report[scope].forEach((row, index) => {
+      if (row.ordinal !== query[scope][index].ordinal || row.label !== query[scope][index].label) throw new Error('invalid_query_response');
+      for (const kind of ['high', 'low'] as const) {
+        const decision = row[kind];
+        if (!decision || ![true, false, null].includes(decision.is_pivot)) throw new Error('invalid_query_response');
+        if (decision.is_pivot === true) {
+          if (!decision.pivot_id || !hexId.test(decision.pivot_id) || expected.has(decision.pivot_id) || row.reason !== null || decision.reason !== null
+            || row.label === null || row.confirmation_label === null || row.confirmation_label <= row.label || asof === null || row.confirmation_label > asof
+            || row.left_count !== radius || row.right_count !== radius || !Number.isSafeInteger(row.confirmation_ordinal) || row.confirmation_ordinal! < 1) throw new Error('invalid_query_response');
+          expected.set(decision.pivot_id, { ordinal: row.ordinal, kind, label: row.label, confirmation: row.confirmation_label, confirmationOrdinal: row.confirmation_ordinal! });
+        } else if (decision.pivot_id !== null) throw new Error('invalid_query_response');
+      }
+    });
+  }
+  if (expected.size !== report.events.length) throw new Error('invalid_query_response');
+  for (const event of report.events) {
+    const origin = expected.get(event.pivot_id);
+    if (!origin || origin.ordinal !== event.anchor_ordinal || origin.kind !== event.kind || origin.label !== event.anchor_label
+      || origin.confirmation !== event.confirmation_label || origin.confirmationOrdinal !== event.confirmation_ordinal
+      || event.delay_source_labels !== radius || typeof event.price !== 'string' || !/^\d+(\.\d+)?$/.test(event.price)) throw new Error('invalid_query_response');
+    expected.delete(event.pivot_id);
+  }
+}
+
+export function buildPivotPlot(reply: Reply, report: PivotReport | null) {
+  if (!report || !['1d', '1m'].includes(reply.query.metadata.period ?? '')) return null;
+  try { assertPivotReport(reply.query, report, report.radius); } catch { return null; }
+  const positions = new Map(reply.query.rows.map((row, index) => [row.ordinal, index]));
+  const markers: { time: number; position: 'aboveBar' | 'belowBar'; shape: 'arrowDown' | 'arrowUp'; color: string; text: string }[] = [];
+  let skipped = 0;
+  for (const event of report.events) {
+    const time = positions.get(event.confirmation_ordinal);
+    if (time === undefined || reply.query.rows[time].label !== event.confirmation_label || !reply.display[time]?.ohlc_drawable) { skipped += 1; continue; }
+    markers.push({ time, position: event.kind === 'high' ? 'aboveBar' : 'belowBar', shape: event.kind === 'high' ? 'arrowDown' : 'arrowUp',
+      color: event.kind === 'high' ? '#4169a1' : '#ad6717', text: event.kind === 'high' ? '确高' : '确低' });
+  }
+  markers.sort((a, b) => a.time - b.time);
+  return { markers, skipped };
 }
