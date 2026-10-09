@@ -26,6 +26,7 @@ from .numeric import NumericError
 from .store import EvidenceStore, StoreError, _identity
 from .tdx_acquisition import AcquireError, data_root_id
 from .tdx_market import read_minutes
+from .tdx_daily import read_daily_cache
 from .volume_at_time import volume_report
 from .price_channel import channel_report
 from .true_range import range_report
@@ -51,6 +52,7 @@ _STORE_CODES = {
     "invalid_tdx_http_capture", "invalid_tdx_http_response", "invalid_tdx_http_rows",
     "client_fingerprint_changed", "client_architecture_changed", "client_identity_unavailable",
     "source_path_outside_client", "source_file_limit", "http_result_unknown", "response_limit", "invalid_response",
+    "invalid_tdx_symbol", "daily_cache_missing", "cache_unstable", "invalid_day_capture",
 }
 
 
@@ -478,6 +480,38 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
             raw = read_minutes(Path(r"D:\tdx_64"), symbol, count=count, end_time=parameters.get("end_time", ""))
             return store.import_bytes(raw, "tdx-http-market-v1", filename=f"{symbol}.http.json",
                                       interpretation={"instrument": symbol, "venue": symbol[-2:], "asset_type": "stock"})
+
+        def finished(future):
+            nonlocal upload_busy
+            upload_busy = False
+
+        upload_busy, submitted = True, False
+        try:
+            future = owner.submit(operation)
+            future.add_done_callback(finished)
+            submitted = True
+            return {"attempt": await asyncio.shield(future)}
+        finally:
+            if not submitted:
+                upload_busy = False
+
+    @app.post("/api/read-tdx-daily-cache")
+    async def read_tdx_daily_cache(request: Request):
+        nonlocal upload_busy
+        parameters = _parameters(request, {"symbol"}, ("symbol",))
+        async for chunk in request.stream():
+            if chunk:
+                raise _RequestError("invalid_request")
+        if not owner.accepting:
+            raise _RequestError("service_closing", 503)
+        if upload_busy:
+            raise _RequestError("upload_in_progress", 409)
+        symbol = parameters["symbol"]
+
+        def operation(store):
+            raw = read_daily_cache(Path(r"D:\tdx_64"), symbol)
+            return store.import_bytes(raw, "tdx-public-day-v1", filename=f"{symbol}.day",
+                                      interpretation={"instrument": symbol, "venue": symbol[-2:]})
 
         def finished(future):
             nonlocal upload_busy

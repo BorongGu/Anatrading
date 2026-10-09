@@ -43,6 +43,12 @@ def _parser():
     minutes.add_argument("--symbol", required=True, help="证券代码，例如600059.SH")
     minutes.add_argument("--count", type=int, default=720)
     minutes.add_argument("--end-time", default="", help="历史截止YYYYMMDDHHMMSS，留空取最新")
+    daily = commands.add_parser("read-tdx-daily-cache", help="读取单证券原整数日线缓存，无需手动导出")
+    daily.add_argument("--client-directory", type=Path, default=Path(r"D:\tdx_64"))
+    daily.add_argument("--symbol", required=True)
+    all_daily = commands.add_parser("import-tdx-daily-caches", help="读取当前来源证券池已有日线缓存并逐文件发布到运行中的工作台")
+    all_daily.add_argument("--client-directory", type=Path, default=Path(r"D:\tdx_64"))
+    all_daily.add_argument("--port", type=_port, default=8765)
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -86,6 +92,10 @@ def _run(arguments):
         return {key: result[key] for key in ("status", "error_code", "evidence_directory", "capture_state",
                 "target_observed", "coverage", "units", "raw_sha256", "snapshot_id", "attempt_id",
                 "reconciled", "reused", "run_id", "recovery_version", "source_status", "client_task_cancelled") if key in result}
+    if arguments.command == "import-tdx-daily-caches":
+        from .tdx_daily import import_current_caches
+
+        return import_current_caches(arguments.root, arguments.client_directory, port=arguments.port)
     if arguments.command == "serve":
         from .workbench_lifecycle import serve
 
@@ -97,6 +107,12 @@ def _run(arguments):
     if arguments.command == "restore":
         return EvidenceStore.restore(arguments.backup, arguments.destination)
     with EvidenceStore(arguments.root) as store:
+        if arguments.command == "read-tdx-daily-cache":
+            from .tdx_daily import read_daily_cache
+
+            raw = read_daily_cache(arguments.client_directory, arguments.symbol)
+            return store.import_bytes(raw, "tdx-public-day-v1", filename=f"{arguments.symbol}.day",
+                                      interpretation={"instrument": arguments.symbol, "venue": arguments.symbol[-2:]})
         if arguments.command == "read-tdx-minutes":
             from .tdx_market import read_minutes
 

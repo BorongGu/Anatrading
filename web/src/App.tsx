@@ -43,6 +43,8 @@ export default function App() {
   const [minuteMarket, setMinuteMarket] = useState('SH');
   const [minuteCount, setMinuteCount] = useState('720');
   const [minuteEnd, setMinuteEnd] = useState('');
+  const [readSource, setReadSource] = useState('daily_cache');
+  const [snapshotFilter, setSnapshotFilter] = useState('');
   const [backgroundSnapshot, setBackgroundSnapshot] = useState('');
   const [backgroundWindow, setBackgroundWindow] = useState('60');
   const [channelLookback, setChannelLookback] = useState(20);
@@ -142,15 +144,19 @@ export default function App() {
   async function readMinuteData(event: FormEvent) {
     event.preventDefault();
     if (!config || importing) return;
-    const generation = invalidate(); setImporting(true); setNotice('正在读取通达信分钟数据…');
-    const parameters = new URLSearchParams({ symbol: `${minuteCode.trim()}.${minuteMarket}`, count: minuteCount });
-    if (minuteEnd) parameters.set('end_time', minuteEnd.replaceAll('-', '') + '150000');
+    const daily = readSource === 'daily_cache';
+    const generation = invalidate(); setImporting(true); setNotice(`正在读取通达信${daily ? '日线缓存' : '分钟数据'}…`);
+    const parameters = new URLSearchParams({ symbol: `${minuteCode.trim()}.${minuteMarket}` });
+    if (!daily) {
+      parameters.set('count', minuteCount);
+      if (minuteEnd) parameters.set('end_time', minuteEnd.replaceAll('-', '') + '150000');
+    }
     try {
-      const result = await jsonRequest<{ attempt: Attempt }>(`/api/read-tdx-minutes?${parameters}`, {
+      const result = await jsonRequest<{ attempt: Attempt }>(`/api/${daily ? 'read-tdx-daily-cache' : 'read-tdx-minutes'}?${parameters}`, {
         method: 'POST', headers: { 'X-Anatrading-Token': config.csrf_token },
       });
       const attempt = result.attempt;
-      setNotice(`分钟数据${statusNames[attempt.status] ?? attempt.status}${attempt.error_code ? ` · ${explain(new Error(attempt.error_code))}` : ''}`);
+      setNotice(`${daily ? '日线缓存' : '分钟数据'}${statusNames[attempt.status] ?? attempt.status}${attempt.error_code ? ` · ${explain(new Error(attempt.error_code))}` : ''}`);
       const catalog = await refreshCatalog();
       if (attempt.status === 'committed' && attempt.snapshot_id && catalog && gate.current.isCurrent(generation)) {
         await loadQuery({ ...emptySelection, snapshot: attempt.snapshot_id }, catalog);
@@ -191,6 +197,8 @@ export default function App() {
   }
 
   const snapshot = snapshots.find(item => item.snapshot_id === selection.snapshot);
+  const matchingSnapshots = snapshots.filter(item => `${snapshotName(item)} ${item.snapshot_id}`.toLowerCase().includes(snapshotFilter.trim().toLowerCase()));
+  const visibleSnapshots = matchingSnapshots.slice().reverse().slice(0, 200);
   const q = reply?.query;
   const selectedGeometry = selected && reply ? reply.geometry.rows.find(row => row.ordinal === selected.ordinal)
     ?? reply.geometry.unlocated.find(row => row.ordinal === selected.ordinal) : undefined;
@@ -205,28 +213,34 @@ export default function App() {
       <aside className="sidebar">
         <div className="section-heading"><h2>数据快照</h2><button className="quiet" onClick={() => void refreshCatalog()} disabled={!config || importing}>刷新</button></div>
         <p className="subtle">按原件与合同独立保存，切换时重新核验。</p>
+        <label>筛选来源<input value={snapshotFilter} onChange={event => setSnapshotFilter(event.target.value)} placeholder="证券代码、名称或快照ID" /></label>
+        <p className="subtle">共 {snapshots.length} 份快照；匹配 {matchingSnapshots.length} 份，显示前 {visibleSnapshots.length} 份。</p>
         <label className="field-label" htmlFor="snapshot">选择快照</label>
         <select id="snapshot" value={selection.snapshot} disabled={!config} onChange={event => void loadQuery({ ...emptySelection, snapshot: event.target.value })}>
           <option value="">请选择数据快照</option>
-          {snapshots.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 8)}</option>)}
+          {snapshot && !visibleSnapshots.includes(snapshot) && <option value={snapshot.snapshot_id}>{snapshotName(snapshot)} · 当前选择</option>}
+          {visibleSnapshots.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 8)}</option>)}
         </select>
         <div className="snapshot-list">
-          {snapshots.slice().reverse().map(item => <button className={`snapshot-card ${selection.snapshot === item.snapshot_id ? 'active' : ''}`} key={item.snapshot_id}
+          {visibleSnapshots.map(item => <button className={`snapshot-card ${selection.snapshot === item.snapshot_id ? 'active' : ''}`} key={item.snapshot_id}
             onClick={() => void loadQuery({ ...emptySelection, snapshot: item.snapshot_id })}>
             <strong>{snapshotName(item)}</strong><span>{formatNames[item.manifest.contract?.format_id ?? ''] ?? item.manifest.contract?.format_id ?? '来源未注明'}</span>
             <small>{item.row_count.toLocaleString()} 条源记录 · {item.snapshot_id.slice(0, 8)}</small>
           </button>)}
           {!snapshots.length && <div className="sidebar-empty">尚无已提交快照。<br />先导入一份支持的原始文件。</div>}
         </div>
-        <details className="import-panel" open><summary>读取通达信分钟数据</summary>
+        <details className="import-panel" open><summary>自动读取通达信数据</summary>
           <form onSubmit={readMinuteData}>
-            <label>股票代码<input value={minuteCode} onChange={event => setMinuteCode(event.target.value)} pattern="[0-9]{6}" maxLength={6} required disabled={!config || importing} /></label>
+            <label>数据来源<select value={readSource} onChange={event => setReadSource(event.target.value)} disabled={!config || importing}>
+              <option value="daily_cache">日线 · 原始缓存整数</option><option value="minute_http">1分钟 · 本地行情接口</option>
+            </select></label>
+            <label>证券代码<input value={minuteCode} onChange={event => setMinuteCode(event.target.value)} pattern="[0-9]{6}" maxLength={6} required disabled={!config || importing} /></label>
             <label>市场<select value={minuteMarket} onChange={event => setMinuteMarket(event.target.value)} disabled={!config || importing}>
               <option value="SH">上海</option><option value="SZ">深圳</option><option value="BJ">北京</option>
             </select></label>
-            <label>分钟条数<input type="number" min="1" max={config?.max_query_rows ?? 20000} value={minuteCount} onChange={event => setMinuteCount(event.target.value)} required disabled={!config || importing} /></label>
-            <label>截止日期（留空取最新）<input type="date" value={minuteEnd} onChange={event => setMinuteEnd(event.target.value)} disabled={!config || importing} /></label>
-            <p className="subtle">先打开并登录通达信。读取1分钟数据，原值独立保存。</p>
+            {readSource === 'minute_http' && <><label>分钟条数<input type="number" min="1" max={config?.max_query_rows ?? 20000} value={minuteCount} onChange={event => setMinuteCount(event.target.value)} required disabled={!config || importing} /></label>
+              <label>截止日期（留空取最新）<input type="date" value={minuteEnd} onChange={event => setMinuteEnd(event.target.value)} disabled={!config || importing} /></label></>}
+            <p className="subtle">{readSource === 'daily_cache' ? '直接读取客户端已有日线缓存，保留原整数成交量，无需手动导出。缺失缓存会明确报告。' : '先打开并登录通达信。读取1分钟数据，原值独立保存。'}</p>
             <button className="primary" disabled={!config || importing}>{importing ? '处理中…' : '读取并查看K线'}</button>
           </form>
         </details>
