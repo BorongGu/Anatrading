@@ -36,6 +36,7 @@ from .tdx_reference import read_reference
 from .daily_coverage import collection_runs, coverage_report
 from .daily_screen import screen_report
 from .minute_daily_reconciliation import reconciliation_report
+from .source_actions import action_captures, action_window, captured_actions
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -64,6 +65,8 @@ _STORE_CODES = {
     "invalid_daily_screen",
     "invalid_daily_followup",
     "followup_screen_mismatch",
+    "invalid_reference_capture", "reference_capture_mismatch", "reference_capture_unavailable",
+    "reference_capture_not_actions", "invalid_action_window", "action_reference_window_unavailable",
 }
 
 
@@ -421,6 +424,28 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
     async def attempts(request: Request):
         _parameters(request, set())
         return {"attempts": await owner.call(lambda store: store.attempts())}
+
+    @app.get("/api/action-captures")
+    async def saved_action_captures(request: Request):
+        _parameters(request, set())
+        return {"captures": await owner.call(lambda store: action_captures(root))}
+
+    @app.get("/api/action-window/{snapshot_id}")
+    async def saved_action_window(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "capture_id", "query_id", "start", "end"},
+                                 ("capture_id", "query_id", "start", "end"))
+        selection = _selection(parameters)
+
+        def calculate(store):
+            query = _bounded_query(store, snapshot_id, selection)
+            if query["query_id"] != parameters["query_id"]:
+                raise _RequestError("query_id_mismatch", 409)
+            reference = captured_actions(root, parameters["capture_id"])
+            if _pair_claim(query["metadata"]) != _pair_claim(dict(source_code=reference["target"])):
+                raise _RequestError("background_symbol_mismatch", 409)
+            return action_window(query, reference, parameters["start"], parameters["end"])
+
+        return JSONResponse(await owner.call(calculate))
 
     @app.get("/api/daily-cache-runs")
     async def daily_cache_runs(request: Request):

@@ -13,6 +13,7 @@ import { ReferenceData } from './ReferenceData.tsx';
 import { DailyCoverage } from './DailyCoverage.tsx';
 import { DailyBackground } from './DailyBackground.tsx';
 import { MinuteDailyReconciliation } from './MinuteDailyReconciliation.tsx';
+import { SourceActions } from './SourceActions.tsx';
 import { fields, fieldNames } from './types.ts';
 import type { Attempt, ChannelReport, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
 
@@ -323,6 +324,7 @@ export default function App() {
           {q.metadata.period === '1d' && <VolatilityAnalysis query={q} selected={selected} period={atrPeriod} onPeriodSelect={setAtrPeriod} />}
           {q.metadata.period === '1d' && <DailyVolume query={q} selected={selected} lookback={dailyVolumeLookback} onLookbackSelect={setDailyVolumeLookback} />}
           {q.metadata.period === '1d' && <PathEfficiency query={q} selected={selected} lookback={efficiencyLookback} onLookbackSelect={setEfficiencyLookback} />}
+          {q.metadata.period === '1d' && <SourceActions key={q.query_id} query={q} onChoose={chooseRow} />}
           {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} dailyVolumeLookback={dailyVolumeLookback} onDailyVolumeLookbackSelect={setDailyVolumeLookback} efficiencyLookback={efficiencyLookback} onEfficiencyLookbackSelect={setEfficiencyLookback} />}
           {q.metadata.period === '1m' && <MinuteDailyReconciliation query={q} dailySnapshot={backgroundSnapshot} />}
           <QualityDetails query={q} />

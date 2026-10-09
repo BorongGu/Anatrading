@@ -149,3 +149,17 @@ export interface ReferenceReport {
   empty_shape: 'value_only_empty' | null;
 }
 export interface Attempt { attempt_id: string; status: string; snapshot_id?: string | null; error_code?: string | null; filename?: string; started_at?: string; format_id?: string }
+export interface ActionCapture {
+  capture_id: string; status: string; target?: string; captured_at?: string;
+  selection?: { start: string; end: string }; returned_count?: number; error_code?: string;
+}
+export interface ActionWindow {
+  method_id: 'source-action-window-v1'; query_id: string; action_window_id: string; capture_id: string;
+  target: string; start_exclusive: string; end_inclusive: string; qualification: 'retrospective_source_records';
+  captured_at: string; request_sha256: string; response_sha256: string;
+  pairing_status: 'assumed_text_match'; coverage: 'unverified'; historical_available_at: null;
+  request_range_status: string; capture_selection: { start: string; end: string }; returned_count: number;
+  observation_status: string; selected_count: number; duplicate_selected_date_rows: number;
+  unreadable_query_date_ordinals: number[];
+  rows: (ReferenceReport['rows'][number] & { query_ordinals: number[]; link_reason: string | null })[];
+}
