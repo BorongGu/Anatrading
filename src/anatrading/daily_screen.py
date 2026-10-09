@@ -1,10 +1,10 @@
 """Exact, explicitly dated conditions on a fixed current-source collection."""
 from datetime import date
 from fractions import Fraction
-from functools import lru_cache
 import struct
 
-from .daily_coverage import selected_collection, verified_cache
+from .daily_coverage import selected_collection, verified_cache, _native_date_label as _date_label
+from .daily_followup import validate_interval, source_change, group_summary
 from .daily_volume import daily_volume_report
 from .formats import _day
 from .numeric import NumericError, decimal_text, decimal_value
@@ -12,16 +12,6 @@ from .path_efficiency import efficiency_report
 from .price_channel import channel_report
 from .store import _identity
 from .tdx_acquisition import AcquireError
-
-
-@lru_cache(maxsize=32768)
-def _date_label(value):
-    if not 10000000 <= value <= 99999999:
-        return None
-    try:
-        return date(value//10000, value//100 % 100, value % 100).isoformat()
-    except ValueError:
-        return None
 
 
 def validate_parameters(*, source_date, channel_lookback=20, volume_lookback=20, efficiency_lookback=10,
@@ -99,8 +89,11 @@ def screen_values(raw, snapshot_id, **parameters):
     return result
 
 
-def screen_report(root, snapshots, run_ids, **parameters):
+def screen_report(root, snapshots, run_ids, *, evaluation_date=None, expected_screen_id=None, **parameters):
     params = validate_parameters(**parameters)
+    if evaluation_date is not None: validate_interval(params['source_date'],evaluation_date)
+    if expected_screen_id is not None and evaluation_date is None:
+        raise AcquireError('invalid_daily_followup')
     pool, pool_sha, outcomes = selected_collection(root, run_ids)
     catalog = {snapshot['snapshot_id']: snapshot for snapshot in snapshots}
     counts = dict(pool=len(pool), processed=len(outcomes), committed=0, missing=0, failed=0,
@@ -110,6 +103,8 @@ def screen_report(root, snapshots, run_ids, **parameters):
     for symbol in pool:
         item = outcomes.get(symbol, dict(status='unprocessed'))
         row = dict(symbol=symbol, status=item['status'], snapshot_id=None, raw_sha256=None, analysis=None)
+        if evaluation_date is not None:
+            row.update(group=None,observation=dict(status='not_grouped',reason='screen_not_eligible',start=None,end=None,change=None))
         if item['status'] == 'committed':
             try:
                 snapshot = catalog[item['snapshot_id']]
@@ -126,6 +121,9 @@ def screen_report(root, snapshots, run_ids, **parameters):
             counts['not_evaluated'] += int(not analysis['eligible'])
             state = 'matched' if analysis['matched'] else 'unmatched' if analysis['eligible'] else 'not_evaluated'
             row.update(status=state, snapshot_id=item['snapshot_id'], raw_sha256=item['raw_sha256'], analysis=analysis)
+            if evaluation_date is not None and analysis['eligible']:
+                row.update(group='matched' if analysis['matched'] else 'other_eligible',
+                           observation=source_change(raw,params['source_date'],evaluation_date))
         elif item['status'] != 'unprocessed':
             counts['missing' if item['status'] == 'missing' else 'failed'] += 1
         rows.append(row)
@@ -136,4 +134,19 @@ def screen_report(root, snapshots, run_ids, **parameters):
                   unknowns=['historical_universe', 'known_at', 'bar_closure', 'adjustment', 'quantity_unit', 'calendar_coverage', 'synchronous_capture'],
                   flat_policy='zero_with_explicit_reason', enabled_conditions=[name for name in
                       ('channel_relation', 'minimum_volume', 'minimum_efficiency', 'direction') if params[name] is not None])
-    return dict(report, screen_id=_identity(report))
+    if evaluation_date is not None:
+        source_report = dict(report, rows=[{name: value for name, value in row.items()
+                                           if name not in {'group', 'observation'}} for row in rows])
+        source_screen_id = _identity(source_report)
+        if expected_screen_id is not None and source_screen_id != expected_screen_id:
+            raise AcquireError('followup_screen_mismatch')
+        report.update(method_id='current-pool-daily-followup-v1',
+                      source_screen_id=source_screen_id,
+                      parameters=dict(params,evaluation_date=evaluation_date),
+                      qualification='ex_post_conditional_source_prices',
+                      quantile_policy='type7_exact_linear_interpolation',
+                      display_policy=dict(percent_places=4,rounding='half_even',negative_zero=False),
+                      groups={group:group_summary(rows,group) for group in ['matched','other_eligible']})
+        report['unknowns'] += ['corporate_actions','execution_price','costs','selection_bias']
+        return dict(report,followup_id=_identity(report))
+    return dict(report,screen_id=_identity(report))

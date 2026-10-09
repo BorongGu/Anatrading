@@ -61,6 +61,8 @@ _STORE_CODES = {
     "invalid_tdx_reference_request", "invalid_tdx_reference_response", "tdx_reference_unavailable",
     "invalid_daily_cache_runs", "daily_cache_evidence_mismatch",
     "invalid_daily_screen",
+    "invalid_daily_followup",
+    "followup_screen_mismatch",
 }
 
 
@@ -439,6 +441,22 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
         except ValueError:
             raise _RequestError("invalid_daily_screen") from None
         return {"screen": await owner.call(lambda store: screen_report(root, store.snapshot_catalog(), run_ids, **parameters))}
+
+    @app.get("/api/daily-followup")
+    async def daily_followup(request: Request):
+        parameters = _parameters(request, {"run_ids", "source_date", "evaluation_date", "screen_id", "channel_lookback", "volume_lookback",
+            "efficiency_lookback", "channel_relation", "minimum_volume", "minimum_efficiency", "direction"},
+            ("run_ids", "source_date", "evaluation_date"))
+        run_ids = parameters.pop("run_ids").split(",")
+        expected_screen_id = parameters.pop("screen_id", None)
+        try:
+            for name in ("channel_lookback", "volume_lookback", "efficiency_lookback"):
+                if name in parameters:
+                    parameters[name] = int(parameters[name])
+        except ValueError:
+            raise _RequestError("invalid_daily_screen") from None
+        return {"followup": await owner.call(lambda store: screen_report(
+            root, store.snapshot_catalog(), run_ids, expected_screen_id=expected_screen_id, **parameters))}
 
     @app.post("/api/import")
     async def ingest(request: Request):

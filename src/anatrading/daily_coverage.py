@@ -1,6 +1,7 @@
 """Inspect explicitly selected native collection runs and their stored source dates."""
 from collections import Counter
 from datetime import date
+from functools import lru_cache
 import hashlib
 import json
 from pathlib import Path
@@ -41,15 +42,18 @@ def collection_runs(root):
     return result
 
 
+@lru_cache(maxsize=32768)
+def _native_date_label(value):
+    if not 10000000 <= value <= 99999999:
+        return None
+    try:
+        return date(value//10000, value//100 % 100, value % 100).isoformat()
+    except ValueError:
+        return None
+
+
 def _dates(raw):
-    values = []
-    for (value,) in struct.iter_unpack('<I28x', raw):
-        try:
-            if not 10000000 <= value <= 99999999:
-                raise ValueError()
-            values.append(date(value//10000, value//100 % 100, value % 100).isoformat())
-        except ValueError:
-            values.append(None)
+    values = [_native_date_label(value) for (value,) in struct.iter_unpack('<I28x', raw)]
     known = [value for value in values if value is not None]
     return dict(first_record_date=values[0], last_record_date=values[-1],
                 earliest_source_date=min(known, default=None), latest_source_date=max(known, default=None),

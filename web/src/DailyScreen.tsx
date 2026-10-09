@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { checkedFetch, explain } from './api.ts';
 import type { VolumeFraction } from './types.ts';
+import { DailyFollowup } from './DailyFollowup.tsx';
 
 interface Analysis {
   ordinal: number | null; close: string | null; reason: string | null;
@@ -12,9 +13,13 @@ interface Analysis {
 }
 interface ScreenRow { symbol: string; status: string; snapshot_id: string | null; raw_sha256: string | null; analysis: Analysis | null }
 export interface ScreenWindows { channel_lookback: number; volume_lookback: number; efficiency_lookback: number }
+export interface ScreenParameters extends ScreenWindows {
+  source_date: string; channel_relation: string | null; minimum_volume: string | null;
+  minimum_efficiency: string | null; direction: string | null;
+}
 interface Screen {
   method_id: string; screen_id: string; run_ids: string[]; enabled_conditions: string[];
-  parameters: ScreenWindows & { source_date: string };
+  parameters: ScreenParameters;
   counts: { pool: number; processed: number; committed: number; missing: number; failed: number; unprocessed: number; target_unique: number; target_missing: number; target_duplicate: number; date_set_unknown: number; eligible: number; matched: number; not_evaluated: number };
   rows: ScreenRow[];
 }
@@ -99,6 +104,7 @@ export function DailyScreen({ runIds, onSelect }: { runIds: string[]; onSelect: 
       })}</tbody></table></div>
       {rows.length > 100 && <div className="pagination"><button disabled={page === 0} onClick={() => setPage(page-1)}>上一页</button><span>第 {page+1}／{Math.ceil(rows.length/100)} 页</span><button disabled={(page+1)*100 >= rows.length} onClick={() => setPage(page+1)}>下一页</button></div>}
       <details><summary>固定结果身份</summary><code>{report.screen_id}</code><p className="subtle">导出保留全部源池记录、参数、逐项条件、窗口成员、原始哈希及快照；更换原件或参数会产生不同结果身份。</p></details>
+      <DailyFollowup parameters={report.parameters} runIds={report.run_ids} screenId={report.screen_id} onSelect={onSelect} />
     </>}
   </div>;
 }
