@@ -1,5 +1,5 @@
 import { fields } from './types.ts';
-import type { ChannelReport, Display, GapReport, GeometryEnvelope, GeometryRow, PivotReport, Query, Reply, Row, SelectionDraft } from './types.ts';
+import type { AggregationReport, ChannelReport, Display, GapReport, GeometryEnvelope, GeometryRow, PivotReport, Query, Reply, Row, SelectionDraft } from './types.ts';
 
 export class Generation {
   private value = 0;
@@ -62,6 +62,57 @@ export function buildPlot(rows: Row[], display: Display[]) {
     status.push(notes);
   });
   return { candles, volumes, labels: rows.map(row => row.label ?? ''), status };
+}
+
+export function assertAggregationReport(query: Query, report: AggregationReport, targetMinutes: number): void {
+  let asof = query.rows.reduce<string | null>((last, row) => last === null || row.label! > last ? row.label : last, null);
+  if (asof !== null && query.selection.cutoff !== null && query.selection.cutoff < asof) asof = query.selection.cutoff;
+  if (!report || report.method_id !== 'selected-minute-label-aggregation-v1' || report.query_id !== query.query_id
+    || report.snapshot_id !== query.snapshot_id || report.target_minutes !== targetMinutes || report.as_of_label !== asof
+    || report.template_id !== 'observed-600059-240-clocks-v1' || report.member_scope !== 'selected_records_only'
+    || report.qualification !== 'conditional_source_values' || report.bucket_label_semantics !== 'nominal_last_template_label'
+    || report.completeness_semantics !== 'selected_template_members_present_not_market_bar_closed'
+    || !hexId.test(report.aggregation_id) || !Array.isArray(report.buckets) || !Array.isArray(report.excluded)) throw new Error('invalid_query_response');
+  const source = new Map([...query.rows, ...query.unlocated].map(row => [row.ordinal, row.label]));
+  const accounted = new Set<number>(), ids = new Set<string>();
+  function account(ordinal: number, label: string | null) {
+    if (!source.has(ordinal) || source.get(ordinal) !== label || accounted.has(ordinal)) throw new Error('invalid_query_response');
+    accounted.add(ordinal);
+  }
+  let previous = '';
+  for (const bucket of report.buckets) {
+    if (!hexId.test(bucket.bucket_id) || ids.has(bucket.bucket_id) || bucket.end_label <= previous
+      || !Array.isArray(bucket.expected_labels) || bucket.expected_labels.length !== targetMinutes
+      || bucket.first_label !== bucket.expected_labels[0] || bucket.end_label !== bucket.expected_labels.at(-1)
+      || !Array.isArray(bucket.members) || !bucket.values || !bucket.observed_values
+      || !bucket.display || typeof bucket.template_complete !== 'boolean'
+      || !Object.hasOwn(directionColors, bucket.display.direction) || typeof bucket.display.ohlc_drawable !== 'boolean'
+      || typeof bucket.display.precision_lost !== 'boolean') throw new Error('invalid_query_response');
+    ids.add(bucket.bucket_id); previous = bucket.end_label;
+    for (const member of bucket.members) {
+      if (!bucket.expected_labels.includes(member.label) || (asof !== null && member.label > asof)) throw new Error('invalid_query_response');
+      account(member.ordinal, member.label);
+    }
+    if (bucket.last_observed_label !== (bucket.members.at(-1)?.label ?? null)
+      || (bucket.template_complete && (bucket.membership_reason !== null || bucket.missing_labels.length || bucket.duplicate_labels.length || bucket.future_labels.length
+        || bucket.members.length !== targetMinutes || new Set(bucket.members.map(member => member.label)).size !== targetMinutes
+        || fields.some(key => bucket.values[key] !== bucket.observed_values[key])))
+      || (!bucket.template_complete && (bucket.membership_reason === null || fields.some(key => bucket.values[key] !== null)))) throw new Error('invalid_query_response');
+    for (const key of fields) for (const scope of ['values', 'observed_values'] as const) {
+      if (bucket[scope][key] !== null && (typeof bucket[scope][key] !== 'string' || !/^\d+(?:\.\d+)?$/.test(bucket[scope][key]!))) throw new Error('invalid_query_response');
+    }
+  }
+  for (const row of report.excluded) account(row.ordinal, row.label);
+  if (accounted.size !== source.size) throw new Error('invalid_query_response');
+}
+
+export function buildAggregationPlot(report: AggregationReport) {
+  // Future nominal ends remain in the partial table and never move onto the chart.
+  const buckets = report.buckets.filter(bucket => report.as_of_label !== null && bucket.end_label <= report.as_of_label);
+  const rows: Row[] = buckets.map((bucket, index) => ({ ordinal: index + 1, label: bucket.end_label,
+    source_label: null, locator: `derived-bucket:${bucket.bucket_id}`, tokens: {}, values: bucket.values,
+    checks: [], volume_shares: null, amount_cny: null }));
+  return { ...buildPlot(rows, buckets.map((bucket, index) => ({ ordinal: index + 1, ...bucket.display }))), buckets };
 }
 
 export function buildChannelPlot(query: Query, report: ChannelReport | null) {

@@ -8,6 +8,23 @@ export interface Row {
   volume_shares: null; amount_cny: null;
 }
 export interface Display { ordinal: number; direction: 'up' | 'down' | 'equal' | 'unknown'; ohlc_drawable: boolean; precision_lost: boolean }
+export interface AggregateBucket {
+  bucket_id: string; first_label: string; end_label: string; segment: string;
+  expected_labels: string[]; members: { ordinal: number; label: string }[];
+  missing_labels: string[]; duplicate_labels: string[]; future_labels: string[];
+  last_observed_label: string | null; template_complete: boolean; membership_reason: string | null;
+  values: Record<Field, string | null>; observed_values: Record<Field, string | null>;
+  reasons: Record<'ohlc' | 'volume' | 'amount', string | null>; observed_reasons: AggregateBucket['reasons'];
+  display: Omit<Display, 'ordinal'>;
+}
+export interface AggregationReport {
+  method_id: 'selected-minute-label-aggregation-v1'; aggregation_id: string; query_id: string; snapshot_id: string;
+  target_minutes: number; as_of_label: string | null; template_id: 'observed-600059-240-clocks-v1';
+  qualification: 'conditional_source_values'; member_scope: 'selected_records_only';
+  bucket_label_semantics: 'nominal_last_template_label'; completeness_semantics: string;
+  unknown_date_ordinals: number[]; unknown_clock_dates: string[];
+  excluded: { ordinal: number; label: string | null; reason: string }[]; buckets: AggregateBucket[];
+}
 export interface Evidence { value?: unknown; status?: string; reason?: string; applicability?: string }
 export interface SourceContract {
   format_id?: string;

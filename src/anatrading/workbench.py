@@ -39,6 +39,7 @@ from .minute_daily_reconciliation import reconciliation_report
 from .source_actions import action_captures, action_window, captured_actions
 from .source_gaps import gap_report
 from .source_pivots import pivot_report
+from .minute_aggregation import aggregation_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -640,6 +641,30 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
             context = _bounded_query(store, snapshot_id, {key: value for key, value in selection.items()
                                                         if key in {"cutoff", "mode"}})
             return volume_report(query, context, lookback)
+
+        return JSONResponse(await owner.call(calculate))
+
+    @app.get("/api/minute-aggregation/{snapshot_id}")
+    async def minute_aggregation(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "query_id", "target_minutes"}, ("query_id",))
+        selection = _selection(parameters)
+        try:
+            target_minutes = int(parameters.get("target_minutes", "5"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+        if target_minutes not in {5, 15, 30, 60}:
+            raise _RequestError("invalid_request")
+
+        def calculate(store):
+            query = _bounded_query(store, snapshot_id, selection)
+            if query["query_id"] != parameters["query_id"]:
+                raise _RequestError("query_id_mismatch", 409)
+            try:
+                return aggregation_report(query, target_minutes)
+            except ValueError as error:
+                if str(error) == "aggregation_bucket_limit":
+                    raise _RequestError("query_row_limit") from None
+                raise
 
         return JSONResponse(await owner.call(calculate))
 
