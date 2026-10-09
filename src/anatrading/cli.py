@@ -49,6 +49,7 @@ def _parser():
     all_daily = commands.add_parser("import-tdx-daily-caches", help="读取当前来源证券池已有日线缓存并逐文件发布到运行中的工作台")
     all_daily.add_argument("--client-directory", type=Path, default=Path(r"D:\tdx_64"))
     all_daily.add_argument("--port", type=_port, default=8765)
+    all_daily.add_argument("--start-at", help="从当前来源池指定代码开始，跳过其前面的代码；例如300565.SZ")
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -95,7 +96,7 @@ def _run(arguments):
     if arguments.command == "import-tdx-daily-caches":
         from .tdx_daily import import_current_caches
 
-        return import_current_caches(arguments.root, arguments.client_directory, port=arguments.port)
+        return import_current_caches(arguments.root, arguments.client_directory, port=arguments.port, start_at=arguments.start_at)
     if arguments.command == "serve":
         from .workbench_lifecycle import serve
 
