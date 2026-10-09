@@ -1,5 +1,5 @@
 import { fields } from './types.ts';
-import type { Display, GeometryEnvelope, GeometryRow, Reply, Row, SelectionDraft } from './types.ts';
+import type { ChannelReport, Display, GeometryEnvelope, GeometryRow, Query, Reply, Row, SelectionDraft } from './types.ts';
 
 export class Generation {
   private value = 0;
@@ -45,6 +45,26 @@ export function buildPlot(rows: Row[], display: Display[]) {
     status.push(notes);
   });
   return { candles, volumes, labels: rows.map(row => row.label ?? ''), status };
+}
+
+export function buildChannelPlot(query: Query, report: ChannelReport | null) {
+  if (!report || query.metadata.period !== '1d' || report.query_id !== query.query_id
+    || report.rows.length !== query.rows.length || report.rows.some((row, i) => row.ordinal !== query.rows[i].ordinal)) return null;
+  const segments: { upper: { time: number; value: number }[]; lower: { time: number; value: number }[] }[] = [];
+  let segment: typeof segments[number] | null = null;
+  let skipped = 0;
+  report.rows.forEach((row, time) => {
+    const upper = coordinate(row.upper), lower = coordinate(row.lower);
+    if (row.reason || upper === null || lower === null || lower < 0 || upper < lower
+      || (upper === lower && row.width !== '0')) {
+      segment = null; skipped += 1;
+      return;
+    }
+    if (!segment) { segment = { upper: [], lower: [] }; segments.push(segment); }
+    segment.upper.push({ time, value: upper });
+    segment.lower.push({ time, value: lower });
+  });
+  return { segments, skipped };
 }
 
 export function queryParameters(draft: SelectionDraft, batchRows: number, limit: number): URLSearchParams {

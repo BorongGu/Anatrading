@@ -8,7 +8,7 @@ import { VolumeAnalysis } from './VolumeAnalysis.tsx';
 import { PriceChannel } from './PriceChannel.tsx';
 import { DailyBackground } from './DailyBackground.tsx';
 import { fields, fieldNames } from './types.ts';
-import type { Attempt, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
+import type { Attempt, ChannelReport, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
 
 const formatNames: Record<string, string> = { 'tdx-public-text-v1': '通达信 · 已审文本', 'tdx-public-day-v1': '通达信 · 日线 .day', 'baostock-decoded-v0.9.4': 'BaoStock · 已审解码正文', 'tdx-http-market-v1': '通达信 · 分钟接口记录' };
 const emptySelection: SelectionDraft = { snapshot: '', cutoff: '', start: '', end: '' };
@@ -45,6 +45,7 @@ export default function App() {
   const [backgroundSnapshot, setBackgroundSnapshot] = useState('');
   const [backgroundWindow, setBackgroundWindow] = useState('60');
   const [channelLookback, setChannelLookback] = useState(20);
+  const [channelReport, setChannelReport] = useState<ChannelReport | null>(null);
   const gate = useRef(new Generation());
   const abort = useRef<AbortController | null>(null);
 
@@ -273,7 +274,7 @@ export default function App() {
             <div><span className="field-label">当前选择 · 无法定位</span><strong>{q.counts.unlocated_rows.toLocaleString()}<small> 条</small></strong></div>
             <div className="range-summary"><span className="field-label">选择内源标签范围</span><code>{q.rows[0]?.label ?? '空'} → {q.rows.at(-1)?.label ?? '空'}</code><small>缩放仅改变可视区域，不改变选择与导出</small></div>
           </section>
-          <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} />
+          <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} />
           <section className="panel export-panel"><div><strong>导出当前选择</strong><p>{q.counts.selected_rows} 条定位 ＋ {q.counts.unlocated_rows} 条无法定位 · 保留原字段、质量与版本</p><code title={q.query_id}>Q {q.query_id}</code></div>
             <div className="button-group"><button disabled={!!exporting} onClick={() => void exportSelection('json')}>{exporting === 'json' ? '校验中…' : '下载 JSON'}</button><button disabled={!!exporting} onClick={() => void exportSelection('parquet')}>{exporting === 'parquet' ? '校验中…' : '下载 Parquet'}</button><button disabled={!!exporting} onClick={() => void exportSelection('geometry')}>{exporting === 'geometry' ? '校验中…' : '导出K线结构JSON'}</button></div>
           </section>
@@ -293,7 +294,7 @@ export default function App() {
           <section className="panel detail-panel"><div className="section-heading"><h2>固定记录详情</h2>{selected && <button className="quiet" onClick={() => setSelected(null)}>清除</button>}</div>
             {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
           {q.metadata.period === '1m' && <VolumeAnalysis query={q} selected={selected} />}
-          {q.metadata.period === '1d' && <PriceChannel query={q} selected={selected} lookback={channelLookback} onLookbackSelect={setChannelLookback} />}
+          {q.metadata.period === '1d' && <PriceChannel query={q} selected={selected} lookback={channelLookback} onLookbackSelect={setChannelLookback} report={channelReport} onReport={setChannelReport} />}
           {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} />}
           <QualityDetails query={q} />
         </>}

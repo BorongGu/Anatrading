@@ -11,14 +11,14 @@ const ranges = { both: '上下两侧均越界（先后顺序未知）', upper_on
 const closes = { above: '源收盘高于上界', below: '源收盘低于下界', touch_upper: '源收盘等于上界',
   touch_lower: '源收盘等于下界', touch_both: '源收盘等于重合的上下界', inside: '源收盘位于区间内' };
 
-export function PriceChannel({ query, selected, lookback, onLookbackSelect }: {
+export function PriceChannel({ query, selected, lookback, onLookbackSelect, report, onReport }: {
   query: Query; selected: Row | null; lookback: number; onLookbackSelect: (value: number) => void;
+  report: ChannelReport | null; onReport: (value: ChannelReport | null) => void;
 }) {
-  const [report, setReport] = useState<ChannelReport | null>(null);
   const [issue, setIssue] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    setReport(null); setIssue('');
+    onReport(null); setIssue('');
     const parameters = new URLSearchParams({ lookback: String(lookback), mode: query.selection.mode });
     for (const key of ['cutoff', 'ordinal_start', 'ordinal_end'] as const) {
       if (query.selection[key] !== null) parameters.set(key, String(query.selection[key]));
@@ -31,10 +31,10 @@ export function PriceChannel({ query, selected, lookback, onLookbackSelect }: {
         || result.rows.length !== query.rows.length || result.unlocated.length !== query.unlocated.length
         || result.rows.some((row, i) => row.ordinal !== query.rows[i].ordinal)
         || result.unlocated.some((row, i) => row.ordinal !== query.unlocated[i].ordinal)) throw new Error('invalid_query_response');
-      setReport(result);
+      onReport(result);
     }).catch(error => { if (!controller.signal.aborted) setIssue(explain(error)); });
     return () => controller.abort();
-  }, [query, lookback]);
+  }, [query, lookback, onReport]);
   const current = report?.query_id === query.query_id && report.lookback === lookback ? report : null;
   const focus = selected ?? query.rows.at(-1);
   const value = current && focus ? [...current.rows, ...current.unlocated].find(row => row.ordinal === focus.ordinal) : null;

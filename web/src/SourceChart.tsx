@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, createChartEx, createSeriesMarkers } from 'lightweight-charts';
-import type { IChartApiBase, MouseEventParams, SeriesMarker } from 'lightweight-charts';
-import { buildPlot } from './model.ts';
+import { CandlestickSeries, ColorType, CrosshairMode, HistogramSeries, LineSeries, LineType, createChartEx, createSeriesMarkers } from 'lightweight-charts';
+import type { IChartApiBase, ISeriesApi, MouseEventParams, SeriesMarker } from 'lightweight-charts';
+import { buildChannelPlot, buildPlot } from './model.ts';
 import { SequenceAxis } from './sequence-axis.ts';
 import { RecordDetails } from './RecordDetails.tsx';
-import type { Reply, Row } from './types.ts';
+import type { ChannelReport, Reply, Row } from './types.ts';
 
 export function recordStatusMarkers(status: string[][]): SeriesMarker<number>[] {
   return status.flatMap((notes, time) => {
@@ -17,11 +17,15 @@ export function recordStatusMarkers(status: string[][]): SeriesMarker<number>[] 
   });
 }
 
-export function SourceChart({ reply, onChoose, onError, visibleBars }: { reply: Reply; onChoose: (row: Row) => void; onError: () => void; visibleBars?: number }) {
+export function SourceChart({ reply, onChoose, onError, visibleBars, channel = null }: {
+  reply: Reply; onChoose: (row: Row) => void; onError: () => void; visibleBars?: number; channel?: ChannelReport | null;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApiBase<number> | null>(null);
+  const channelSeries = useRef<ISeriesApi<'Line', number>[]>([]);
   const [hover, setHover] = useState<number | null>(null);
   const plot = useMemo(() => buildPlot(reply.query.rows, reply.display), [reply]);
+  const channelPlot = useMemo(() => buildChannelPlot(reply.query, channel), [reply.query, channel]);
   useEffect(() => {
     if (!host.current || !reply.query.rows.length) return;
     let chart: IChartApiBase<number> | null = null;
@@ -67,16 +71,37 @@ export function SourceChart({ reply, onChoose, onError, visibleBars }: { reply: 
       onError();
       return;
     }
-    return () => { chart?.remove(); chartRef.current = null; };
+    return () => { chart?.remove(); chartRef.current = null; channelSeries.current = []; };
   }, [reply, plot, onChoose, onError, visibleBars]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    try {
+      channelSeries.current.forEach(series => chart.removeSeries(series));
+      channelSeries.current = [];
+      // Separate runs leave undefined windows unconnected by the line renderer.
+      for (const segment of channelPlot?.segments ?? []) {
+        for (const [field, color] of [['upper', '#4169a1'], ['lower', '#ad6717']] as const) {
+          const series = chart.addSeries(LineSeries, { color, lineWidth: 1, lineType: LineType.WithSteps,
+            lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
+            priceFormat: { type: 'price', precision: 4, minMove: 0.0001 } }, 0);
+          channelSeries.current.push(series);
+          series.setData(segment[field]);
+        }
+      }
+    } catch { onError(); }
+  }, [reply, channelPlot, onError]);
 
   return <section className="panel chart-panel" aria-label="源 OHLC 与源数量图">
     <div className="section-heading"><div><h2>源 OHLC <span className="muted">/ 源数量</span></h2><p>源记录序列 · 等距不代表时间间隔 · 坐标为近似显示</p></div>
       <button className="quiet" onClick={() => chartRef.current?.timeScale().fitContent()} disabled={!reply.query.rows.length}>恢复视图</button></div>
     <div className="chart-legend"><span><i className="red-dot" />收 &gt; 开</span><span><i className="green-dot" />收 &lt; 开</span><span>灰色：相等 / 未知 · 方向取精确比较</span><span className="amber">状态行：0 数量为零 · ∅ 数量缺失 · ! 问题提示（位置不表示数量）</span></div>
+    {channelPlot && <p className="subtle">前 {channel?.lookback} 个来源日期区间：蓝色上界 · 棕色下界 · 阶梯线连接来源序列 · {channelPlot.skipped} 条因未定义或显示限制未绘制，跨缺口不连线。</p>}
     {reply.query.rows.length ? <div ref={host} className="chart-host" onMouseLeave={() => setHover(null)} /> : <div className="empty-chart">当前截止范围没有可定位记录。无法定位记录仍单独列出。</div>}
     <div className="chart-tooltip" aria-label="十字线精确值">
-      {hover !== null && reply.query.rows[hover] ? <><div className="tooltip-title">十字线 · 精确解码字符串<span>{plot.status[hover].join(' · ')}</span></div><RecordDetails row={reply.query.rows[hover]} contract={reply.query.manifest.contract} compact /></>
+      {hover !== null && reply.query.rows[hover] ? <><div className="tooltip-title">十字线 · 精确解码字符串<span>{plot.status[hover].join(' · ')}</span></div><RecordDetails row={reply.query.rows[hover]} contract={reply.query.manifest.contract} compact />
+        {channelPlot && <p>前序区间精确值：上界 <code>{channel?.rows[hover].upper ?? '∅'}</code> · 下界 <code>{channel?.rows[hover].lower ?? '∅'}</code> · 宽度 <code>{channel?.rows[hover].width ?? '∅'}</code>；完整窗口见区间详情。</p>}</>
         : <p className="muted">移动十字线查看精确值；点击记录可固定详情。单位与柱定义保持源资格，不推断真实成交方向。</p>}
     </div>
   </section>;

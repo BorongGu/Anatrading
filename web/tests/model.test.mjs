@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildPlot, Generation, queryParameters, assertReply } from '../src/model.ts';
+import { buildPlot, buildChannelPlot, Generation, queryParameters, assertReply } from '../src/model.ts';
 import { geometry, queryId } from './geometry-fixtures.mjs';
 
 // Artificial records prove UI boundaries only; they are not market evidence.
@@ -15,6 +15,40 @@ const reply = (rows, displays) => ({
     selection: { snapshot_id: 's', cutoff: null, ordinal_start: null, ordinal_end: null, mode: 'retrospective' },
     counts: { selected_rows: rows.length, unlocated_rows: 0 } },
   geometry: geometry(rows), display: displays, navigation: { previous_label: null, next_label: null },
+});
+
+const channelRow = (ordinal, upper = '13', lower = '8', reason = null) => ({ ordinal, upper, lower, width: upper === lower ? '0' : '5', reason });
+const channelQuery = rows => ({ query_id: queryId, metadata: { period: '1d' }, rows });
+const channelReport = rows => ({ query_id: queryId, lookback: 20, rows });
+
+test('channel overlay uses source sequence positions and splits across unavailable bounds', () => {
+  const q = channelQuery([row(7, 'A'), row(8, 'B'), row(9, 'B'), row(10, 'D'), row(11, 'E')]);
+  const report = channelReport([channelRow(7), channelRow(8, null, null, 'history_insufficient'), channelRow(9), channelRow(10), channelRow(11)]);
+  const frozen = JSON.stringify(report);
+  const plot = buildChannelPlot(q, report);
+  assert.equal(plot.skipped, 1);
+  assert.deepEqual(plot.segments.map(segment => segment.upper), [[{ time: 0, value: 13 }], [{ time: 2, value: 13 }, { time: 3, value: 13 }, { time: 4, value: 13 }]]);
+  assert.deepEqual(plot.segments.map(segment => segment.lower.map(point => point.time)), [[0], [2, 3, 4]]);
+  assert.equal(JSON.stringify(report), frozen);
+});
+
+test('stale query, wrong period and mismatched source ordinals cannot overlay', () => {
+  const q = channelQuery([row(1, 'A')]);
+  const report = channelReport([channelRow(1)]);
+  assert.equal(buildChannelPlot(q, null), null);
+  assert.equal(buildChannelPlot({ ...q, query_id: 'stale' }, report), null);
+  assert.equal(buildChannelPlot({ ...q, metadata: { period: '1m' } }, report), null);
+  assert.equal(buildChannelPlot(q, channelReport([channelRow(2)])), null);
+  assert.equal(buildChannelPlot(q, channelReport([])), null);
+});
+
+test('channel invalid coordinates and collapsed unequal bounds stay undrawn; true zero width remains valid', () => {
+  const q = channelQuery([row(1, 'A'), row(2, 'B'), row(3, 'C'), row(4, 'D')]);
+  const report = channelReport([channelRow(1, 'Infinity'), channelRow(2, 'bad'),
+    channelRow(3, '99999999999999999999.999999999999999999', '99999999999999999999.999999999999999998'), channelRow(4, '0', '0')]);
+  const plot = buildChannelPlot(q, report);
+  assert.equal(plot.skipped, 3);
+  assert.deepEqual(plot.segments, [{ upper: [{ time: 3, value: 0 }], lower: [{ time: 3, value: 0 }] }]);
 });
 
 test('duplicate labels retain independent sequence positions and exact strings', () => {
