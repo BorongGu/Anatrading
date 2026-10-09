@@ -33,6 +33,7 @@ from .true_range import range_report
 from .daily_volume import daily_volume_report
 from .path_efficiency import efficiency_report
 from .tdx_reference import read_reference
+from .daily_coverage import collection_runs, coverage_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -57,6 +58,7 @@ _STORE_CODES = {
     "source_path_outside_client", "source_file_limit", "http_result_unknown", "response_limit", "invalid_response",
     "invalid_tdx_symbol", "daily_cache_missing", "cache_unstable", "invalid_day_capture",
     "invalid_tdx_reference_request", "invalid_tdx_reference_response", "tdx_reference_unavailable",
+    "invalid_daily_cache_runs", "daily_cache_evidence_mismatch",
 }
 
 
@@ -410,6 +412,17 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
     async def attempts(request: Request):
         _parameters(request, set())
         return {"attempts": await owner.call(lambda store: store.attempts())}
+
+    @app.get("/api/daily-cache-runs")
+    async def daily_cache_runs(request: Request):
+        _parameters(request, set())
+        return {"runs": await owner.call(lambda store: collection_runs(root))}
+
+    @app.get("/api/daily-cache-coverage")
+    async def daily_cache_coverage(request: Request):
+        parameters = _parameters(request, {"run_ids"}, ("run_ids",))
+        return {"coverage": await owner.call(lambda store: coverage_report(
+            root, store.snapshot_catalog(), parameters["run_ids"].split(",")))}
 
     @app.post("/api/import")
     async def ingest(request: Request):
