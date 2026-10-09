@@ -3,11 +3,13 @@ import { explain, jsonRequest } from './api.ts';
 import { assertReply } from './model.ts';
 import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
 import { SourceChart } from './SourceChart.tsx';
+import { PriceChannel } from './PriceChannel.tsx';
 import type { DailyBackgroundReport, Query, Row, Snapshot } from './types.ts';
 
-export function DailyBackground({ query, selected, snapshots, dailySnapshot, onSelect, window, onWindowSelect }: {
+export function DailyBackground({ query, selected, snapshots, dailySnapshot, onSelect, window, onWindowSelect, channelLookback, onChannelLookbackSelect }: {
   query: Query; selected: Row | null; snapshots: Snapshot[]; dailySnapshot: string; onSelect: (value: string) => void;
   window: string; onWindowSelect: (value: string) => void;
+  channelLookback: number; onChannelLookbackSelect: (value: number) => void;
 }) {
   const [report, setReport] = useState<DailyBackgroundReport | null>(null);
   const [dailyRow, setDailyRow] = useState<Row | null>(null);
@@ -73,6 +75,7 @@ export function DailyBackground({ query, selected, snapshots, dailySnapshot, onS
         {!!current?.context_unlocated_rows && <p className="inline-note amber">日线来源上下文有 {current.context_unlocated_rows} 条日期无法定位，其中 {daily.query.unlocated.length} 条位于本次查询；不归入当前日期背景。</p>}
         <SourceChart reply={daily} onChoose={chooseDailyRow} onError={chartError} visibleBars={60} />
         {shownRow && <RecordDetails row={shownRow} contract={daily.query.manifest.contract} geometry={geometry} />}
+        <PriceChannel query={daily.query} selected={dailyRow} lookback={channelLookback} onLookbackSelect={onChannelLookbackSelect} />
         <details><summary>对照来源与完整查询范围</summary>
           <p className="subtle">本次窗口查询可定位日线共 {daily.query.rows.length} 条，图表初始显示其中最近60条，可缩放查看当前窗口全部记录。重复日期与坏字段保留，不自动选取替代记录。日线复权声明：{String(daily.query.manifest.contract?.source_semantics?.fields?.adjustment?.value ?? 'unknown')}。</p>
           <p>日线快照 <code>{daily.query.snapshot_id}</code></p><p>日线查询 <code>{daily.query.query_id}</code></p>

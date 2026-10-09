@@ -72,6 +72,19 @@ export interface VolumeReport {
   rows: VolumeRow[]; unlocated: VolumeRow[];
 }
 export interface Reply extends GeometryEnvelope { display: Display[]; navigation: { previous_label: string | null; next_label: string | null } }
+export interface ChannelMember { date: string; ordinals: number[]; high: string | null; low: string | null; reason: string | null }
+export interface ChannelRow {
+  ordinal: number; history_dates: string[]; members: ChannelMember[];
+  upper: string | null; lower: string | null; width: string | null;
+  range_relation: 'both' | 'upper_only' | 'lower_only' | 'neither' | null;
+  close_relation: 'above' | 'below' | 'touch_upper' | 'touch_lower' | 'touch_both' | 'inside' | null;
+  touch_upper: boolean | null; touch_lower: boolean | null; reason: string | null; comparison_reason: string | null;
+}
+export interface ChannelReport {
+  method_id: 'prior-source-price-channel-v1'; query_id: string; context_query_id: string; channel_id: string;
+  qualification: 'conditional_source_values'; lookback: number; unreadable_date_rows: number; context_unlocated_rows: number;
+  rows: ChannelRow[]; unlocated: ChannelRow[];
+}
 export interface DailyBackgroundReport {
   method_id: 'prior-source-date-background-v1'; background_id: string; daily_query_id: string;
   anchor: { snapshot_id: string; ordinal: number; label: string };
