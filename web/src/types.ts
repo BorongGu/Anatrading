@@ -117,6 +117,27 @@ export interface ChannelReport {
   qualification: 'conditional_source_values'; lookback: number; unreadable_date_rows: number; context_unlocated_rows: number;
   rows: ChannelRow[]; unlocated: ChannelRow[];
 }
+export interface GapEvent {
+  ordinal: number; label: string; extreme: string; relation: 'equal' | 'beyond';
+  contains_boundary: boolean; range_relation: 'overlaps_interval' | 'passed_without_overlap';
+}
+export interface SourceGap {
+  gap_id: string; direction: 'up' | 'down'; lower: string; upper: string; width: string;
+  near_event: GapEvent | null; far_event: GapEvent | null;
+  interrupted_at: { label: string; ordinals: number[]; reason: string } | null;
+  state: 'far_boundary_observed' | 'observation_interrupted' | 'near_boundary_observed' | 'not_observed_before_asof';
+}
+export interface GapRow {
+  ordinal: number; label: string | null; previous_label: string | null; previous_ordinals: number[];
+  open_close_change: string | null; gap: SourceGap | null; reason: string | null;
+}
+export interface GapReport {
+  method_id: 'source-price-gaps-v1'; query_id: string; context_query_id: string; gaps_id: string;
+  qualification: 'conditional_source_values'; as_of_label: string | null;
+  origin_scope: 'selected_source_rows'; observation_scope: 'full_source_context_to_asof';
+  adjacency: 'adjacent_located_labels'; first_event_scope: 'first_unique_valid_located_before_interruption';
+  context_unlocated_rows: number; coverage_reason: string | null; rows: GapRow[]; unlocated: GapRow[];
+}
 export interface RangeEstimate { value: string; lower: string; upper: string; display: string | null; display_reason: string | null }
 export interface RangeRow {
   ordinal: number; previous_date: string | null; previous_ordinals: number[];

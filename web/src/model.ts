@@ -1,5 +1,5 @@
 import { fields } from './types.ts';
-import type { ChannelReport, Display, GeometryEnvelope, GeometryRow, Query, Reply, Row, SelectionDraft } from './types.ts';
+import type { ChannelReport, Display, GapReport, GeometryEnvelope, GeometryRow, Query, Reply, Row, SelectionDraft } from './types.ts';
 
 export class Generation {
   private value = 0;
@@ -172,4 +172,33 @@ export function assertReply(reply: Reply, draft: SelectionDraft, limit: number):
     if (!d || d.ordinal !== row.ordinal || !Object.hasOwn(directionColors, d.direction)
       || typeof d.ohlc_drawable !== 'boolean' || typeof d.precision_lost !== 'boolean') throw new Error('invalid_query_response');
   });
+}
+
+export function assertGapReport(query: Query, report: GapReport): void {
+  let asof = query.rows.reduce<string | null>((value, row) => value === null || row.label! > value ? row.label : value, null);
+  if (asof !== null && query.selection.cutoff !== null && query.selection.cutoff < asof) asof = query.selection.cutoff;
+  if (!report || report.method_id !== 'source-price-gaps-v1' || report.query_id !== query.query_id
+    || report.qualification !== 'conditional_source_values' || report.as_of_label !== asof
+    || report.origin_scope !== 'selected_source_rows' || report.observation_scope !== 'full_source_context_to_asof'
+    || report.adjacency !== 'adjacent_located_labels' || report.first_event_scope !== 'first_unique_valid_located_before_interruption'
+    || !hexId.test(report.gaps_id) || !hexId.test(report.context_query_id)) throw new Error('invalid_query_response');
+  for (const scope of ['rows', 'unlocated'] as const) {
+    if (!Array.isArray(report[scope]) || report[scope].length !== query[scope].length) throw new Error('invalid_query_response');
+    report[scope].forEach((row, index) => {
+      if (row.ordinal !== query[scope][index].ordinal || row.label !== query[scope][index].label) throw new Error('invalid_query_response');
+      const gap = row.gap;
+      if (!gap) return;
+      if (!hexId.test(gap.gap_id) || !['up', 'down'].includes(gap.direction)
+        || ![gap.lower, gap.upper, gap.width].every(value => typeof value === 'string' && /^\d+(\.\d+)?$/.test(value))
+        || row.label === null || asof === null) throw new Error('invalid_query_response');
+      for (const event of [gap.near_event, gap.far_event]) {
+        if (event && (!Number.isSafeInteger(event.ordinal) || event.ordinal < 1 || event.label <= row.label || event.label > asof
+          || typeof event.extreme !== 'string' || typeof event.contains_boundary !== 'boolean'
+          || !['equal', 'beyond'].includes(event.relation) || !['overlaps_interval', 'passed_without_overlap'].includes(event.range_relation))) throw new Error('invalid_query_response');
+      }
+      if (gap.far_event && (!gap.near_event || gap.near_event.label > gap.far_event.label)) throw new Error('invalid_query_response');
+      if (gap.interrupted_at && (gap.interrupted_at.label <= row.label || gap.interrupted_at.label > asof
+        || [gap.near_event, gap.far_event].some(event => event && event.label >= gap.interrupted_at!.label))) throw new Error('invalid_query_response');
+    });
+  }
 }
