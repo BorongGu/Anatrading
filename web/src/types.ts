@@ -77,6 +77,17 @@ export interface DailyVolumeReport {
   qualification: 'conditional_source_values'; lookback: number; unreadable_date_rows: number; context_unlocated_rows: number;
   rows: DailyVolumeRow[]; unlocated: DailyVolumeRow[];
 }
+export interface EfficiencyRow {
+  ordinal: number; window_dates: string[];
+  members: { date: string; ordinals: number[]; close: string | null; reason: string | null }[];
+  net_change: string | null; path_length: string | null; direction: 'up' | 'down' | 'flat' | null;
+  efficiency: VolumeFraction | null; reason: string | null;
+}
+export interface EfficiencyReport {
+  method_id: 'source-close-path-efficiency-v1'; query_id: string; context_query_id: string; efficiency_id: string;
+  qualification: 'conditional_source_values'; lookback: number; flat_policy: 'zero_with_explicit_reason';
+  unreadable_date_rows: number; context_unlocated_rows: number; rows: EfficiencyRow[]; unlocated: EfficiencyRow[];
+}
 export interface Reply extends GeometryEnvelope { display: Display[]; navigation: { previous_label: string | null; next_label: string | null } }
 export interface ChannelMember { date: string; ordinals: number[]; high: string | null; low: string | null; reason: string | null }
 export interface ChannelRow {

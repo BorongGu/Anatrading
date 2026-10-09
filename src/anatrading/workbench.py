@@ -31,6 +31,7 @@ from .volume_at_time import volume_report
 from .price_channel import channel_report
 from .true_range import range_report
 from .daily_volume import daily_volume_report
+from .path_efficiency import efficiency_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -587,6 +588,25 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
             context = _bounded_query(store, snapshot_id, {key: value for key, value in selection.items()
                                                         if key in {"cutoff", "mode"}})
             return daily_volume_report(query, context, lookback)
+
+        return JSONResponse(await owner.call(calculate))
+
+    @app.get("/api/path-efficiency/{snapshot_id}")
+    async def path_efficiency(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "lookback"})
+        selection = _selection(parameters)
+        try:
+            lookback = int(parameters.get("lookback", "10"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+        if not 2 <= lookback <= 252:
+            raise _RequestError("invalid_request")
+
+        def calculate(store):
+            query = _bounded_query(store, snapshot_id, selection)
+            context = _bounded_query(store, snapshot_id, {key: value for key, value in selection.items()
+                                                        if key in {"cutoff", "mode"}})
+            return efficiency_report(query, context, lookback)
 
         return JSONResponse(await owner.call(calculate))
 
