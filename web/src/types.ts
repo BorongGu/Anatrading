@@ -71,6 +71,12 @@ export interface VolumeReport {
   excluded_unlocated_rows: number; outside_template_rows: number;
   rows: VolumeRow[]; unlocated: VolumeRow[];
 }
+export interface DailyVolumeRow extends VolumeComparison { ordinal: number; history_dates: string[] }
+export interface DailyVolumeReport {
+  method_id: 'prior-source-daily-volume-v1'; query_id: string; context_query_id: string; volume_id: string;
+  qualification: 'conditional_source_values'; lookback: number; unreadable_date_rows: number; context_unlocated_rows: number;
+  rows: DailyVolumeRow[]; unlocated: DailyVolumeRow[];
+}
 export interface Reply extends GeometryEnvelope { display: Display[]; navigation: { previous_label: string | null; next_label: string | null } }
 export interface ChannelMember { date: string; ordinals: number[]; high: string | null; low: string | null; reason: string | null }
 export interface ChannelRow {
