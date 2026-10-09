@@ -35,6 +35,7 @@ from .path_efficiency import efficiency_report
 from .tdx_reference import read_reference
 from .daily_coverage import collection_runs, coverage_report
 from .daily_screen import screen_report
+from .minute_daily_reconciliation import reconciliation_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -268,11 +269,7 @@ def _pair_claim(metadata):
     return next(iter(codes)), next(iter(venues))
 
 
-def _daily_background(store, minute_snapshot, daily_snapshot, ordinal, window=60):
-    if type(ordinal) is not int or ordinal < 1:
-        raise _RequestError("invalid_request")
-    if window is not None and (type(window) is not int or not 1 <= window <= _MAX_ROWS):
-        raise _RequestError("invalid_request")
+def _paired_sources(store, minute_snapshot, daily_snapshot):
     minute_meta = store.snapshot_catalog(minute_snapshot)[0]["metadata"]
     daily_meta = store.snapshot_catalog(daily_snapshot)[0]["metadata"]
     if minute_meta.get("period") != "1m" or daily_meta.get("period") != "1d":
@@ -285,6 +282,14 @@ def _daily_background(store, minute_snapshot, daily_snapshot, ordinal, window=60
     assets = {meta.get("interpretation", {}).get("asset_type") for meta in (minute_meta, daily_meta)} - {None}
     if len(assets) > 1:
         raise _RequestError("background_symbol_mismatch", 409)
+
+
+def _daily_background(store, minute_snapshot, daily_snapshot, ordinal, window=60):
+    if type(ordinal) is not int or ordinal < 1:
+        raise _RequestError("invalid_request")
+    if window is not None and (type(window) is not int or not 1 <= window <= _MAX_ROWS):
+        raise _RequestError("invalid_request")
+    _paired_sources(store, minute_snapshot, daily_snapshot)
     anchor_query = _bounded_query(store, minute_snapshot, dict(ordinal_start=ordinal, ordinal_end=ordinal))
     if not anchor_query["rows"]:
         raise _RequestError("background_anchor_unlocated")
@@ -696,6 +701,25 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
         except ValueError:
             raise _RequestError("invalid_request") from None
         return JSONResponse(await owner.call(lambda store: _daily_background(store, snapshot_id, parameters["daily_snapshot"], ordinal, window)))
+
+    @app.get("/api/minute-daily-reconciliation/{snapshot_id}")
+    async def minute_daily_reconciliation(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "daily_snapshot", "query_id", "amount_multiplier"},
+                                 ("daily_snapshot", "query_id"))
+        selection = _selection(parameters)
+        multiplier = parameters.get("amount_multiplier")
+        if multiplier is not None and multiplier not in {"1", "10000"}:
+            raise _RequestError("invalid_request")
+
+        def calculate(store):
+            _paired_sources(store, snapshot_id, parameters["daily_snapshot"])
+            minute = _bounded_query(store, snapshot_id, selection)
+            if minute["query_id"] != parameters["query_id"]:
+                raise _RequestError("query_id_mismatch", 409)
+            daily = _bounded_query(store, parameters["daily_snapshot"], {})
+            return reconciliation_report(minute, daily, None if multiplier is None else int(multiplier))
+
+        return JSONResponse(await owner.call(calculate))
 
     @app.post("/api/export/{snapshot_id}")
     async def export(snapshot_id: str, request: Request):

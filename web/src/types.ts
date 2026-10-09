@@ -55,6 +55,21 @@ export interface GeometryReport {
   rows: GeometryRow[]; unlocated: GeometryRow[];
 }
 export interface GeometryEnvelope { query: Query; geometry: GeometryReport }
+export interface ReconciliationValues {
+  selected_minute_sum: string | null; daily_source_value: string | null; difference: string | null;
+  minute_reason: string | null; daily_reason: string | null;
+}
+export interface ReconciliationReport {
+  method_id: 'selected-minute-daily-source-reconciliation-v1'; qualification: 'retrospective_source_arithmetic';
+  reconciliation_id: string; minute_query_id: string; daily_query_id: string;
+  minute_snapshot_id: string; daily_snapshot_id: string; pairing_status: 'assumed_text_match';
+  amount_multiplier: 1 | 10000 | null; template_id: 'observed-600059-240-clocks-v1';
+  unreadable_minute_date_ordinals: number[]; unreadable_daily_date_ordinals: number[];
+  days: { source_date: string; selected_count: number; minute_ordinals: number[]; daily_ordinals: number[];
+    quantity: ReconciliationValues; amount: ReconciliationValues;
+    coverage: { template_slots: number; observed_template_slots: number; missing_clocks: string[];
+      extra_clocks: string[]; duplicate_clocks: string[]; unlocated_clock_ordinals: number[] } }[];
+}
 export interface VolumeFraction { numerator: string; denominator: string; display: string }
 export interface VolumeComparison {
   current: string | null; baseline_sum: string | null; baseline_mean: VolumeFraction | null;
