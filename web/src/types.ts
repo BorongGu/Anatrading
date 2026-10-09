@@ -85,6 +85,19 @@ export interface ChannelReport {
   qualification: 'conditional_source_values'; lookback: number; unreadable_date_rows: number; context_unlocated_rows: number;
   rows: ChannelRow[]; unlocated: ChannelRow[];
 }
+export interface RangeEstimate { value: string; lower: string; upper: string; display: string | null; display_reason: string | null }
+export interface RangeRow {
+  ordinal: number; previous_date: string | null; previous_ordinals: number[];
+  components: Record<'high_low' | 'high_previous_close' | 'low_previous_close', string | null>;
+  tr: string | null; tr_reason: string | null; atr: RangeEstimate | null; atr_reason: string | null;
+  atr_blocked_date: string | null; prior_atr: RangeEstimate | null; tr_over_prior_atr: RangeEstimate | null; ratio_reason: string | null;
+}
+export interface RangeReport {
+  method_id: 'source-wilder-range-v1'; query_id: string; context_query_id: string; range_id: string;
+  qualification: 'conditional_source_values'; period: number; seed_policy: 'first_period_subsequent_tr_mean';
+  seed_previous_date: string | null; seed_dates: string[]; unreadable_date_rows: number; context_unlocated_rows: number;
+  rows: RangeRow[]; unlocated: RangeRow[];
+}
 export interface DailyBackgroundReport {
   method_id: 'prior-source-date-background-v1'; background_id: string; daily_query_id: string;
   anchor: { snapshot_id: string; ordinal: number; label: string };

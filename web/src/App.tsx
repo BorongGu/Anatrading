@@ -6,6 +6,7 @@ import { SourceChart } from './SourceChart.tsx';
 import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
 import { VolumeAnalysis } from './VolumeAnalysis.tsx';
 import { PriceChannel } from './PriceChannel.tsx';
+import { VolatilityAnalysis } from './VolatilityAnalysis.tsx';
 import { DailyBackground } from './DailyBackground.tsx';
 import { fields, fieldNames } from './types.ts';
 import type { Attempt, ChannelReport, Config, Query, Reply, Row, SelectionDraft, Snapshot } from './types.ts';
@@ -46,6 +47,7 @@ export default function App() {
   const [backgroundWindow, setBackgroundWindow] = useState('60');
   const [channelLookback, setChannelLookback] = useState(20);
   const [channelReport, setChannelReport] = useState<ChannelReport | null>(null);
+  const [atrPeriod, setAtrPeriod] = useState(14);
   const gate = useRef(new Generation());
   const abort = useRef<AbortController | null>(null);
 
@@ -295,7 +297,8 @@ export default function App() {
             {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
           {q.metadata.period === '1m' && <VolumeAnalysis query={q} selected={selected} />}
           {q.metadata.period === '1d' && <PriceChannel query={q} selected={selected} lookback={channelLookback} onLookbackSelect={setChannelLookback} report={channelReport} onReport={setChannelReport} />}
-          {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} />}
+          {q.metadata.period === '1d' && <VolatilityAnalysis query={q} selected={selected} period={atrPeriod} onPeriodSelect={setAtrPeriod} />}
+          {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} />}
           <QualityDetails query={q} />
         </>}
         <footer>本地研究工具 · 单快照证据切片<span>图表由 <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a> 提供 · <a href="/licenses/lightweight-charts.LICENSE.txt" target="_blank" rel="noreferrer">Apache 2.0</a> · <a href="/licenses/lightweight-charts.NOTICE.txt" target="_blank" rel="noreferrer">NOTICE</a></span></footer>

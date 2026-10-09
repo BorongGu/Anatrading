@@ -28,6 +28,7 @@ from .tdx_acquisition import AcquireError, data_root_id
 from .tdx_market import read_minutes
 from .volume_at_time import volume_report
 from .price_channel import channel_report
+from .true_range import range_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -532,6 +533,25 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
             context = _bounded_query(store, snapshot_id, {key: value for key, value in selection.items()
                                                         if key in {"cutoff", "mode"}})
             return channel_report(query, context, lookback)
+
+        return JSONResponse(await owner.call(calculate))
+
+    @app.get("/api/true-range/{snapshot_id}")
+    async def true_range(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "period"})
+        selection = _selection(parameters)
+        try:
+            period = int(parameters.get("period", "14"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+        if not 1 <= period <= 252:
+            raise _RequestError("invalid_request")
+
+        def calculate(store):
+            query = _bounded_query(store, snapshot_id, selection)
+            context = _bounded_query(store, snapshot_id, {key: value for key, value in selection.items()
+                                                        if key in {"cutoff", "mode"}})
+            return range_report(query, context, period)
 
         return JSONResponse(await owner.call(calculate))
 
