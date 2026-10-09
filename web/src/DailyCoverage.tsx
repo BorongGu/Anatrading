@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { explain, jsonRequest } from './api.ts';
+import { DailyScreen } from './DailyScreen.tsx';
+import type { ScreenWindows } from './DailyScreen.tsx';
 
 interface Run { run_id: string; status: string; processed: number; pool_sha256: string }
 interface CoverageRow {
@@ -14,7 +16,7 @@ interface Coverage {
 }
 const states: Record<string, string> = { committed: '已入库', missing: '缺缓存', failed: '失败', rejected: '未入库', publication_unknown: '入库结果未知', unprocessed: '未处理' };
 
-export function DailyCoverage({ onSelect }: { onSelect: (snapshot: string) => void }) {
+export function DailyCoverage({ onSelect }: { onSelect: (snapshot: string, sourceDate?: string, windows?: ScreenWindows) => void }) {
   const [runs, setRuns] = useState<Run[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [report, setReport] = useState<Coverage | null>(null);
@@ -71,5 +73,6 @@ export function DailyCoverage({ onSelect }: { onSelect: (snapshot: string) => vo
       {rows.length > 100 && <div className="pagination"><button disabled={page === 0} onClick={() => setPage(page-1)}>上一页</button><span>第 {page+1}／{Math.ceil(rows.length/100)} 页</span><button disabled={(page+1)*100 >= rows.length} onClick={() => setPage(page+1)}>下一页</button></div>}
       <details><summary>源列表哈希</summary><code>{report.pool_sha256}</code></details>
     </>}
+    {!!selected.length && <DailyScreen runIds={selected} onSelect={onSelect} />}
   </section>;
 }

@@ -41,6 +41,7 @@ export function DailyVolume({ query, selected, lookback, onLookbackSelect }: {
   return <section className="panel" aria-label="日线源数量与前序均量">
     <div className="section-heading"><h2>日线源数量 · 前序均量</h2><label>历史来源日期数<select value={lookback} onChange={event => onLookbackSelect(Number(event.target.value))}>
       <option value={20}>20日</option><option value={10}>10日</option><option value={55}>55日</option>
+      {![10, 20, 55].includes(lookback) && <option value={lookback}>{lookback}日（筛选窗口）</option>}
     </select></label></div>
     <p className="inline-note amber">跨日数量尺度、股本口径可比性是假设；单位、日期覆盖、行情闭合和历史可得时点未知。当前数值可能尚未覆盖全天。</p>
     <p className="subtle">当前源数量除以前N个可读来源日期的均量，排除当前日期。异常日期不跳过、不补齐，零数量保留。</p>

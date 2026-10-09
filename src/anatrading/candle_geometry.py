@@ -20,24 +20,29 @@ def _ratio(part, whole):
                 percent_display=f"{hundredths // 100}.{hundredths % 100:02d}")
 
 
-def geometry_row(row):
-    result = dict(ordinal=row["ordinal"], status="not_evaluated", reason=None, direction=None,
-                  **dict.fromkeys(_LENGTHS), ratios=dict.fromkeys(_RATIOS), ratio_reason=None)
+def ohlc_values(row):
+    """Validate the shared price bounds without calculating unused geometry ratios."""
     prices = [row["values"].get(key) for key in ("open", "high", "low", "close")]
     if any(value is None for value in prices):
-        result["reason"] = "missing_ohlc"
-        return result
+        return None, "missing_ohlc"
     try:
         opening, high, low, close = [decimal_value(value) for value in prices]
     except NumericError:
-        result["reason"] = "invalid_price"
-        return result
+        return None, "invalid_price"
     if any(value < 0 for value in (opening, high, low, close)):
-        result["reason"] = "negative_price"
-        return result
+        return None, "negative_price"
     if not (low <= opening <= high and low <= close <= high):
-        result["reason"] = "invalid_ohlc"
+        return None, "invalid_ohlc"
+    return (opening, high, low, close), None
+
+
+def geometry_row(row):
+    result = dict(ordinal=row["ordinal"], status="not_evaluated", reason=None, direction=None,
+                  **dict.fromkeys(_LENGTHS), ratios=dict.fromkeys(_RATIOS), ratio_reason=None)
+    prices, result["reason"] = ohlc_values(row)
+    if result["reason"]:
         return result
+    opening, high, low, close = prices
     lengths = dict(range=exact_sum((high, low.copy_negate())),
                    body=exact_sum((close, opening.copy_negate())).copy_abs(),
                    upper_shadow=exact_sum((high, max(opening, close).copy_negate())),

@@ -45,6 +45,8 @@ def _dates(raw):
     values = []
     for (value,) in struct.iter_unpack('<I28x', raw):
         try:
+            if not 10000000 <= value <= 99999999:
+                raise ValueError()
             values.append(date(value//10000, value//100 % 100, value % 100).isoformat())
         except ValueError:
             values.append(None)
@@ -55,7 +57,7 @@ def _dates(raw):
                 descending_steps=sum(a > b for a, b in zip(values, values[1:]) if a is not None and b is not None))
 
 
-def coverage_report(root, snapshots, run_ids):
+def selected_collection(root, run_ids):
     root = Path(root).resolve()
     if not run_ids or len(run_ids) != len(set(run_ids)) or len(run_ids) > 100:
         raise AcquireError('invalid_daily_cache_runs')
@@ -86,6 +88,31 @@ def coverage_report(root, snapshots, run_ids):
             pool, pool_sha = symbols, sha
         except (OSError, ValueError, KeyError, TypeError):
             raise AcquireError('invalid_daily_cache_runs') from None
+    return pool, pool_sha, outcomes
+
+
+def verified_cache(root, snapshot, item):
+    root = Path(root).resolve()
+    try:
+        sha, symbol = item['raw_sha256'], item['symbol']
+        if not re.fullmatch('[0-9a-f]{64}', sha) or snapshot['snapshot_id'] != item['snapshot_id']:
+            raise ValueError()
+        raw = _inside(root/'raw'/sha[:2]/sha, root).read_bytes()
+        if (not raw or len(raw) % 32 or hashlib.sha256(raw).hexdigest() != sha
+                or len(raw)//32 != snapshot['row_count']
+                or snapshot['metadata']['period'] != '1d'
+                or snapshot['manifest']['contract']['format_id'] != 'tdx-public-day-v1'
+                or snapshot['manifest']['raw_sha256'] != sha
+                or snapshot['manifest']['interpretation'].get('instrument') != symbol
+                or snapshot['manifest']['interpretation'].get('venue') != symbol[-2:]):
+            raise ValueError()
+    except (OSError, KeyError, ValueError, TypeError):
+        raise AcquireError('daily_cache_evidence_mismatch') from None
+    return raw
+
+
+def coverage_report(root, snapshots, run_ids):
+    pool, pool_sha, outcomes = selected_collection(root, run_ids)
     catalog = {snapshot['snapshot_id']: snapshot for snapshot in snapshots}
     counts = dict(pool=len(pool), processed=len(outcomes), committed=0, missing=0, failed=0,
                   unprocessed=len(pool)-len(outcomes), source_rows=0)
@@ -98,21 +125,11 @@ def coverage_report(root, snapshots, run_ids):
                    invalid_date_rows=0, duplicate_date_rows=0, descending_steps=0)
         if item['status'] == 'committed':
             try:
-                snapshot, sha = catalog[item['snapshot_id']], item['raw_sha256']
-                if not re.fullmatch('[0-9a-f]{64}', sha):
-                    raise ValueError()
-                raw = _inside(Path(root)/'raw'/sha[:2]/sha, Path(root)).read_bytes()
-                if (not raw or len(raw) % 32 or hashlib.sha256(raw).hexdigest() != sha
-                        or len(raw)//32 != snapshot['row_count']
-                        or snapshot['metadata']['period'] != '1d'
-                        or snapshot['manifest']['contract']['format_id'] != 'tdx-public-day-v1'
-                        or snapshot['manifest']['raw_sha256'] != sha
-                        or snapshot['manifest']['interpretation'].get('instrument') != symbol
-                        or snapshot['manifest']['interpretation'].get('venue') != symbol[-2:]):
-                    raise ValueError()
+                snapshot = catalog[item['snapshot_id']]
             except (OSError, KeyError, ValueError, TypeError):
                 raise AcquireError('daily_cache_evidence_mismatch') from None
-            row.update(snapshot_id=item['snapshot_id'], raw_sha256=sha, source_rows=len(raw)//32, **_dates(raw))
+            raw = verified_cache(root, snapshot, item)
+            row.update(snapshot_id=item['snapshot_id'], raw_sha256=item['raw_sha256'], source_rows=len(raw)//32, **_dates(raw))
             counts['committed'] += 1
             counts['source_rows'] += row['source_rows']
             latest[row['latest_source_date'] or 'unreadable'] += 1

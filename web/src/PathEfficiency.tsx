@@ -40,6 +40,7 @@ export function PathEfficiency({ query, selected, lookback, onLookbackSelect }: 
   return <section className="panel" aria-label="收盘路径效率">
     <div className="section-heading"><h2>收盘路径效率 · ER</h2><label>来源日期间变化数<select value={lookback} onChange={event => onLookbackSelect(Number(event.target.value))}>
       <option value={10}>10次变化</option><option value={20}>20次变化</option><option value={55}>55次变化</option>
+      {![10, 20, 55].includes(lookback) && <option value={lookback}>{lookback}次变化（筛选窗口）</option>}
     </select></label></div>
     <p className="subtle">净位移绝对值 / 累计收盘涨跌路径。接近1表示所采样收盘较少折返；接近0表示位移抵消较多。只描述收盘序列，不识别盘中路径或无信息量噪声。</p>
     <p className="inline-note amber">跨日尺度、复权可比性是假设；日期覆盖、行情闭合与历史可得时点未知，预测价值尚未验证。</p>

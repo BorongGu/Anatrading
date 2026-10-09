@@ -62,6 +62,13 @@ def test_partial_prefix_keeps_unprocessed_members(tmp_path):
     assert [row['status'] for row in result['rows']] == ['missing', 'unprocessed', 'unprocessed']
 
 
+def test_native_short_date_is_not_a_readable_format_label(tmp_path):
+    outcome,snapshot=committed(tmp_path,POOL[0],[10101])
+    run(tmp_path,'a'*32,[outcome])
+    row=daily_coverage.coverage_report(tmp_path,[snapshot],['a'*32])['rows'][0]
+    assert row['invalid_date_rows']==1 and row['latest_source_date'] is None
+
+
 def test_relative_data_root_matches_cli_startup(tmp_path, monkeypatch):
     root = tmp_path/'root'
     outcome, snapshot = committed(root, POOL[0], [20261008])

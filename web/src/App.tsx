@@ -323,7 +323,10 @@ export default function App() {
           {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} dailyVolumeLookback={dailyVolumeLookback} onDailyVolumeLookbackSelect={setDailyVolumeLookback} efficiencyLookback={efficiencyLookback} onEfficiencyLookbackSelect={setEfficiencyLookback} />}
           <QualityDetails query={q} />
         </>}
-        <DailyCoverage onSelect={snapshot => { void loadQuery({ ...emptySelection, snapshot }); }} />
+        <DailyCoverage onSelect={(snapshot, sourceDate, windows) => {
+          if (windows) { setChannelLookback(windows.channel_lookback); setDailyVolumeLookback(windows.volume_lookback); setEfficiencyLookback(windows.efficiency_lookback); }
+          void loadQuery({ ...emptySelection, snapshot, cutoff: sourceDate ?? '' });
+        }} />
         <ReferenceData config={config} />
         <footer>本地研究工具 · 单快照证据切片<span>图表由 <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a> 提供 · <a href="/licenses/lightweight-charts.LICENSE.txt" target="_blank" rel="noreferrer">Apache 2.0</a> · <a href="/licenses/lightweight-charts.NOTICE.txt" target="_blank" rel="noreferrer">NOTICE</a></span></footer>
       </main>

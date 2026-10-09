@@ -17,6 +17,7 @@ const explanations: Record<string, string> = {
   daily_cache_missing: '客户端暂无该证券的日线缓存，未填补或改用其他来源。',
   invalid_daily_cache_runs: '采集批次尚未结束、来源列表不同或处理范围重叠，请核对批次选择。',
   daily_cache_evidence_mismatch: '原始日线与批次快照不一致，请核对原件和快照后重试。',
+  invalid_daily_screen: '筛选日期、窗口或阈值无效；窗口为2～252，量比阈值非负，ER阈值为0～1。',
   cache_unstable: '客户端正在更新缓存，请稍后重新读取。',
   invalid_day_capture: '日线缓存为空、过大或记录未完整写入。',
   http_result_unknown: '行情接口连接失败或超时，请确认通达信处于运行状态。',

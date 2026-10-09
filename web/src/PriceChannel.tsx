@@ -41,6 +41,7 @@ export function PriceChannel({ query, selected, lookback, onLookbackSelect, repo
   return <section className="panel" aria-label="前序日线价格区间">
     <div className="section-heading"><h2>前序日线价格区间</h2><label>历史来源日期数<select value={lookback} onChange={event => onLookbackSelect(Number(event.target.value))}>
       <option value={20}>20日</option><option value={55}>55日</option><option value={10}>10日</option>
+      {![10, 20, 55].includes(lookback) && <option value={lookback}>{lookback}日（筛选窗口）</option>}
     </select></label></div>
     <p className="inline-note amber">条件性源数值比较。跨日价格尺度、复权可比性是假设；日历、覆盖、闭合和历史可得时点未知，尚无预测价值验证。</p>
     <p className="subtle">上界为此前N个可读来源日期的最高值，下界为最低值，排除当前日期。窗口从完整截止历史取得，异常日期不跳过、不补齐；等于边界只计触碰。</p>

@@ -2,7 +2,7 @@
 from bisect import bisect_left
 from datetime import date
 
-from .candle_geometry import geometry_row
+from .candle_geometry import ohlc_values
 from .numeric import decimal_text, decimal_value, exact_sum
 from .store import _identity
 
@@ -29,10 +29,9 @@ def _member(day, rows):
     elif rows[0]["label"] is None:
         result["reason"] = "unlocated_label"
     else:
-        result["reason"] = geometry_row(rows[0])["reason"]
+        prices, result["reason"] = ohlc_values(rows[0])
         if result["reason"] is None:
-            result.update(high=decimal_text(decimal_value(rows[0]["values"]["high"])),
-                          low=decimal_text(decimal_value(rows[0]["values"]["low"])))
+            result.update(high=decimal_text(prices[1]), low=decimal_text(prices[2]))
     return result
 
 

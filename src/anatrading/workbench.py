@@ -34,6 +34,7 @@ from .daily_volume import daily_volume_report
 from .path_efficiency import efficiency_report
 from .tdx_reference import read_reference
 from .daily_coverage import collection_runs, coverage_report
+from .daily_screen import screen_report
 
 
 _MAX_UPLOAD = 16 * 1024 * 1024
@@ -59,6 +60,7 @@ _STORE_CODES = {
     "invalid_tdx_symbol", "daily_cache_missing", "cache_unstable", "invalid_day_capture",
     "invalid_tdx_reference_request", "invalid_tdx_reference_response", "tdx_reference_unavailable",
     "invalid_daily_cache_runs", "daily_cache_evidence_mismatch",
+    "invalid_daily_screen",
 }
 
 
@@ -423,6 +425,20 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
         parameters = _parameters(request, {"run_ids"}, ("run_ids",))
         return {"coverage": await owner.call(lambda store: coverage_report(
             root, store.snapshot_catalog(), parameters["run_ids"].split(",")))}
+
+    @app.get("/api/daily-screen")
+    async def daily_screen(request: Request):
+        parameters = _parameters(request, {"run_ids", "source_date", "channel_lookback", "volume_lookback",
+            "efficiency_lookback", "channel_relation", "minimum_volume", "minimum_efficiency", "direction"},
+            ("run_ids", "source_date"))
+        run_ids = parameters.pop("run_ids").split(",")
+        try:
+            for name in ("channel_lookback", "volume_lookback", "efficiency_lookback"):
+                if name in parameters:
+                    parameters[name] = int(parameters[name])
+        except ValueError:
+            raise _RequestError("invalid_daily_screen") from None
+        return {"screen": await owner.call(lambda store: screen_report(root, store.snapshot_catalog(), run_ids, **parameters))}
 
     @app.post("/api/import")
     async def ingest(request: Request):
