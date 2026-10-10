@@ -223,7 +223,7 @@ export default function App() {
 
   return <div className="app-shell">
     <header className="topbar"><a className="brand" href="/" aria-label="Anatrading 首页"><span className="brand-mark">A</span><span>Anatrading<small>数据证据工作台</small></span></a>
-      <div className="header-status"><span className="local-dot" />本机 · 单快照<span className="badge">历史回顾</span></div></header>
+      <div className="header-status"><span className="local-dot" />本机 · 单快照 · 历史回顾</div></header>
     <div className="workspace">
       <aside className="sidebar">
         <div className="section-heading"><h2>数据快照</h2><button className="quiet" onClick={() => void refreshCatalog()} disabled={!config || importing}>刷新</button></div>
@@ -297,7 +297,7 @@ export default function App() {
             <button type="button" className="quiet" disabled={!snapshot || !selection.cutoff} onClick={() => void loadQuery({ ...selectionRef.current, cutoff: '' })}>全部标签</button>
           </div>
         </form>
-        {!reply && <section className="panel empty-state" aria-live="polite"><div className="empty-glyph">⌁</div><h2>{phase === 'loading' ? '正在核验原件并读取当前选择' : phase === 'error' ? '当前结果已阻断' : selection.snapshot ? '等待应用当前选择' : '选择快照，开始历史回顾'}</h2>
+        {!reply && <section className="panel empty-state" aria-live="polite"><div className="empty-glyph" aria-hidden="true"><i /><i /><i /></div><h2>{phase === 'loading' ? '正在核验原件并读取当前选择' : phase === 'error' ? '当前结果已阻断' : selection.snapshot ? '等待应用当前选择' : '选择快照，开始历史回顾'}</h2>
           <p>{phase === 'loading' ? '旧图、详情与导出已清除。' : '图表、精确字段与导出由同一个查询驱动。超过 20,000 条时请填写源序号窗口。'}</p></section>}
         {reply && q && <>
           <section className="selection-summary" aria-label="当前数据窗口">

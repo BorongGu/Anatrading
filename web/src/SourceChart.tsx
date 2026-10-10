@@ -34,10 +34,10 @@ export function SourceChart({ reply, onChoose, onError, visibleBars, channel = n
     try {
       chart = createChartEx(host.current, new SequenceAxis(plot.labels), {
         autoSize: true,
-        layout: { background: { type: ColorType.Solid, color: '#ffffff' }, textColor: '#657184', fontSize: 11, attributionLogo: true },
-        grid: { vertLines: { color: '#f1f3f7' }, horzLines: { color: '#edf0f5' } },
-        rightPriceScale: { borderColor: '#e3e8ef', scaleMargins: { top: 0.1, bottom: 0.08 } },
-        timeScale: { borderColor: '#e3e8ef', ignoreWhitespaceIndices: false, enableConflation: false,
+        layout: { background: { type: ColorType.Solid, color: '#fffdf8' }, textColor: '#6b6656', fontSize: 11, attributionLogo: true },
+        grid: { vertLines: { color: '#f1eee2' }, horzLines: { color: '#ece7d8' } },
+        rightPriceScale: { borderColor: '#e0dac8', scaleMargins: { top: 0.1, bottom: 0.08 } },
+        timeScale: { borderColor: '#e0dac8', ignoreWhitespaceIndices: false, enableConflation: false,
           precomputeConflationOnInit: false, tickMarkMaxCharacterLength: 20, minBarSpacing: 0.01 },
         crosshair: { mode: CrosshairMode.Normal, horzLine: { labelVisible: false } },
         localization: { locale: 'zh-CN' },
@@ -85,7 +85,7 @@ export function SourceChart({ reply, onChoose, onError, visibleBars, channel = n
       channelSeries.current = [];
       // Separate runs leave undefined windows unconnected by the line renderer.
       for (const segment of channelPlot?.segments ?? []) {
-        for (const [field, color] of [['upper', '#4169a1'], ['lower', '#ad6717']] as const) {
+        for (const [field, color] of [['upper', '#4f7385'], ['lower', '#a3702f']] as const) {
           const series = chart.addSeries(LineSeries, { color, lineWidth: 1, lineType: LineType.WithSteps,
             lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false,
             priceFormat: { type: 'price', precision: 4, minMove: 0.0001 } }, 0);

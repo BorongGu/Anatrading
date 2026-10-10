@@ -22,7 +22,7 @@ function AggregateChart({ report, onChoose }: { report: AggregationReport; onCho
     let chart: IChartApiBase<number> | null = null;
     try {
       chart = createChartEx(host.current, new SequenceAxis(plot.labels), {
-        autoSize: true, layout: { background: { type: ColorType.Solid, color: '#ffffff' }, textColor: '#657184', attributionLogo: true },
+        autoSize: true, layout: { background: { type: ColorType.Solid, color: '#fffdf8' }, textColor: '#6b6656', attributionLogo: true },
         crosshair: { mode: CrosshairMode.Normal },
         timeScale: { ignoreWhitespaceIndices: false, enableConflation: false, precomputeConflationOnInit: false, tickMarkMaxCharacterLength: 20 },
       });

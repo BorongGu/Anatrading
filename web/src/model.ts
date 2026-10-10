@@ -300,7 +300,7 @@ export function buildPivotPlot(reply: Reply, report: PivotReport | null) {
     const time = positions.get(event.confirmation_ordinal);
     if (time === undefined || reply.query.rows[time].label !== event.confirmation_label || !reply.display[time]?.ohlc_drawable) { skipped += 1; continue; }
     markers.push({ time, position: event.kind === 'high' ? 'aboveBar' : 'belowBar', shape: event.kind === 'high' ? 'arrowDown' : 'arrowUp',
-      color: event.kind === 'high' ? '#4169a1' : '#ad6717', text: event.kind === 'high' ? '确高' : '确低' });
+      color: event.kind === 'high' ? '#4f7385' : '#a3702f', text: event.kind === 'high' ? '确高' : '确低' });
   }
   markers.sort((a, b) => a.time - b.time);
   return { markers, skipped };
