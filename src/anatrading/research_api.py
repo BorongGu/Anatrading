@@ -221,6 +221,36 @@ def _calculate_path(store, sid, cutoff, error):
 
 def register_research_routes(app, owner, parse_parameters, error, safe_store_call):
     """Reuse the established local HTTP boundary and error mapping."""
+    @app.get("/api/research/two-group-explanation")
+    async def two_group_explanation(request: Request):
+        from .two_group_explanation import two_group_report, ERRORS
+        p = parse_parameters(request, {"snapshot_ids", "group_a", "group_b", "current_start", "current_end"},
+                             ("snapshot_ids", "group_a", "group_b", "current_start", "current_end"))
+        if any(len(p[key]) > MAX_MEMBERS * 65 for key in ("snapshot_ids", "group_a", "group_b")):
+            raise error("research_member_limit")
+        ids = [_identifier(sid, error) for sid in p["snapshot_ids"].split(",")]
+        groups = {key: [_identifier(sid, error) for sid in p[name].split(",")]
+                  for key, name in (("A", "group_a"), ("B", "group_b"))}
+        if not 4 <= len(ids) <= MAX_MEMBERS:
+            raise error("research_member_limit")
+        if len(set(ids)) != len(ids):
+            raise error("duplicate_snapshot")
+        if (any(len(group) < 2 for group in groups.values()) or
+                len(set(groups["A"] + groups["B"])) != len(groups["A"] + groups["B"]) or
+                set(groups["A"] + groups["B"]) != set(ids)):
+            raise error("invalid_groups")
+        start, end = _day(p["current_start"], error), _day(p["current_end"], error)
+        if start >= end:
+            raise error("invalid_dates")
+        def calculate(store):
+            queries = _load(store, ids, None, error)
+            try:
+                return two_group_report(queries, groups, start, end)
+            except ValueError as exc:
+                code = str(exc)
+                raise error(code if code in ERRORS or code in _SAFE_ERRORS else "invalid_research_input") from None
+        return JSONResponse(await owner.call(lambda store: safe_store_call(lambda: calculate(store))))
+
     @app.get("/api/research/path-match/{snapshot_id}")
     async def path_match(snapshot_id: str, request: Request):
         sid = _identifier(snapshot_id, error)
