@@ -5,7 +5,7 @@ or predictive usefulness.
 """
 from copy import deepcopy
 from datetime import date, timedelta
-from decimal import localcontext
+from decimal import Decimal, localcontext
 import json
 import random
 
@@ -176,6 +176,7 @@ def test_research_total_budget_rejected_before_any_materialization(tmp_path, mon
         raise AssertionError('Over-total-budget research materialized observations')
     monkeypatch.setattr(EvidenceStore, 'query_row_count', count)
     monkeypatch.setattr(EvidenceStore, 'query', forbidden)
+    monkeypatch.setattr(EvidenceStore, '_research_query', forbidden)
     ids = [f'{i:064x}' for i in range(11)]
     async def scenario():
         async with client_for(root) as client:
@@ -193,3 +194,120 @@ def test_universe_same_market_gate_allows_china_venues_and_rejects_mixed_market(
     for symbol in ['AAPL.NASDAQ','00700.HK']:
         with pytest.raises(ValueError, match='^research_market_mismatch$'):
             universe_report([china[0], query([1,2,3],symbol)], '2026-01-03',2)
+
+
+def _projection_sources(store):
+    """Mixed source failures made through normal decoding; no DB repair path."""
+    snapshots = []
+    for side, symbol in enumerate(['sh.600001', 'sz.000001']):
+        records = []
+        for i in range(34):
+            day = (date(2026, 1, 1) + timedelta(days=i)).isoformat()
+            price = str(Decimal(20 + side) + Decimal(i) / 100)
+            row = [day, symbol, *([price] * 4), '9223372036854775807',
+                   '99999999999999999999.999999999999999999', '3']
+            if i == 8:
+                row[1] = 'sh.699999'
+            if i == 13:
+                row[5] = '0'
+            if i == 17:
+                row[0] = day.replace('-', '/')  # Located only from the raw token.
+            if i == 18:
+                row[0] = 'not-a-date'
+            if i == 24:
+                row[6], row[7] = 'bad', 'bad'  # Price-only eligibility stays intact.
+            records.append(row)
+        records.append(deepcopy(records[11]))
+        records.append(['2026/12/31', symbol, *(['1'] * 4), '0', '0', '3'])
+        records.reverse()  # Source order cannot be mistaken for chronological order.
+        snapshots.append(store.import_bytes(bao_payload(records, code=symbol),
+                         'baostock-decoded-v0.9.4')['snapshot_id'])
+    return snapshots
+
+
+def _independent_projection(full):
+    keys = ['snapshot_id','batch_id','manifest','metadata','batch_checks','selection','query_id','counts']
+    expected = {key: deepcopy(full[key]) for key in keys}
+    expected['read_projection'] = 'daily_ohlc_input_v1'
+    for scope in ['rows','unlocated']:
+        expected[scope] = []
+        for row in full[scope]:
+            projected = {key: deepcopy(row[key]) for key in ['ordinal','label','tokens','checks']}
+            projected['values'] = {key: None if row['values'][key] is None else Decimal(row['values'][key])
+                                   for key in ['open','high','low','close']}
+            expected[scope].append(projected)
+    return expected
+
+
+def test_compact_projection_matches_independent_reference_and_complete_reports(tmp_path):
+    from anatrading.research_api import _calculate
+    from anatrading.research_series import daily_coverage
+    from anatrading.workbench import _RequestError
+    with EvidenceStore(tmp_path) as store:
+        ids = _projection_sources(store)
+        for cutoff in [None, '2025-12-31', '2026-01-18', '2026-01-27', '2026-02-03', '2027-01-01']:
+            full = [store.query(sid, cutoff=cutoff) for sid in ids]
+            with localcontext() as ctx:
+                ctx.prec = 2
+                compact = [store._research_query(sid, cutoff=cutoff) for sid in ids]
+                assert compact == [_independent_projection(q) for q in full]
+                for original, projected in zip(full, compact):
+                    assert daily_bars(projected) == daily_bars(original)
+                    assert daily_coverage(projected) == daily_coverage(original)
+                for horizon in [1, 5, 10, 20]:
+                    params = dict(cutoff=cutoff, lookback=2, horizon=horizon, test_start='2026-01-16')
+                    assert _calculate('single', compact[:1], params, _RequestError) == _calculate('single', full[:1], params, _RequestError)
+                params = dict(cutoff=cutoff, lookback=5)
+                assert _calculate('pair', compact, params, _RequestError) == _calculate('pair', full, params, _RequestError)
+                if cutoff is not None:
+                    assert _calculate('universe', compact, params, _RequestError) == _calculate('universe', full, params, _RequestError)
+            assert [store.query(sid, cutoff=cutoff) for sid in ids] == full
+
+
+def test_compact_reads_leave_public_export_bytes_and_parquet_unchanged(tmp_path):
+    from pathlib import Path
+    import pyarrow.parquet as pq
+    with EvidenceStore(tmp_path / 'store') as store:
+        sid = _projection_sources(store)[0]
+        selection = dict(cutoff='2026-02-03')
+        before = store.query(sid, **selection)
+        json_before = store.export_json(sid, tmp_path / 'before.json', **selection)
+        parquet_before = store.export_parquet(sid, tmp_path / 'before.parquet', **selection)
+        before_bytes = Path(json_before['path']).read_bytes()
+        before_table = pq.read_table(parquet_before['path'])
+        for _ in range(3):
+            projected = store._research_query(sid, **selection)
+            assert projected['query_id'] == before['query_id']
+            signal_report(projected, lookback=2)
+        assert store.query(sid, **selection) == before
+        json_after = store.export_json(sid, tmp_path / 'after.json', **selection)
+        parquet_after = store.export_parquet(sid, tmp_path / 'after.parquet', **selection)
+        assert Path(json_after['path']).read_bytes() == before_bytes
+        assert json_after['query_id'] == json_before['query_id']
+        assert json_after['sha256'] == json_before['sha256']
+        assert pq.read_table(parquet_after['path']).equals(before_table, check_metadata=True)
+        assert parquet_after['query_id'] == parquet_before['query_id']
+        assert parquet_after['sha256'] == parquet_before['sha256']
+
+
+@pytest.mark.parametrize('bad_checks', [
+    '[{"name":"source_code"}]', '[{"outcome":"fail"}]',
+    '[{"name":"source_code","outcome":"PRIVATE_BAD_OUTCOME"}]',
+    '{}', '[null]', 'null', 'PRIVATE_BROKEN_JSON',
+])
+def test_compact_damaged_checks_cannot_turn_into_qualified_http_result(tmp_path, bad_checks):
+    import asyncio
+    from test_research_api import client_for
+    root = tmp_path / 'store'
+    with EvidenceStore(root) as store:
+        sid = _projection_sources(store)[0]
+        q = store.query(sid)
+        store.db.execute('UPDATE observations SET checks_json=? WHERE batch_id=? AND ordinal=3',
+                         [bad_checks, q['batch_id']])
+    async def scenario():
+        async with client_for(root) as client:
+            response = await client.get('/api/research/single/' + sid)
+            assert response.status_code == 500
+            assert response.json() == {'error': 'internal_error'}
+            assert 'PRIVATE' not in response.text
+    asyncio.run(scenario())

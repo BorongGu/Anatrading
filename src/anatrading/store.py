@@ -87,6 +87,18 @@ def _identity(value):
     return hashlib.sha256(_json(value).encode("utf-8")).hexdigest()
 
 
+def _research_checks(encoded):
+    """Validate persisted check structure without constructing quality totals."""
+    checks = json.loads(encoded)
+    if not isinstance(checks, list) or any(
+        not isinstance(check, dict) or not isinstance(check.get("name"), str)
+        or check.get("outcome") not in ("pass", "fail", "not_evaluated")
+        for check in checks
+    ):
+        raise ValueError("invalid_research_checks")
+    return checks
+
+
 def _utcnow():
     return datetime.now(timezone.utc).isoformat()
 
@@ -431,6 +443,54 @@ class EvidenceStore:
             for check in row["checks"]:
                 counts[check["name"]]["pass_" if check["outcome"] == "pass" else check["outcome"]] += 1
         return {name: {"pass" if key == "pass_" else key: value for key, value in count.items()} for name, count in sorted(counts.items())}
+
+    def _research_query(self, snapshot_id, cutoff=None):
+        """Private full-prefix OHLC projection after research budget admission.
+
+        The selection/query_id identify the unchanged public full source query,
+        not this internal payload. Never return or export this mapping directly.
+        Raw bytes are verified on every read, including an empty selection.
+        """
+        if not isinstance(snapshot_id, str) or not re.fullmatch("[0-9a-f]{64}", snapshot_id):
+            raise StoreError("invalid_snapshot_id")
+        with self._mutex:
+            found = self.db.execute(
+                "SELECT s.batch_id,b.raw_sha256,b.manifest_json,b.metadata_json,b.checks_json,b.row_count,r.byte_length "
+                "FROM snapshots s JOIN batches b USING(batch_id) JOIN raw_objects r ON r.sha=b.raw_sha256 "
+                "WHERE s.snapshot_id=?", [snapshot_id]).fetchone()
+            if found is None:
+                raise StoreError("snapshot_not_found")
+            batch_id, sha, manifest_json, metadata_json, batch_checks, batch_rows, size = found
+            self._verify_raw(sha, size)
+            manifest, metadata = json.loads(manifest_json), json.loads(metadata_json)
+            _validate_label_cutoff(cutoff, metadata)
+            all_unlocated = self.db.execute(
+                "SELECT count(*) FROM observations WHERE batch_id=? AND label IS NULL", [batch_id]
+            ).fetchone()[0]
+            where, parameters = "batch_id=?", [batch_id]
+            if cutoff is not None:
+                where += " AND (label IS NULL OR label<=?)"
+                parameters.append(cutoff)
+            cursor = self.db.execute(
+                "SELECT ordinal,label,tokens_json,checks_json,source_open,source_high,source_low,source_close "
+                "FROM observations WHERE " + where + " ORDER BY label NULLS LAST,ordinal", parameters)
+            selected, unlocated = [], []
+            for ordinal, label, tokens_json, checks_json, opening, high, low, close in cursor.fetchall():
+                tokens = json.loads(tokens_json)
+                if not isinstance(tokens, dict):
+                    raise ValueError("invalid_research_tokens")
+                row = dict(ordinal=ordinal, label=label, tokens=tokens, checks=_research_checks(checks_json),
+                           values=dict(open=opening, high=high, low=low, close=close))
+                (unlocated if label is None else selected).append(row)
+            # Preserve legacy source-query identity even though its full payload
+            # is not materialized here. The internal marker is not an ID input.
+            selection = dict(snapshot_id=snapshot_id, mode="retrospective", cutoff=cutoff,
+                             ordinal_start=None, ordinal_end=None, fields=list(VALUE_FIELDS), versions=manifest["versions"])
+            return dict(snapshot_id=snapshot_id, batch_id=batch_id, selection=selection, query_id=_identity(selection),
+                        manifest=manifest, metadata=metadata, rows=selected, unlocated=unlocated,
+                        counts=dict(selected_rows=len(selected), unlocated_rows=len(unlocated), batch_rows=batch_rows,
+                                    batch_unlocated_rows=all_unlocated), batch_checks=_research_checks(batch_checks),
+                        read_projection="daily_ohlc_input_v1")
 
     def query(self, snapshot_id, cutoff=None, ordinal_start=None, ordinal_end=None, mode="retrospective"):
         if mode != "retrospective":

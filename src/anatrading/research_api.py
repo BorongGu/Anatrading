@@ -66,7 +66,7 @@ def _load(store, ids, cutoff, error):
     counts = [store.query_row_count(sid, cutoff=cutoff) for sid in ids]
     if any(n > MAX_SERIES_ROWS for n in counts) or sum(counts) > MAX_TOTAL_ROWS:
         raise error("research_row_limit")
-    queries = [store.query(sid, cutoff=cutoff) for sid in ids]
+    queries = [store._research_query(sid, cutoff=cutoff) for sid in ids]
     if any(q["metadata"].get("period") != "1d" for q in queries):
         raise error("unsupported_period")
     return queries
