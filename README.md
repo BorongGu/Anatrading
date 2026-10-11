@@ -14,6 +14,13 @@
 
 第二批已完成内部紧凑读取和[分钟采样诊断 A](docs/research/028-intraday-research-candidates.md#9-a-纯函数实现记录2026-10-11)。紧凑读取保留公开查询、导出、精确源值与研究身份；分钟 A 仅为已复核的单日期来源模板纯函数，尚未接入 API 或界面，也不提供实时分钟功能。第三批已实现腾讯日线/新浪分钟的有界取数、恢复和离线捕获导入，本地测试与独立实现复核通过；40 份旧真实捕获已完成离线入库对账，新命令的真实联网仍受阻，详见下文。
 
+第四批已通过后端联合回归与独立实现复核：
+
+- **同伴价格对照 A**：按固定起止日，把目标与剔除目标后的同伴中位数/等权均值比较；目前仅纯函数，无 API/UI。
+- **可解释股票筛选**：只读 API 可对动量、波动和回撤设置有限 AND/OR 条件，保留每只股票入选、排除或待核查的依据。已接入多股研究页面，前端模型/静态组件测试、构建与独立实现复核通过；真实浏览器操作和窄屏仍待验。
+
+两项均只描述提供的来源价格和当前所选样本，不能据此推断选股效果或历史行业表现。方法、来源验证及后续路线见 [030 同伴研究](docs/research/030-peer-relative-research.md)、[032 筛选研究](docs/research/032-explainable-stock-filters.md)和[031 高级能力路线](docs/research/031-tradingview-advanced-roadmap.md)。
+
 一套 Python + TypeScript/React 代码库支持 Linux 与 Windows 的通用研究功能；通达信客户端调用和原生进程控制保留 Windows 专用适配器。仓库为私有仓库，真实行情、账户信息、密钥和本地运行文件均不提交。
 
 ## 安装与运行
@@ -140,17 +147,19 @@ npm run build
 Pop-Location
 ```
 
-2026-10-11 第三批工作区冻结版本验证：
+2026-10-11 第四批后端联合冻结验证（107 个 src/tests 文件前后哈希一致）：
 
-- Linux Python 全套：**1,937 通过、0 失败、49 跳过、1 项警告**，用时 68.86 s。48 项因缺少私有真实样本跳过，1 项为 Windows 原生进程证据；警告为锁定依赖中的 Starlette/httpx 弃用提示。
-- 前端本片未修改；最近一次验证为 **72 通过、0 失败、0 跳过**，TypeScript 与 Vite 生产构建通过。构建仍提示主包超过 500 kB，并有 npm 环境配置警告；不据此声称首次交互性能达标。
+- Linux Python 全套：**2,200 通过、0 失败、49 跳过、1 项警告**，用时 84.56 s。48 项因缺少私有真实样本跳过，1 项为 Windows 原生进程证据；警告为锁定依赖中的 Starlette/httpx 弃用提示。
+- [筛选界面验收](docs/qualification/research-filter-ui.md)：全前端 **128 通过、0 失败、0 跳过**，含 15 项独立反例；另 15 类 Python→TypeScript 合成响应桥接通过，TypeScript/Vite 构建及[最终实现复核](docs/reviews/2026-10-11-research-ui-review.md)通过。06:22 UTC 最终重跑前后 54 个 web 源码/测试文件哈希一致。JS 主包 636.49 kB，保留超过 500 kB 的警告；模型/静态组件与桥接测试不证明真实点击、字体、窄屏或加载性能。
 - [首版实现复核](docs/qualification/research-implementation-review.md)已关闭来源冲突和隔离资格问题；[紧凑读取复核](docs/reviews/2026-10-11-compact-research-reads-review.md)300 项定向测试通过；[分钟 A 复核](docs/reviews/2026-10-11-intraday-candidate-review.md)接受限定纯函数，相关 124 项测试通过。这些定向结果已包含在全套中，不累计相加。
 - [自动取数独立复核](docs/reviews/2026-10-11-automatic-market-data-review.md)：全部 public 测试 455 项通过，其中独立对抗测试 173 项通过；已包含于全套，不累计相加。真实离线入库和新网络失败如上单列。
+- [同伴 A 验收](docs/qualification/peer-relative-research.md)：8 个预定真实来源案例，160 个端点中 158 个存在、2 个缺失；两个缺失端点按预期关闭比较，精确有理数对账通过。50 股/200,000 行合成内存输入的单次纯函数约 0.847 s，不代表接口或稳定性能。
+- [筛选实现与来源验收](docs/qualification/stock-filters.md)：60 个固定配置、260 次 ASGI 请求、600 次“配置×成员”判定及全部条件/引用核对通过；重复、重开和成员/条件顺序变化不改响应。每成员每次只计数、加载、原件检查与规范化一次。50 成员五种合同重异常响应为 297,975 B，较旧响应增量 252,964 B，体积门槛通过；资源观察及一次完整复测已结束：六配置中位耗时、新增解释层（最多 5.68 ms）和字节门槛通过；首轮 29/30 个耗时对通过，复测 15/15 通过，首次失败保留。10×20,000/N20 的独立进程峰值 RSS 差两次为 +23.77/+43.49 MiB，超过 +16 MiB 门槛；资源仅部分通过，稳定 p95 未验。
 - 第二批[性能复验](docs/qualification/research-performance.md#内部紧凑读取复验当前实现)：39 次正式 ASGI 请求通过，完整/紧凑读取结果、来源原件和身份一致，主矩阵响应与旧基准逐字节相等。200,000 行集合中，10×20,000 的中位耗时由 15.298 s 降至 11.988 s，50×4,000 由 14.719 s 降至 12.888 s；各三次测量，仍有十余秒等待，未含真实网络或浏览器。
 
-上述结果来自本地冻结版本验证，仓库尚未配置 GitHub CI。它们覆盖首版研究、内部紧凑读取、分钟 A 纯函数、新有界取数及格式、HTTP 边界和 Linux 通用修复；跳过项不能计为通过，前端单测及构建也不代替真实浏览器操作。
+上述结果来自本地冻结版本验证，仓库尚未配置 GitHub CI。它们覆盖首版研究、内部紧凑读取、分钟 A 与同伴 A 纯函数、筛选只读 API、有界取数及格式、HTTP 边界和 Linux 通用修复；跳过项不能计为通过，前端单测及构建也不代替真实浏览器操作。
 
-尚未完成：新取数命令的真实网络成功链路、真实浏览器操作、研究接口的实际 socket/网络 HTTP、并发等待/尾延迟与峰值内存、Windows 原生回归、用户真实导出的逐字段对账，以及严格样本外预测增量。[浏览器验收](docs/qualification/research-browser.md)已获用户授权，但同环境 Chromium 在创建页面前遭本地 socket 权限拒绝，支持的提权重试仍失败；页面未加载、无界面截图，须在具备相应权限的受支持环境补验。合成性能的有限优化保留条件已通过，交互响应目标仍未验收。数据单位、复权、日历、成员历史和历史可得性未知时继续标示限制。首版双股和集合仅允许同一市场，沪/深/京归入同一 A 股市场；跨市场同步规则另行研究。
+尚未完成：筛选真实浏览器交互及窄屏验收、同伴 A 的 API/UI、筛选 RSS/逐对时延稳定资格与 p95、新取数命令的真实网络成功链路、真实浏览器操作、研究接口的实际 socket/网络 HTTP、并发等待/尾延迟与峰值内存、Windows 原生回归、用户真实导出的逐字段对账，以及严格样本外预测增量。[浏览器验收](docs/qualification/research-browser.md)已获用户授权，但同环境 Chromium 在创建页面前遭本地 socket 权限拒绝，支持的提权重试仍失败；页面未加载、无界面截图，须在具备相应权限的受支持环境补验。合成性能的有限优化保留条件已通过，交互响应目标仍未验收。数据单位、复权、日历、成员历史和历史可得性未知时继续标示限制。首版双股和集合仅允许同一市场，沪/深/京归入同一 A 股市场；跨市场同步规则另行研究。
 
 “计算正确”“真实来源兼容”“有预测或交易价值”分别验收。本轮研究按来源记录做历史描述；因果算法不使用未来柱，也不能证明当前拿到的历史版本在当时已经可得。事件后续价格变化不等于成交收益，双股偏离不等于协整或套利，所选样本广度不等于全市场或历史行业指数。
 
@@ -162,5 +171,8 @@ Pop-Location
 - [首版实现独立复核](docs/qualification/research-implementation-review.md) / [紧凑读取复核](docs/reviews/2026-10-11-compact-research-reads-review.md) / [性能复验](docs/qualification/research-performance.md)
 - [自动取数方案](docs/plans/2026-10-11-automatic-market-data.md) / [来源研究](docs/research/029-automated-ashare-data.md) / [格式与来源验收](docs/qualification/public-market-formats.md) / [新命令真实验收](docs/qualification/public-acquisition.md) / [独立复核](docs/reviews/2026-10-11-automatic-market-data-review.md)
 - [分钟候选及 A 纯函数](docs/research/028-intraday-research-candidates.md) / [分钟独立复核](docs/reviews/2026-10-11-intraday-candidate-review.md)：B/C 仍为研究候选，A 尚无 HTTP/UI
+- [同伴 A 定义](docs/research/030-peer-relative-research.md) / [同伴验收](docs/qualification/peer-relative-research.md) / [筛选定义](docs/research/032-explainable-stock-filters.md) / [筛选实现复核](docs/reviews/2026-10-11-explainable-filters-review.md) / [筛选验收](docs/qualification/stock-filters.md)
+- [多股筛选界面验收](docs/qualification/research-filter-ui.md) / [界面独立复核](docs/reviews/2026-10-11-research-ui-review.md)：模型、静态组件及构建通过，真实浏览器未验
+- [TradingView 高级能力与分期路线](docs/research/031-tradingview-advanced-roadmap.md)：长期目标与后续候选，具体新增范围须单独研究复核
 - [国内能力矩阵](docs/research/006-domestic-capabilities.md) / [国际能力矩阵](docs/research/007-international-capabilities.md)：广覆盖调研；具体版本与同任务实测仍需补齐
 - 历史记录：[早期架构决策](docs/REVIEW_DECISIONS.md)、[数据格式约定](docs/contracts/INITIAL_DATA_CONTRACT.md)、[存储验收](docs/qualification/evidence-core.md)、[图形验收](docs/qualification/workbench.md)、[HTTP 约定](docs/contracts/WORKBENCH_HTTP.md)。旧计数、性能和平台结论只适用于各报告注明的版本与日期

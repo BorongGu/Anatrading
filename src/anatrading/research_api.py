@@ -141,3 +141,38 @@ def register_research_routes(app, owner, parse_parameters, error):
         params = dict(cutoff=cutoff, lookback=_window(p.get("lookback", "20"), 2, error))
         return JSONResponse(await owner.call(
             lambda store: _calculate("universe", _load(store, ids, cutoff, error), params, error)))
+
+    @app.get("/api/research/universe-filter")
+    async def universe_filter(request: Request):
+        from .stock_filters import FILTER_ERRORS, filter_report, parse_rule
+
+        p = parse_parameters(request, {"snapshot_ids", "cutoff", "lookback", "rule"},
+                             ("snapshot_ids", "cutoff", "rule"))
+        # Reject rule size/shape before any Store call; do not fall back to an
+        # unfiltered universe when a supplied rule is invalid.
+        try:
+            rule = parse_rule(p["rule"])
+        except ValueError as exc:
+            raise error(str(exc) if str(exc) in FILTER_ERRORS else "invalid_filter_rule") from None
+        if len(p["snapshot_ids"]) > MAX_MEMBERS * 65:
+            raise error("research_member_limit")
+        ids = [_identifier(sid, error) for sid in p["snapshot_ids"].split(",")]
+        if not 2 <= len(ids) <= MAX_MEMBERS:
+            raise error("research_member_limit")
+        if len(set(ids)) != len(ids):
+            raise error("duplicate_snapshot")
+        ids.sort()
+        cutoff = _day(p["cutoff"], error)
+        lookback = _window(p.get("lookback", "20"), 2, error)
+
+        def calculate(store):
+            queries = _load(store, ids, cutoff, error)
+            try:
+                return filter_report(queries, cutoff, lookback, rule)
+            except ValueError as exc:
+                code = str(exc)
+                if code in _SAFE_ERRORS or code in FILTER_ERRORS:
+                    raise error(code) from None
+                raise  # Unknown failures retain the owner's controlled 500.
+
+        return JSONResponse(await owner.call(calculate))

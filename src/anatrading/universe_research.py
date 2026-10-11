@@ -43,6 +43,11 @@ def _at_cutoff(query, cutoff):
 
 
 def universe_report(queries, cutoff, lookback=20):
+    return _universe_evaluation(queries, cutoff, lookback)[0]
+
+
+def _universe_evaluation(queries, cutoff, lookback=20, *, with_evidence=False):
+    """Shared calculation; optional private exact facts never alter old output."""
     if type(lookback) is not int or not 2 <= lookback <= 252:
         raise ValueError('invalid_lookback')
     strict_date(cutoff, 'invalid_label_cutoff')
@@ -58,7 +63,7 @@ def universe_report(queries, cutoff, lookback=20):
     selected = [_at_cutoff(q, cutoff) for q in queries]
     if sum(len(q['rows']) + len(q.get('unlocated', [])) for q in selected) > 200000:
         raise ValueError('research_total_row_limit')
-    members, exact_momenta = [], {}
+    members, exact_momenta, evidence = [], {}, {}
     for q, identity in zip(selected, identities):
         bars = daily_bars(q)
         coverage = daily_coverage(q, bars)
@@ -75,6 +80,7 @@ def universe_report(queries, cutoff, lookback=20):
         for metric in _METRICS:
             row[metric], row[metric+'_reason'] = None, reason
         row['n_returns'] = sum(a['reason'] is None and b['reason'] is None for a, b in zip(window, window[1:]))
+        momentum, drawdown, witness = None, None, None
         if reason is None:
             prices = [b['close'] for b in window]
             momentum = Fraction(prices[-1]) / Fraction(prices[0]) - 1
@@ -83,11 +89,23 @@ def universe_report(queries, cutoff, lookback=20):
                 exact_momenta[identity['symbol']] = momentum
             row['volatility'], row['volatility_reason'] = _volatility(prices)
             peak, drawdown = prices[0], Fraction(0)
-            for price in prices:
+            peak_bar = window[0]
+            if with_evidence:
+                witness = dict(peak=peak_bar, trough=peak_bar)
+            for bar, price in zip(window, prices):
+                if price > peak:
+                    peak_bar = bar
                 peak = max(peak, price)
-                drawdown = min(drawdown, Fraction(price) / Fraction(peak) - 1)
+                candidate = Fraction(price) / Fraction(peak) - 1
+                if with_evidence and candidate < drawdown:
+                    witness = dict(peak=peak_bar, trough=bar)
+                drawdown = min(drawdown, candidate)
             row['max_drawdown'], row['max_drawdown_reason'] = _float_fraction(drawdown)
         members.append(row)
+        if with_evidence:
+            evidence[q.get('snapshot_id')] = dict(
+                window=window, momentum=momentum, max_drawdown=drawdown,
+                drawdown_witness=witness)
     # Rank exact source ratios, so binary rounding cannot create false ties.
     members.sort(key=lambda r: (r['momentum'] is None,
                                -exact_momenta.get(r['identity']['symbol'], Fraction(0)),
@@ -122,7 +140,7 @@ def universe_report(queries, cutoff, lookback=20):
                    positive_momentum_fraction=positive / valid if valid else None,
                    momentum_coverage=valid / n, cutoff_coverage=cutoff_valid / n,
                    coverage_unknown=sum(not r['coverage']['coverage_known'] for r in members), metrics=counts)
-    return dict(members=members, breadth=breadth, cutoff=cutoff,
+    report = dict(members=members, breadth=breadth, cutoff=cutoff,
                 parameters=dict(lookback=lookback, volatility_ddof=1), estimate_type='float64',
                 window_unit='source_date_groups', window_price_count=lookback+1,
                 membership='selected_sample_no_historical_sector_inference',
@@ -130,3 +148,4 @@ def universe_report(queries, cutoff, lookback=20):
                 units=dict(momentum='source_close_change', volatility='log_return_per_source_interval',
                            max_drawdown='nonpositive_close_path_drawdown'),
                 ranking='momentum_descending_competition_then_symbol')
+    return report, evidence
