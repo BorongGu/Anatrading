@@ -46,8 +46,8 @@ def universe_report(queries, cutoff, lookback=20):
     return _universe_evaluation(queries, cutoff, lookback)[0]
 
 
-def _universe_evaluation(queries, cutoff, lookback=20, *, with_evidence=False):
-    """Shared calculation; optional private exact facts never alter old output."""
+def _universe_identities(queries, cutoff, lookback):
+    """Keep all member identity checks ahead of selection and any metrics."""
     if type(lookback) is not int or not 2 <= lookback <= 252:
         raise ValueError('invalid_lookback')
     strict_date(cutoff, 'invalid_label_cutoff')
@@ -60,15 +60,36 @@ def _universe_evaluation(queries, cutoff, lookback=20, *, with_evidence=False):
         raise ValueError('research_duplicate_symbol')
     if len({q.get('snapshot_id') for q in queries}) != len(queries):
         raise ValueError('research_duplicate_snapshot')
+    return identities
+
+
+def _prepare_window(query, cutoff, lookback):
+    """Consume a full prefix; only coverage and independent window bars escape."""
+    bars = daily_bars(query)
+    coverage = daily_coverage(query, bars)
+    target = bars[-1] if bars and bars[-1]['date'] == cutoff else None
+    window = bars[-(lookback+1):] if target is not None else []
+    return dict(coverage=coverage, window=window)
+
+
+def _universe_evaluation(queries, cutoff, lookback=20, *, with_evidence=False):
+    """Pure full-input wrapper, preserving selection and per-member error order."""
+    identities = _universe_identities(queries, cutoff, lookback)
     selected = [_at_cutoff(q, cutoff) for q in queries]
     if sum(len(q['rows']) + len(q.get('unlocated', [])) for q in selected) > 200000:
         raise ValueError('research_total_row_limit')
+    # Do not prepare later members before the earlier member's metric work.
+    preparations = (_prepare_window(q, cutoff, lookback) for q in selected)
+    return _evaluate_members(selected, identities, preparations, cutoff, lookback,
+                             with_evidence=with_evidence)
+
+
+def _evaluate_members(queries, identities, preparations, cutoff, lookback, *, with_evidence=False):
+    """One numerical/aggregation implementation for full and prepared inputs."""
     members, exact_momenta, evidence = [], {}, {}
-    for q, identity in zip(selected, identities):
-        bars = daily_bars(q)
-        coverage = daily_coverage(q, bars)
-        target = bars[-1] if bars and bars[-1]['date'] == cutoff else None
-        window = bars[-(lookback+1):] if target is not None else []
+    for q, identity, prepared in zip(queries, identities, preparations, strict=True):
+        coverage, window = prepared['coverage'], prepared['window']
+        target = window[-1] if window else None
         row = dict(identity=identity, snapshot_id=q.get('snapshot_id'),
                    cutoff_present=target is not None, cutoff_valid=target is not None and target['reason'] is None,
                    start_date=window[0]['date'] if window else None, end_date=cutoff,

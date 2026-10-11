@@ -848,7 +848,7 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
                         headers={"X-Query-Id": query_id, "X-Geometry-Id": geometry_id, "X-Content-SHA256": digest,
                                  "Content-Disposition": f'attachment; filename="anatrading-{geometry_id}.json"'})
 
-    register_research_routes(app, owner, _parameters, _RequestError)
+    register_research_routes(app, owner, _parameters, _RequestError, _safe_store_call)
 
     directory = Path(web_directory) if web_directory is not None else Path(__file__).resolve().parents[2] / "web/dist"
     if directory.is_dir():

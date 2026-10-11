@@ -61,15 +61,47 @@ def _window(value, lower, error):
     return number
 
 
-def _load(store, ids, cutoff, error):
-    # Reject budgets before loading any source rows or constructing a report.
+def _research_budget(store, ids, cutoff, error):
+    # Every count completes before checking limits; no source has been loaded.
     counts = [store.query_row_count(sid, cutoff=cutoff) for sid in ids]
     if any(n > MAX_SERIES_ROWS for n in counts) or sum(counts) > MAX_TOTAL_ROWS:
         raise error("research_row_limit")
+
+
+def _load(store, ids, cutoff, error):
+    _research_budget(store, ids, cutoff, error)
     queries = [store._research_query(sid, cutoff=cutoff) for sid in ids]
     if any(q["metadata"].get("period") != "1d" for q in queries):
         raise error("unsupported_period")
     return queries
+
+
+def _research_call(operation, error):
+    try:
+        return operation()
+    except ValueError as exc:
+        code = str(exc)
+        raise error(code if code in _SAFE_ERRORS else "invalid_research_input") from None
+
+
+def _filter_call(operation, error):
+    from .stock_filters import FILTER_ERRORS
+
+    try:
+        return operation()
+    except ValueError as exc:
+        code = str(exc)
+        if code in _SAFE_ERRORS or code in FILTER_ERRORS:
+            raise error(code) from None
+        raise  # Unknown failures retain the owner's controlled mapping.
+
+
+def _envelope(kind, queries, parameters, result):
+    inputs = [dict(snapshot_id=q["snapshot_id"], query_id=q["query_id"]) for q in queries]
+    parameters = {**parameters, "model": result.get("parameters", {})}
+    identity = dict(method_id=_METHODS[kind], inputs=inputs, parameters=parameters)
+    return dict(**identity, analysis_id=_identity(identity), mode="retrospective",
+                limitations=[*_LIMITATIONS, *(["current_selected_membership"] if kind == "universe" else [])], result=result)
 
 
 def _calculate(kind, queries, parameters, error):
@@ -79,25 +111,97 @@ def _calculate(kind, queries, parameters, error):
     from .pair_research import pair_report
     from .universe_research import universe_report
 
-    try:
+    def calculate():
         if kind == "single":
-            result = signal_report(queries[0], lookback=parameters["lookback"],
-                                   horizon=parameters["horizon"], test_start=parameters["test_start"])
-        elif kind == "pair":
-            result = pair_report(queries[0], queries[1], lookback=parameters["lookback"])
-        else:
-            result = universe_report(queries, cutoff=parameters["cutoff"], lookback=parameters["lookback"])
-    except ValueError as exc:
-        code = str(exc)
-        raise error(code if code in _SAFE_ERRORS else "invalid_research_input") from None
-    inputs = [dict(snapshot_id=q["snapshot_id"], query_id=q["query_id"]) for q in queries]
-    parameters = {**parameters, "model": result.get("parameters", {})}
-    identity = dict(method_id=_METHODS[kind], inputs=inputs, parameters=parameters)
-    return dict(**identity, analysis_id=_identity(identity), mode="retrospective",
-                limitations=[*_LIMITATIONS, *(["current_selected_membership"] if kind == "universe" else [])], result=result)
+            return signal_report(queries[0], lookback=parameters["lookback"],
+                                 horizon=parameters["horizon"], test_start=parameters["test_start"])
+        if kind == "pair":
+            return pair_report(queries[0], queries[1], lookback=parameters["lookback"])
+        return universe_report(queries, cutoff=parameters["cutoff"], lookback=parameters["lookback"])
+
+    result = _research_call(calculate, error)
+    # Source/envelope identities stay outside the calculation ValueError guard.
+    return _envelope(kind, queries, parameters, result)
 
 
-def register_research_routes(app, owner, parse_parameters, error):
+def _capture_preparation(operation, guard, error, safe_store_call):
+    """Retain only the existing boundary's safe code/status, never an exception."""
+    try:
+        return safe_store_call(lambda: guard(operation, error)), None
+    except error as exc:
+        return None, (exc.code, exc.status)
+
+
+def _prepare_source(store, sid, cutoff, lookback, guard, error, safe_store_call):
+    from .universe_research import _at_cutoff, _prepare_window
+
+    # Read errors bypass deferred preparation entirely, including bad JSON.
+    query = store._research_query(sid, cutoff=cutoff)
+    header = {key: query[key] for key in (
+        "snapshot_id", "batch_id", "query_id", "selection", "manifest", "metadata",
+        "batch_checks", "counts", "read_projection") if key in query}
+    selected, selection_error = _capture_preparation(
+        lambda: _at_cutoff(query, cutoff), guard, error, safe_store_call)
+    result = dict(header=header, selected_count=None, selection_error=selection_error,
+                  prepared=None, preparation_error=None)
+    if selection_error is None:
+        result["selected_count"] = len(selected["rows"]) + len(selected.get("unlocated", []))
+        result["prepared"], result["preparation_error"] = _capture_preparation(
+            lambda: _prepare_window(selected, cutoff, lookback), guard, error, safe_store_call)
+    # This function ends before the next source read. No full rows escape.
+    return result
+
+
+def _load_universe(store, ids, cutoff, lookback, guard, error, safe_store_call):
+    _research_budget(store, ids, cutoff, error)
+    prepared = [_prepare_source(store, sid, cutoff, lookback, guard, error, safe_store_call) for sid in ids]
+    if any(item["header"]["metadata"].get("period") != "1d" for item in prepared):
+        raise error("unsupported_period")
+    return prepared
+
+
+def _prepared_evaluation(prepared, cutoff, lookback, error, *, with_evidence=False):
+    from .universe_research import _universe_identities, _evaluate_members
+
+    headers = [item["header"] for item in prepared]
+    identities = _universe_identities(headers, cutoff, lookback)
+    for item in prepared:
+        if item["selection_error"] is not None:
+            raise error(*item["selection_error"])
+    if sum(item["selected_count"] for item in prepared) > MAX_TOTAL_ROWS:
+        raise ValueError("research_total_row_limit")
+
+    def windows():
+        for item in prepared:
+            if item["preparation_error"] is not None:
+                raise error(*item["preparation_error"])
+            yield item["prepared"]
+
+    return _evaluate_members(headers, identities, windows(), cutoff, lookback,
+                             with_evidence=with_evidence)
+
+
+def _calculate_universe(store, ids, parameters, error, safe_store_call):
+    cutoff, lookback = parameters["cutoff"], parameters["lookback"]
+    prepared = _load_universe(store, ids, cutoff, lookback, _research_call, error, safe_store_call)
+    result = _research_call(lambda: _prepared_evaluation(prepared, cutoff, lookback, error)[0], error)
+    return _envelope("universe", [item["header"] for item in prepared], parameters, result)
+
+
+def _calculate_filter(store, ids, cutoff, lookback, rule, error, safe_store_call):
+    from .stock_filters import _filter_inputs, _assemble_filter
+
+    prepared = _load_universe(store, ids, cutoff, lookback, _filter_call, error, safe_store_call)
+
+    def calculate():
+        canonical, headers = _filter_inputs([item["header"] for item in prepared], cutoff, rule)
+        universe, evidence = _prepared_evaluation(prepared, cutoff, lookback, error, with_evidence=True)
+        return _assemble_filter(headers, cutoff, lookback, canonical, universe, evidence)
+
+    return _filter_call(calculate, error)
+
+
+def register_research_routes(app, owner, parse_parameters, error, safe_store_call):
     """Reuse the established local HTTP boundary and error mapping."""
     @app.get("/api/research/single/{snapshot_id}")
     async def single(snapshot_id: str, request: Request):
@@ -140,11 +244,11 @@ def register_research_routes(app, owner, parse_parameters, error):
         cutoff = _day(p["cutoff"], error)
         params = dict(cutoff=cutoff, lookback=_window(p.get("lookback", "20"), 2, error))
         return JSONResponse(await owner.call(
-            lambda store: _calculate("universe", _load(store, ids, cutoff, error), params, error)))
+            lambda store: _calculate_universe(store, ids, params, error, safe_store_call)))
 
     @app.get("/api/research/universe-filter")
     async def universe_filter(request: Request):
-        from .stock_filters import FILTER_ERRORS, filter_report, parse_rule
+        from .stock_filters import FILTER_ERRORS, parse_rule
 
         p = parse_parameters(request, {"snapshot_ids", "cutoff", "lookback", "rule"},
                              ("snapshot_ids", "cutoff", "rule"))
@@ -165,14 +269,5 @@ def register_research_routes(app, owner, parse_parameters, error):
         cutoff = _day(p["cutoff"], error)
         lookback = _window(p.get("lookback", "20"), 2, error)
 
-        def calculate(store):
-            queries = _load(store, ids, cutoff, error)
-            try:
-                return filter_report(queries, cutoff, lookback, rule)
-            except ValueError as exc:
-                code = str(exc)
-                if code in _SAFE_ERRORS or code in FILTER_ERRORS:
-                    raise error(code) from None
-                raise  # Unknown failures retain the owner's controlled 500.
-
-        return JSONResponse(await owner.call(calculate))
+        return JSONResponse(await owner.call(
+            lambda store: _calculate_filter(store, ids, cutoff, lookback, rule, error, safe_store_call)))
