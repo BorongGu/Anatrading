@@ -100,6 +100,14 @@ $imported = .\.venv\Scripts\anatrading.exe --root .\data\local import `
 
 Linux 的查询和导出参数相同，将返回的 `snapshot_id` 传给 `query`/`export` 即可。界面将它称为“数据版本”；稳定的命令名、字段名和数据库标识保持兼容。
 
+仅需检查已有数据库时，`snapshots`、`attempts`、`query`、`export`、`candle-geometry` 可显式加 `--read-only`：
+
+```bash
+.venv/bin/anatrading --root ./data/local snapshots --read-only
+```
+
+这一模式不新建或初始化数据库、不迁移或恢复导入状态，仍为 `running` 的记录按原状返回；缺库或不兼容结构会拒绝。它仍持有原目录排他锁，须先退出服务，也不承诺整个目录零写入；`export --read-only` 仍会生成导出文件，并拒绝数据库、恢复标记和锁等保留路径及其子路径/符号链接别名。默认命令和 HTTP/工作台未切换为此模式，见[显式只读方案](docs/plans/2026-10-11-read-only-store.md)。
+
 日线截止格式为 `YYYY-MM-DD`，分钟为 `YYYY-MM-DDTHH:MM`，均包含边界。原价格/金额以 Decimal 和精确字符串保留；重复、无法定位与错误记录有单独原因，不自动删点或补零。图形坐标可以使用浮点，原值和下载保持精确表示。浏览器单文件上限 16 MiB，查询范围上限 20,000 条；普通查看可显式指定源序号窗口，递推研究不能借截短历史绕过预算。
 
 离线备份必须写入数据目录外的新目录，恢复也只接受新空目录：
@@ -169,13 +177,14 @@ npm run build
 Pop-Location
 ```
 
-最近一次产品 `tests` 集合验证为2026-10-11的041冻结版本；202个源码、测试、前端及配置/锁定文件验收前后哈希一致。阶段针对性检查包含于对应全量集合，不累计相加；扩展 `qualification` 的阶段失败与后续离线修复另列：
+最近一次产品 `tests` 集合验证为2026-10-11的显式数据库只读工程冻结版本；213个产品源码、测试、前端、资格脚本和依赖配置文件在回归前后及前端命令纠正后哈希一致。阶段针对性检查包含于对应全量集合，不累计相加；扩展 `qualification` 的阶段失败与后续离线修复另列：
 
-- Linux Python 产品 `tests`：**2,994 通过、0 失败、49 跳过、1 项警告**，用时 114.02 s。48 项因缺少私有真实样本跳过，1 项为 Windows 原生进程证据；警告为锁定依赖中的 Starlette/httpx 弃用提示。
-- [041前端与接口验收](docs/qualification/historical-path-retrieval.md)：全前端 **150通过、0失败、0跳过**，TypeScript/Vite构建通过。新增22项含新建合成Store→实际HTTP→响应校验→静态渲染及请求状态检查；既有[筛选界面](docs/qualification/research-filter-ui.md)的15项反例与15类跨语言桥接按原阶段证据保留。JS主包663.42 kB，超过500 kB及npm代理配置提示保留；自动检查不证明真实点击、字体、窄屏或加载性能。
+- Linux Python 产品 `tests`：**3,103 通过、0 失败、49 跳过、1 项警告**，用时 116.86 s。48 项因缺少私有真实样本跳过，1 项为 Windows 原生进程证据；警告为锁定依赖中的 Starlette/httpx 弃用提示。
+- 本片全前端 **150通过、0失败、0跳过**，TypeScript/Vite构建通过。[041新增22项](docs/qualification/historical-path-retrieval.md)含新建合成Store→实际HTTP→响应校验→静态渲染及请求状态检查；既有[筛选界面](docs/qualification/research-filter-ui.md)的15项反例与15类跨语言桥接按原阶段证据保留。JS主包663.42 kB，超过500 kB及npm代理配置提示保留；自动检查不证明真实点击、字体、窄屏或加载性能。
+- [显式只读验收](docs/reviews/2026-10-11-read-only-store-review.md)：新增109项及受影响264项通过，均含于产品全量；仓库外独立6项合成检查通过。DB/WAL状态、旧查询身份及JSON/Parquet等价通过限定核对，未触真实库。首轮Node因工作目录错误有7个SSR测试文件失败、仅100项通过；保留失败日志，改在 `web` 目录运行后完整150项通过，未改源码。
 - [041分层验收](docs/qualification/historical-path-retrieval.md)：核心29、HTTP5、独立oracle15项通过，均包含于全量；未知来源失败与显示格式桥接问题已修正。固定一份保存来源的输入与210点定位一致、保护原件哈希不变，未打开真实数据库或联网；这不构成效果或120股兼容认证。20,000行确定性输入单次核心0.967 s、整进程RSS91,408 KiB、JSON2,101,946 B，只验证本次预算实例，不保证广泛性能或优势。浏览器及真人任务未验；独立复核支持交付这一有界描述性实现。
 - [040条件收益合成验收](docs/qualification/conditional-return-core.md)：137项新增（主59、独立78）及相关283通过/4跳过均包含于产品集合。两个计算模式、逐笔应收、连续事件、精度不足拒算和未来追加不改旧结果均有合成对照；无真实数据计算。040当时额外 `qualification` 单独运行202通过、16缺baostock包/元数据失败，另112子用例通过；该次失败记录保留，后续修复另列。
-- **后续资格测试已修复**：独立环境按固定依赖补齐包，并隔离4项合成worker测试对缺失历史文件的意外依赖，新增16项实际前置检查的合成测试。完整 `qualification` **234通过、0失败、0跳过，另112子用例通过**，独立复跑一致；两次各9个受监控进程均无socket/DNS尝试。相关产品175项通过，该隔离修复片未重跑完整产品或前端，2,945/49及128为此前040结果。生产前置检查未改，历史状态文件仍缺，真实登录及原价0/15仍未验，不能据此称采集恢复。041未重跑此资格集合，沿用历史证据。复现见[资格测试说明](qualification/README.md#2026-10-11-离线测试隔离)。
+- **后续资格测试已修复**：独立环境按固定依赖补齐包，并隔离4项合成worker测试对缺失历史文件的意外依赖，新增16项实际前置检查的合成测试。完整 `qualification` **234通过、0失败、0跳过，另112子用例通过**，独立复跑一致；两次各9个受监控进程均无socket/DNS尝试。相关产品175项通过，该隔离修复片未重跑完整产品或前端，2,945/49及128为此前040结果。生产前置检查未改，历史状态文件仍缺，真实登录及原价0/15仍未验，不能据此称采集恢复。041及本次只读工程均未重跑此资格集合，沿用历史证据。复现见[资格测试说明](qualification/README.md#2026-10-11-离线测试隔离)。
 - [039候选提取验收](docs/qualification/tencent-action-candidates.md)：新增67项（含独立34项）、相关751通过/14跳过；120份原件的469个行级对象（目标窗343个）逐原串/位置核对通过，120份旧查询、JSON及Parquet在内存重新生成后逐字一致，无新网络或Store写入。独立终审支持限定纯函数发布。
 - 039阶段扩展 `tests qualification` 为3,010通过、16失败、49跳过，另112子用例通过；16项缺少baostock包或元数据，在同环境隔离HEAD也复现。另一次产品回归因 `/tmp` 空间耗尽中断，临时目录移至workspace保留后，使用新目录重跑得到该阶段2,808通过。旧first30数据库与历史清单哈希有预存差异，原因未知；本次读取前后不变不能补证全部历史未变。失败、恢复及来源差异完整保留于[039验收](docs/qualification/tencent-action-candidates.md)，不能称扩展全套通过。
 - [036固定双股审计](docs/qualification/pair-stability.md)：97项新测试（含57项独立反例）与受影响724通过、10跳过均包含于全套；旧pair完整golden、错误行为和身份不变。一次固定资源矩阵35调用的全部门槛通过：A为每源5k/20k合成输入，完整进程峰值最高232.61 MiB；B为每源≤640行的合法捕获至完整Store读取，最高210.55 MiB；报告最大61,302 B。原B大规模方案因捕获硬限在测前撤回，不能称20k完整Store或任意规模已验；完整RSS增量、稳定尾延迟和跨平台仍未验。唯一真实配对完成4次查询、3次纯调用，来源/账本不变；真人五道判断任务未执行，当前仅核对字段可回答性。唯一真实来源终审通过，接受限定离线纯函数发布。
@@ -213,6 +222,7 @@ Pop-Location
 - [039来源候选提取](docs/research/039-tencent-action-candidates.md) / [验收](docs/qualification/tencent-action-candidates.md) / [独立审查](docs/reviews/2026-10-11-source-action-candidates-review.md)：原串和定位供公告核查，不认证事件经济含义或完整覆盖
 - [040条件收益研究](docs/research/040-data-gap-next-step.md) / [独立审查](docs/reviews/2026-10-11-conditional-return-core-review.md) / [合成验收](docs/qualification/conditional-return-core.md)：两种具名计算口径，真实原价与事件资格仍待补齐
 - [041历史路径研究](docs/research/041-historical-path-retrieval.md) / [实施计划](docs/plans/2026-10-11-historical-path-retrieval.md) / [独立审查](docs/reviews/2026-10-11-next-analysis-choice-review.md) / [分层验收](docs/qualification/historical-path-retrieval.md)：单股检索、叠加和差异核对；视觉、真人任务及预测效果未验
+- [数据库只读计划](docs/plans/2026-10-11-read-only-store.md) / [独立审查与验收](docs/reviews/2026-10-11-read-only-store-review.md)：显式CLI/Store模式，保留锁和导出副作用，默认HTTP不变
 - [TradingView 高级能力与分期路线](docs/research/031-tradingview-advanced-roadmap.md)：长期目标与后续候选，具体新增范围须单独研究复核
 - [国内能力矩阵](docs/research/006-domestic-capabilities.md) / [国际能力矩阵](docs/research/007-international-capabilities.md)：广覆盖调研；具体版本与同任务实测仍需补齐
 - 历史记录：[早期架构决策](docs/REVIEW_DECISIONS.md)、[数据格式约定](docs/contracts/INITIAL_DATA_CONTRACT.md)、[存储验收](docs/qualification/evidence-core.md)、[图形验收](docs/qualification/workbench.md)、[HTTP 约定](docs/contracts/WORKBENCH_HTTP.md)。旧计数、性能和平台结论只适用于各报告注明的版本与日期
