@@ -896,3 +896,49 @@ button, summary, a, tr[tabindex] { touch-action: manipulation; }
 }
 
 .filter-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* 固定截止的历史路径检索，独立于旧单股图窗。 */
+.historical-path-panel { min-width: 0; }
+.historical-path-panel button, .historical-path-panel input, .historical-path-panel summary { min-height: 40px; }
+.historical-path-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 16px; margin: 22px 0 14px; }
+.historical-path-controls > label { min-width: 210px; }
+.historical-path-window { margin-top: 25px; padding: 20px; background: var(--paper); border: 1px solid var(--line-strong); }
+.historical-path-window .section-heading { margin-bottom: 14px; flex-wrap: wrap; gap: 10px; }
+.historical-path-window .result-statement { font-size: 22px; font-variant-numeric: tabular-nums; }
+.historical-path-window .metric-grid { margin-bottom: 0; }
+.historical-path-warning { margin: 22px 0; }
+.historical-path-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.historical-path-method { min-width: 0; border-top: 2px solid var(--line-strong); padding-top: 15px; }
+.historical-path-method h3 { margin: 0 0 10px; }
+.historical-path-method h3 small { display: block; font-family: var(--sans); font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 5px; }
+.historical-path-method ol { list-style: none; padding: 0; margin: 16px 0; }
+.historical-path-method li { margin: 10px 0; }
+.historical-path-candidate { display: block; width: 100%; text-align: left; white-space: normal; padding: 12px; line-height: 1.6; border-color: var(--line-strong); }
+.historical-path-candidate strong, .historical-path-candidate span { display: block; overflow-wrap: anywhere; }
+.historical-path-candidate span { font-size: 13px; margin-top: 5px; }
+.historical-path-candidate span:last-child { color: var(--cinnabar); }
+.historical-path-candidate[aria-pressed="true"], .historical-path-decisions [aria-pressed="true"] { border-color: var(--ink); background: var(--paper-deep); }
+.historical-path-counts { font-size: 12px; color: var(--muted); line-height: 1.8; }
+.historical-path-decisions { margin-top: 20px; flex-wrap: wrap; }
+.historical-path-empty { border: 1px solid var(--line); padding: 20px; }
+.historical-path-comparison { border-top: 1px solid var(--line-strong); padding-top: 25px; margin-top: 25px; }
+.historical-path-comparison .research-metric > strong { font-size: 23px; overflow-wrap: anywhere; }
+.historical-path-comparison .section-heading { flex-wrap: wrap; gap: 10px; }
+.historical-path-figure figcaption { flex-wrap: wrap; }
+.historical-path-figure .estimate-chart { width: 100%; height: auto; min-height: 150px; }
+.historical-path-point-table th, .historical-path-point-table td { font-size: 13px; }
+.historical-path-point-table small { display: block; margin-top: 4px; font-weight: normal; color: var(--muted); }
+.historical-path-largest { background: var(--paper-deep); }
+.historical-path-ledger .button-group { margin-top: 12px; align-items: center; flex-wrap: wrap; }
+.historical-path-ledger td { font-size: 12px; }
+.historical-path-provenance code { overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 1000px) { .historical-path-columns { grid-template-columns: 1fr; gap: 20px; } }
+@media (max-width: 600px) {
+  .historical-path-controls { display: block; }
+  .historical-path-controls .button-group { margin-top: 14px; flex-wrap: wrap; }
+  .historical-path-window { padding: 14px; }
+  .historical-path-window .result-statement { font-size: 19px; }
+  .historical-path-window .metric-grid, .historical-path-comparison .metric-grid { grid-template-columns: 1fr; }
+  .historical-path-provenance .metadata-list { grid-template-columns: minmax(0, 1fr); }
+  .historical-path-provenance .metadata-list dd { margin-bottom: 10px; }
+}

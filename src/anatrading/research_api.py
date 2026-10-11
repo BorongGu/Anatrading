@@ -18,6 +18,7 @@ _METHODS = {
     "single": "daily-causal-research-v1",
     "pair": "paired-daily-research-v1",
     "universe": "selected-universe-research-v1",
+    "path-match": "historical-source-path-retrieval-v1",
 }
 _LIMITATIONS = [
     "retrospective_source_version", "adjustment_basis_unverified",
@@ -201,8 +202,39 @@ def _calculate_filter(store, ids, cutoff, lookback, rule, error, safe_store_call
     return _filter_call(calculate, error)
 
 
+def _calculate_path(store, sid, cutoff, error):
+    from .historical_path_retrieval import (
+        MAX_RESULT_BYTES, PATH_ERRORS, _json_bytes, historical_path_report,
+    )
+
+    queries = _load(store, [sid], cutoff, error)
+    try:
+        result = historical_path_report(queries[0], cutoff)
+    except ValueError as exc:
+        code = str(exc)
+        raise error(code if code in _SAFE_ERRORS or code in PATH_ERRORS else "invalid_research_input") from None
+    envelope = _envelope("path-match", queries, dict(cutoff=cutoff), result)
+    if len(_json_bytes(envelope)) > MAX_RESULT_BYTES:
+        raise error("path_result_limit")
+    return envelope
+
+
 def register_research_routes(app, owner, parse_parameters, error, safe_store_call):
     """Reuse the established local HTTP boundary and error mapping."""
+    @app.get("/api/research/path-match/{snapshot_id}")
+    async def path_match(snapshot_id: str, request: Request):
+        sid = _identifier(snapshot_id, error)
+        p = parse_parameters(request, {"cutoff"}, ("cutoff",))
+        cutoff = _day(p["cutoff"], error)
+        try:
+            result = await owner.call(lambda store: _calculate_path(store, sid, cutoff, error))
+        except error as exc:
+            if exc.code != "path_result_limit":
+                raise
+            return JSONResponse(dict(error=exc.code, method_id=_METHODS["path-match"],
+                                     snapshot_id=sid, cutoff=cutoff), status_code=exc.status)
+        return JSONResponse(result)
+
     @app.get("/api/research/single/{snapshot_id}")
     async def single(snapshot_id: str, request: Request):
         sid = _identifier(snapshot_id, error)
