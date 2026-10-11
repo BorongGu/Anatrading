@@ -1,6 +1,6 @@
 # Anatrading 架构
 
-更新：2026-10-11。目标见[总体方案](MASTER_PLAN.md)，本轮边界见[实施方案](plans/2026-10-11-research-workflows.md)与[编码前独立复核](reviews/2026-10-11-research-workflows-review.md)。本文区分已有基础、已实现的首版研究模块和后续设计；内部紧凑读取、分钟 A 纯函数及第三批有界采集/格式通过冻结 Linux 回归与限定独立复核；第四批同伴 A 纯函数和筛选只读 API 完成独立实现复核、真实来源矩阵与联合回归；筛选 UI已接入并通过模型/静态组件、桥接、构建与独立实现复核。第三批旧捕获离线兼容通过，新运输真实网络仍阻断，完整验收按项目分别报告。首版基础见[实现后独立复核](qualification/research-implementation-review.md)。
+更新：2026-10-11。目标见[总体方案](MASTER_PLAN.md)，本轮边界见[实施方案](plans/2026-10-11-research-workflows.md)与[编码前独立复核](reviews/2026-10-11-research-workflows-review.md)。本文区分已有基础、已实现的首版研究模块和后续设计；内部紧凑读取、分钟 A 纯函数及第三批有界采集/格式通过冻结 Linux 回归与限定独立复核；第四批同伴 A 纯函数和筛选只读 API 完成独立实现复核、真实来源矩阵与联合回归；筛选 UI已接入并通过模型/静态组件、桥接、构建与独立实现复核。第五批033集合逐源准备完成功能/来源等价与资源对照，原整体资源门槛未达但获后验分阶段保留决定；第三批旧捕获离线兼容通过，新运输真实网络仍阻断，完整验收按项目分别报告。首版基础见[实现后独立复核](qualification/research-implementation-review.md)。
 
 ## 1. 一套本地内核
 
@@ -29,9 +29,9 @@
 | `pair_research.py`、`universe_research.py` | 已实现首版同市场双股与集合研究；负责对齐、指标、分母和失败原因 |
 | `peer_relative_research.py` | 已实现固定成员同起止端点的同伴价格对照 A；精确中位/均值参考与固定分母，仅纯函数，无 API/UI |
 | `stock_filters.py`、`universe_research.py` 私有辅助 | 已实现三项价格事实的有限AND/OR筛选与三值证据；新旧集合共用一次事实提取，旧响应/身份不变 |
-| `research_api.py` | 原三个日线只读入口及新增 `universe-filter` 使用紧凑读取；规则与预算预检后单次物化，不逐条件重读 |
+| `research_api.py` | 两集合入口全部预算后逐源完整读取/归一化并释放完整来源，跨源仅保留header、覆盖、窗口和安全错误对；单股/双股沿原紧凑加载，不逐条件重读 |
 | `intraday_sampling.py` | 已实现分钟 A 单日期来源模板纯函数及测试；同覆盖 1/5 名义分钟采样诊断，尚无 HTTP/UI |
-| `workbench.py`、`workbench_lifecycle.py` | 现有本机 HTTP、owner 线程及启停；新研究复用这一边界 |
+| `workbench.py`、`workbench_lifecycle.py` | 现有本机HTTP、owner线程及启停；033只在研究注册处传入已有安全mapper，owner与错误码/状态映射不变 |
 | `web/` | 个股/双股/多股/数据管理及032条件筛选已接通；128项Node、15类跨语言桥接、TS/build及独立复核通过；真实浏览器待验，前端不另算研究公式 |
 
 文件名保持兼容。界面把 `snapshot_id` 称为“数据版本”，不迁移既有数据库标识、`query_id`、CLI命令和导出协议。逻辑职责可以由少量文件承担，第二个真实实现出现后再提取必要共用代码。
@@ -107,6 +107,10 @@
 
 递推从同一版本起点计算到截止，不接受图形序号窗口重新初始化。每次请求校验原件；单次请求可以复用已校验上下文，不跨请求缓存绕过原件变化。输出紧凑，不逐行重复全部窗口。
 
+033的 `_load_universe` 用于universe及universe-filter：全部count完成后判断预算，再逐个调用原 `_research_query` 并完整归一化。每个单源作用域结束后才读取下一源，完整query/rows/tokens/checks及全bars不跨源存活；仅保留完整header、全前缀coverage、实际末N+1窗口及必要安全错误对。缺截止窗口仍为空，覆盖绝不从末窗口重算。这改变驻留时长，不改变读取范围；Store、SQL和fetchall未改。
+
+读取/count错误仍立即失败；selection/准备异常只保存现有mapper输出的code/status，按旧period、身份、selection、逐成员准备→指标等阶段裁决，不保存异常对象、cause或traceback以保活全历史。BaseException不被延期。纯函数保留原逐成员惰性准备次序，HTTP与其共享同一指标、排名及筛选组装，不建立第二套数学。详见[033方案](plans/2026-10-11-research-memory.md)、[独立复核](reviews/2026-10-11-research-memory-review.md)及[验收](qualification/research-memory.md)。
+
 内部 `_research_query` 只投影研究所需列，直接保留 DuckDB Decimal，省去公开查询所需的质量汇总与全字段合计；完整 metadata、tokens/checks、源序号、NULL/未定位行、全批覆盖与来源身份保留。结构损坏的 checks/tokens 明确拒绝，不能因减少物化提升来源资格。全部成员先计数，再逐个校验原件与读取，任一失败整份失败；不缓存原件资格、不截取最后 W+1 行替代完整前缀。公开 `query`、`export_json`、`export_parquet` 和身份算法不变；完整/紧凑 HTTP 响应字节经独立差分复验。见[限定方案](plans/2026-10-11-compact-research-reads.md)与[实现复验](reviews/2026-10-11-compact-research-reads-review.md)。
 
 SQL范围下推必须保持旧语义：`label=NULL`不被cutoff悄悄排除、完整`batch_unlocated_rows`计数、准确源序号边界、稳定排序、质量/汇总、`query_id`和导出一致。旧接口超过20,000行的历史上下文问题另行解决，本轮新请求限额不假装修复它。
@@ -152,6 +156,8 @@ SQL范围下推必须保持旧语义：`label=NULL`不被cutoff悄悄排除、�
 
 每个模块验独立手算或参考实现、异常边界、前缀不变、真实源字段对账。发布分别报告Linux和Windows、真实样本/跳过、前端单测/构建与真实浏览器、纯公式与HTTP性能。既有真实样本只证明来源报告中的范围；合成数据不能证明真实兼容或预测价值。
 
-当前 Linux Python 全套 2,200 通过、0 失败、49 跳过（48 项私有真实样本、1 项 Windows 原生进程证据）、1 项依赖弃用警告；联合运行用时84.56 s，107个src/tests文件前后哈希一致。前端128项通过（含15项独立反例），另15类Python→TypeScript合成桥接、TS/build及最终实现复核通过；JS636.49 kB的体积警告保留。第三批全部 public 测试 455 项通过，其中独立对抗 173 项。40 份旧捕获仅取得限定离线格式/Store资格，新真实网络首发失败单列。同伴A真实8例160端点以及筛选60配置260次ASGI/600个成员配置判定通过，均保持未知来源语义；筛选六配置中位、新解释层≤5.68 ms与重异常响应体门槛通过；首轮29/30耗时对、一次完整复测15/15通过，原失败保留。10×20,000/N20独立进程峰值RSS差两次+23.77/+43.49 MiB仍超过+16 MiB；资源仅部分通过，稳定p95未验。紧凑读取独立复验 300 项、分钟 A 相关 124 项通过，属于全套的重叠子集。39 次正式 ASGI 性能请求及完整/紧凑差分通过，200,000 行集合中位数降至 11.988/12.888 s；公开来源/导出/研究身份不变，合成保留条件已通过。详见[性能记录](qualification/research-performance.md)，实际网络、并发/尾延迟、峰值内存与浏览器性能仍待验。[真实浏览器](qualification/research-browser.md)已获用户授权，但同环境 Chromium 本地 socket 权限遭拒，支持的提权重试仍失败，界面操作未跑；Windows 原生、完整来源语义、分钟A/同伴A的API/UI、筛选真实交互/窄屏及预测价值仍有未验项目，不能合并为全部通过。
+当前 Linux Python 全套 2,301 通过、0 失败、49 跳过（48 项私有真实样本、1 项 Windows 原生进程证据）、1 项依赖弃用警告；第五批最终运行用时90.33 s，109个src/tests文件前后哈希一致；独立51项及相关405项已包含在全套。本片未改前端，最终重跑128项通过（含既有15项独立反例），54个web源码/测试文件哈希一致；同一UI版本的第四批15类Python→TypeScript合成桥接及实现复核证据保持有效，本片TS/build重跑通过；JS636.49 kB的体积警告保留。第三批全部 public 测试 455 项通过，其中独立对抗 173 项。40 份旧捕获仅取得限定离线格式/Store资格，新真实网络首发失败单列。同伴A真实8例160端点以及筛选60配置260次ASGI/600个成员配置判定通过，均保持未知来源语义；以下保留第四批资源记录：筛选六配置中位、新解释层≤5.68 ms与重异常响应体门槛通过；首轮29/30耗时对、一次完整复测15/15通过，原失败保留。10×20,000/N20独立进程峰值RSS差两次+23.77/+43.49 MiB仍超过+16 MiB；资源仅部分通过，稳定p95未验。紧凑读取独立复验 300 项、分钟 A 相关 124 项通过，属于全套的重叠子集。39 次正式 ASGI 性能请求及完整/紧凑差分通过，200,000 行集合中位数降至 11.988/12.888 s；公开来源/导出/研究身份不变，合成保留条件已通过。详见[性能记录](qualification/research-performance.md)，实际网络、并发/尾延迟、峰值内存与浏览器性能仍待验。[真实浏览器](qualification/research-browser.md)已获用户授权，但同环境 Chromium 本地 socket 权限遭拒，支持的提权重试仍失败，界面操作未跑；Windows 原生、完整来源语义、分钟A/同伴A的API/UI、筛选真实交互/窄屏及预测价值仍有未验项目，不能合并为全部通过。
+
+第五批033正式矩阵完成120计时+24预热+72独立RSS进程：36个旧/新峰值配对均下降，名义20万行配置减少68.21%–83.90%，全部12中位更快且60个旧/新时延对通过。新筛选相对新集合的+16 MiB峰值差仍4/18未达，最大+115.457 MiB；原预注册整体条件未通过。基于功能/来源/身份等价与可复现绝对改善，按后验工程决定分阶段保留，不能改称门槛通过。当前没有稳定尾延迟、Windows或浏览器性能资格，完整失败及旧记录见[033验收](qualification/research-memory.md)。
 
 原有格式与HTTP细节见[实施决定](contracts/IMPLEMENTATION_DECISIONS.md)、[HTTP约定](contracts/WORKBENCH_HTTP.md)；本轮完整验收集合见[独立复核](reviews/2026-10-11-research-workflows-review.md)。当前未完成项持续列于[路线](ROADMAP.md)。

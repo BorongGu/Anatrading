@@ -389,11 +389,12 @@ def test_http_exact_rule_byte_budget_and_one_evaluator_for_all_conditions(monkey
     import anatrading.universe_research as universe
     ids = seed(tmp_path / 'store', 25)
     calls = dict(evaluator=0, count=0, read=0, raw=0, bars=0)
-    original = filters._universe_evaluation
+    # Both pure and prepared HTTP paths use this same numerical core.
+    original = universe._evaluate_members
     def evaluated(*args, **kwargs):
         calls['evaluator'] += 1
         return original(*args, **kwargs)
-    monkeypatch.setattr(filters, '_universe_evaluation', evaluated)
+    monkeypatch.setattr(universe, '_evaluate_members', evaluated)
     for attr, key in [('query_row_count', 'count'), ('_research_query', 'read'), ('_verify_raw', 'raw')]:
         old = getattr(EvidenceStore, attr)
         def tracked(self, *args, _old=old, _key=key, **kwargs):
@@ -430,14 +431,14 @@ def test_http_safe_errors_and_unclassified_failures_are_distinct(monkeypatch, tm
             for code in sorted(api._SAFE_ERRORS | filters.FILTER_ERRORS):
                 def rejected(*args, _code=code, **kwargs):
                     raise ValueError(_code)
-                monkeypatch.setattr(filters, 'filter_report', rejected)
+                monkeypatch.setattr(filters, '_assemble_filter', rejected)
                 response = await client.get('/api/research/universe-filter', params=api_parameters(ids))
                 assert response.status_code == 400 and response.json() == dict(error=code)
             for exception in [ValueError('secret internal values'), RuntimeError('secret internal values'),
                               TypeError('secret internal values'), AssertionError('secret internal values')]:
                 def broken(*args, _exception=exception, **kwargs):
                     raise _exception
-                monkeypatch.setattr(filters, 'filter_report', broken)
+                monkeypatch.setattr(filters, '_assemble_filter', broken)
                 response = await client.get('/api/research/universe-filter', params=api_parameters(ids))
                 assert response.status_code == 500 and response.json() == dict(error='internal_error')
                 assert 'secret' not in response.text and response.headers['cache-control'] == 'no-store'

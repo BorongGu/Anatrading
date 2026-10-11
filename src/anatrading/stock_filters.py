@@ -268,8 +268,7 @@ def _counts(members):
     return result
 
 
-def filter_report(queries, cutoff, lookback, rule):
-    """Read-only result over trusted full Store queries or synthetic fixtures."""
+def _filter_inputs(queries, cutoff, rule):
     canonical = normalize_rule(rule)  # Always validate before touching sources.
     strict_date(cutoff, 'invalid_label_cutoff')
     if not isinstance(queries, (list, tuple)) or not 2 <= len(queries) <= 50:
@@ -279,7 +278,18 @@ def filter_report(queries, cutoff, lookback, rule):
         if prior is not None and strict_date(prior, 'invalid_cutoff') < cutoff:
             raise ValueError('research_cutoff_mismatch')
     queries = sorted(queries, key=lambda q: q['snapshot_id'])
+    return canonical, queries
+
+
+def filter_report(queries, cutoff, lookback, rule):
+    """Read-only result over trusted full Store queries or synthetic fixtures."""
+    canonical, queries = _filter_inputs(queries, cutoff, rule)
     universe, evidence = _universe_evaluation(queries, cutoff, lookback, with_evidence=True)
+    return _assemble_filter(queries, cutoff, lookback, canonical, universe, evidence)
+
+
+def _assemble_filter(queries, cutoff, lookback, canonical, universe, evidence):
+    """Unchanged source, rule and result assembly over already evaluated facts."""
     by_snapshot = {row['snapshot_id']: row for row in universe['members']}
     sources = [_source(query, by_snapshot[query['snapshot_id']]['identity']) for query in queries]
     contracts = _share_contracts(sources)
