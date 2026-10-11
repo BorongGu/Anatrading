@@ -7,7 +7,7 @@ import { EstimatePlot, Metric, ResearchProvenance } from './ResearchResults.tsx'
 import type { Query } from './types.ts';
 import type { Distribution, ResearchEnvelope, SingleResult } from './research-types.ts';
 
-export function SingleResearch({ query }: { query: Query }) {
+export function SingleResearch({ query, onReport }: { query: Query; onReport?: (queryId: string, report: ResearchEnvelope<SingleResult> | null) => void }) {
   const [lookback, setLookback] = useState('20');
   const [horizon, setHorizon] = useState('5');
   const [testStart, setTestStart] = useState('');
@@ -16,7 +16,7 @@ export function SingleResearch({ query }: { query: Query }) {
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading');
   const [issue, setIssue] = useState('');
   const gate = useRef(new Generation()); const abort = useRef<AbortController | null>(null);
-  function invalidate() { gate.current.invalidate(); abort.current?.abort(); setReport(null); setIssue(''); setPhase('idle'); }
+  function invalidate() { gate.current.invalidate(); abort.current?.abort(); setReport(null); onReport?.(query.query_id, null); setIssue(''); setPhase('idle'); }
   async function load() {
     invalidate(); const generation = gate.current.current();
     try {
@@ -24,7 +24,7 @@ export function SingleResearch({ query }: { query: Query }) {
       const controller = new AbortController(); abort.current = controller; setPhase('loading');
       const result = await jsonRequest<ResearchEnvelope<SingleResult>>(request.path, { signal: controller.signal });
       if (!gate.current.isCurrent(generation)) return;
-      assertResearchReply(result, request.expected); setReport(result); setPhase('ready');
+      assertResearchReply(result, request.expected); setReport(result); onReport?.(query.query_id, result); setPhase('ready');
     } catch (error) { if (gate.current.isCurrent(generation)) { setIssue(explainResearch(error)); setPhase('error'); } }
   }
   useEffect(() => { void load(); return () => { gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);

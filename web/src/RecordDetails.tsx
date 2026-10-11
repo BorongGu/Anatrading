@@ -1,7 +1,10 @@
+import { AdjacentSourceDetails } from './AdjacentSourceDetails.tsx';
+import type { SourceResearchBinding } from './adjacent-source.ts';
+import type { Query } from './types.ts';
 import { fieldNames, fields } from './types.ts';
 import type { GeometryRow, Row, SourceContract } from './types.ts';
 
-export function RecordDetails({ row, contract, geometry, compact = false }: { row: Row; contract: SourceContract | undefined; geometry?: GeometryRow; compact?: boolean }) {
+export function RecordDetails({ row, contract, geometry, compact = false, sourceQuery, sourceResearch = null }: { sourceQuery?: Query; sourceResearch?: SourceResearchBinding | null; row: Row; contract: SourceContract | undefined; geometry?: GeometryRow; compact?: boolean }) {
   return <div className={compact ? 'record-details compact' : 'record-details'}>
     <div className="record-heading"><strong>{row.label ?? '无法定位'}</strong><span>源序号 {row.ordinal}</span><code>{row.locator}</code></div>
     <div className="exact-grid">
@@ -13,6 +16,7 @@ export function RecordDetails({ row, contract, geometry, compact = false }: { ro
         {check.outcome === 'fail' ? '未通过' : '未评估'} · {check.name}{check.reason ? `：${check.reason}` : ''}{check.assumption ? `（条件：${check.assumption}）` : ''}
       </span>)}
     </div>
+    {!compact && sourceQuery?.metadata.period === '1d' && <AdjacentSourceDetails query={sourceQuery} row={row} binding={sourceResearch} />}
     {!compact && geometry && <GeometryDetails geometry={geometry} unlocated={row.label === null} />}
     {!compact && <details className="raw-tokens"><summary>原字段 / 原始位（纯文本）</summary>
       <dl><dt>原始源标签</dt><dd><code>{row.source_label ?? '∅'}</code></dd>

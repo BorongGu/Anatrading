@@ -1,3 +1,6 @@
+import { bindSourceResearch } from './adjacent-source.ts';
+import type { SourceResearchBinding } from './adjacent-source.ts';
+import type { ResearchEnvelope, SingleResult } from './research-types.ts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { checkedFetch, explain, jsonRequest, verifiedExportBlob, verifiedGeometryExportBlob } from './api.ts';
@@ -47,6 +50,11 @@ export default function App() {
   const [phase, setPhase] = useState<'idle' | 'dirty' | 'loading' | 'ready' | 'error'>('idle');
   const [issue, setIssue] = useState('');
   const [notice, setNotice] = useState('');
+  const [sourceResearch, setSourceResearch] = useState<SourceResearchBinding | null>(null);
+  const receiveSourceResearch = useCallback((queryId: string, report: ResearchEnvelope<SingleResult> | null) => {
+    const binding = bindSourceResearch(replyRef.current?.query, queryId, report);
+    if (binding !== undefined) setSourceResearch(binding);
+  }, []);
   const [selected, setSelected] = useState<Row | null>(null);
   const [scope, setScope] = useState<'located' | 'unlocated'>('located');
   const [page, setPage] = useState(0);
@@ -78,7 +86,7 @@ export default function App() {
     abort.current?.abort();
     abort.current = null;
     replyRef.current = null;
-    setReply(null); setSelected(null); setChannelReport(null); setPivotReport(null); setDetailed(false); setPage(0); setScope('located'); setExporting(null); setIssue(''); setPhase('dirty');
+    setReply(null); setSourceResearch(null); setSelected(null); setChannelReport(null); setPivotReport(null); setDetailed(false); setPage(0); setScope('located'); setExporting(null); setIssue(''); setPhase('dirty');
     return generation;
   }, []);
   const chartError = useCallback(() => { invalidate(); setIssue(explain(new Error('chart_render_failed'))); setPhase('error'); }, [invalidate]);
@@ -287,8 +295,8 @@ export default function App() {
             <div className="range-summary"><span className="field-label">选择内源标签范围</span><code>{q.rows[0]?.label ?? '空'} → {q.rows.at(-1)?.label ?? '空'}</code><small>缩放仅改变可视区域，不改变选择与导出</small></div>
           </section>
           <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} pivots={pivotReport?.radius === pivotRadius ? pivotReport : null} />
-          {selected && <section className="panel detail-panel"><div className="section-heading"><h2>选中记录</h2><button className="quiet" onClick={() => setSelected(null)}>收起</button></div><RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /></section>}
-          {q.metadata.period === '1d' && <SingleResearch key={q.query_id} query={q} />}
+          {selected && <section className="panel detail-panel"><div className="section-heading"><h2>选中记录</h2><button className="quiet" onClick={() => setSelected(null)}>收起</button></div><RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} sourceQuery={q} sourceResearch={sourceResearch} /></section>}
+          {q.metadata.period === '1d' && <SingleResearch key={q.query_id} query={q} onReport={receiveSourceResearch} />}
           {q.metadata.period === '1m' && <p className="inline-note">分钟线使用现有量能、聚合与日线背景研究；未应用日线趋势模型。</p>}
           <section className="panel expandable-section"><button className="section-toggle" aria-expanded={detailed} onClick={() => setDetailed(!detailed)}><span><strong>{q.metadata.period === '1m' ? '分钟研究与详细指标' : '展开详细指标'}</strong><small>价格通道、波动、量能、路径、缺口与拐点</small></span><span aria-hidden="true">{detailed ? '−' : '+'}</span></button></section>
           {detailed && <div className="advanced-analysis">
@@ -322,7 +330,7 @@ export default function App() {
             <div className="pagination"><span>表格每页 {pageSize} 条；完整选择仍为 {tableRows.length} 条</span><div className="button-group"><button className="quiet" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>{page + 1} / {pageCount}</span><button className="quiet" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>下一页</button></div></div>
           </section>
           <section className="detail-panel"><div className="section-heading"><h2>固定记录详情</h2>{selected && <button className="quiet" onClick={() => setSelected(null)}>清除</button>}</div>
-            {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
+            {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} sourceQuery={q} sourceResearch={sourceResearch} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
           <QualityDetails query={q} />
           </details>
         </>}
