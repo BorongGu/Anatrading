@@ -1,6 +1,6 @@
 # Anatrading 架构
 
-更新：2026-10-11。目标见[总体方案](MASTER_PLAN.md)，本轮边界见[实施方案](plans/2026-10-11-research-workflows.md)与[编码前独立复核](reviews/2026-10-11-research-workflows-review.md)。本文区分已有基础、已实现的首版研究模块和后续设计；当前 Linux 自动化回归及[实现后独立复核](qualification/research-implementation-review.md)通过，完整验收仍按项目分别报告。
+更新：2026-10-11。目标见[总体方案](MASTER_PLAN.md)，本轮边界见[实施方案](plans/2026-10-11-research-workflows.md)与[编码前独立复核](reviews/2026-10-11-research-workflows-review.md)。本文区分已有基础、已实现的首版研究模块和后续设计；当前第二批内部紧凑读取与分钟 A 纯函数通过冻结 Linux 回归和限定复核，完整验收仍按项目分别报告。首版基础见[实现后独立复核](qualification/research-implementation-review.md)。
 
 ## 1. 一套本地内核
 
@@ -19,17 +19,20 @@
 | 文件或区域 | 职责和状态 |
 |---|---|
 | `formats.py`、`models.py`、`numeric.py` | 已有格式解码、原值和数值边界；保留未知语义与错误 |
-| `store.py` | 已有原件、DuckDB、版本、查询、导出、备份恢复；本轮已补 POSIX 锁和 SQL 范围过滤，Linux 回归通过，Windows 原生待验 |
+| `store.py` | 已有原件、DuckDB、版本、查询、导出、备份恢复；已补 POSIX 锁、SQL 范围过滤及内部 `_research_query` 紧凑投影；公开查询/导出保持不变，Linux 回归通过，Windows 原生待验 |
 | `tdx_*.py` | 已有通达信来源与适配功能；原生客户端操作属 Windows 专用，真实兼容以各来源报告为准 |
 | 现有 `price_channel`、`true_range`、量能、路径、拐点、分钟等模块 | 已有描述计算；按各自研究定义复用 |
 | `research_series.py` | 已实现日线来源日期组、原始精确价格与覆盖标准化；传递身份/复权冲突和隔离资格，保留坏组 |
 | `signal_research.py`、`event_study.py` | 已实现首版单股趋势/波动与固定事件评价；纯函数，不导入 Store |
 | `pair_research.py`、`universe_research.py` | 已实现首版同市场双股与集合研究；负责对齐、指标、分母和失败原因 |
-| `research_api.py` | 已接通三个有界只读入口；绑定输入、方法、参数和完整研究身份 |
+| `research_api.py` | 三个日线有界只读入口改用内部紧凑读取；全部预检后才物化，响应和完整研究身份不变 |
+| `intraday_sampling.py` | 已实现分钟 A 单日期来源模板纯函数及测试；同覆盖 1/5 名义分钟采样诊断，尚无 HTTP/UI |
 | `workbench.py`、`workbench_lifecycle.py` | 现有本机 HTTP、owner 线程及启停；新研究复用这一边界 |
 | `web/` | 已接通个股/双股/多股/数据管理；单测与生产构建通过，真实浏览器待验；前端不另算研究公式 |
 
 文件名保持兼容。界面把 `snapshot_id` 称为“数据版本”，不迁移既有数据库标识、`query_id`、CLI命令和导出协议。逻辑职责可以由少量文件承担，第二个真实实现出现后再提取必要共用代码。
+
+腾讯/新浪自动取数适配器仍在独立设计评审；仓库外来源观察和有界采集不构成本批产品接入，也不扩大以上模块的已验收范围。
 
 ## 3. 原始数据与版本
 
@@ -75,6 +78,8 @@
 
 统计相关、价格偏离、平滑和暖机结束不提供预测概率、协整、均值回归或套利资格。分钟Kalman、自动调参、PCA、组合优化和交易PnL留待后续独立研究。
 
+分钟 A 按 [028 §4.4](research/028-intraday-research-candidates.md#44-独立首轮意见后的-a-输入输出合同候选)和[实现复核](reviews/2026-10-11-intraday-candidate-review.md)固定为 `intraday_sampling_report` 纯函数：一个 1m 来源版本、一个来源日期、显式 descriptor/cutoff，保持 `retrospective/source_template_only`。以固定首 close 为锚点比较同覆盖 1/5 名义分钟收益平方和，缺槽/坏价/已知未闭合阻断共同区间，尾部与未知覆盖单列；不自选锚点、不跨段合计、不认证真实时区或闭合。最多 20,000 源行、8 段、1,440 期待槽及 16 KiB 辅助说明，身份绑定来源、descriptor、截止与负闭合证据。该模块无存储、网络、HTTP 或界面操作，B/C 与分钟 Kalman 仍未实现。
+
 ## 7. 查询与研究 HTTP
 
 复用现有同源FastAPI、Host/Origin/token校验与owner执行线程。所有Store调用在owner内执行，新研究没有第二个数据库写者。
@@ -90,6 +95,8 @@
 结果包含 `method_id/analysis_id/inputs/parameters/mode/limitations/result`；inputs保留有序的版本和query身份，analysis身份绑定方法、输入和全部参数。左右互换、截止变化和集合成员变化产生不同研究身份；集合仅调整传参顺序不改变身份。所有错误返回简洁原因码，不泄漏原始路径或堆栈。
 
 递推从同一版本起点计算到截止，不接受图形序号窗口重新初始化。每次请求校验原件；单次请求可以复用已校验上下文，不跨请求缓存绕过原件变化。输出紧凑，不逐行重复全部窗口。
+
+内部 `_research_query` 只投影研究所需列，直接保留 DuckDB Decimal，省去公开查询所需的质量汇总与全字段合计；完整 metadata、tokens/checks、源序号、NULL/未定位行、全批覆盖与来源身份保留。结构损坏的 checks/tokens 明确拒绝，不能因减少物化提升来源资格。全部成员先计数，再逐个校验原件与读取，任一失败整份失败；不缓存原件资格、不截取最后 W+1 行替代完整前缀。公开 `query`、`export_json`、`export_parquet` 和身份算法不变；完整/紧凑 HTTP 响应字节经独立差分复验。见[限定方案](plans/2026-10-11-compact-research-reads.md)与[实现复验](reviews/2026-10-11-compact-research-reads-review.md)。
 
 SQL范围下推必须保持旧语义：`label=NULL`不被cutoff悄悄排除、完整`batch_unlocated_rows`计数、准确源序号边界、稳定排序、质量/汇总、`query_id`和导出一致。旧接口超过20,000行的历史上下文问题另行解决，本轮新请求限额不假装修复它。
 
@@ -122,6 +129,6 @@ SQL范围下推必须保持旧语义：`label=NULL`不被cutoff悄悄排除、�
 
 每个模块验独立手算或参考实现、异常边界、前缀不变、真实源字段对账。发布分别报告Linux和Windows、真实样本/跳过、前端单测/构建与真实浏览器、纯公式与HTTP性能。既有真实样本只证明来源报告中的范围；合成数据不能证明真实兼容或预测价值。
 
-当前 Linux Python 全套 1,274 通过、0 失败、49 跳过（48 项私有真实样本、1 项 Windows 原生进程证据）、1 项依赖弃用警告；前端 72 项通过且构建通过。[实现后独立复核](qualification/research-implementation-review.md)的 160 项定向测试含 9 项对抗检查，已复验来源冲突/隔离修复、原件逐请求校验、预算预检、SQL 等价与 POSIX 锁。[真实浏览器](qualification/research-browser.md)已获用户授权，但同环境 Chromium 本地 socket 权限遭拒，支持的提权重试仍失败，界面操作未跑；Windows 原生、私有真实来源、完整性能及预测价值仍有未验项目，不能合并为全部通过。
+当前 Linux Python 全套 1,446 通过、0 失败、49 跳过（48 项私有真实样本、1 项 Windows 原生进程证据）、1 项依赖弃用警告；前端 72 项通过且构建通过。冻结全套用时 55.34 s，源码与测试前后哈希一致。紧凑读取独立复验 300 项、分钟 A 相关 124 项通过，属于全套的重叠子集。39 次正式 ASGI 性能请求及完整/紧凑差分通过，200,000 行集合中位数降至 11.988/12.888 s；公开来源/导出/研究身份不变，合成保留条件已通过。详见[性能记录](qualification/research-performance.md)，实际网络、并发/尾延迟、峰值内存与浏览器性能仍待验。[真实浏览器](qualification/research-browser.md)已获用户授权，但同环境 Chromium 本地 socket 权限遭拒，支持的提权重试仍失败，界面操作未跑；Windows 原生、私有真实来源、分钟 A 的 API/UI 集成及预测价值仍有未验项目，不能合并为全部通过。
 
 原有格式与HTTP细节见[实施决定](contracts/IMPLEMENTATION_DECISIONS.md)、[HTTP约定](contracts/WORKBENCH_HTTP.md)；本轮完整验收集合见[独立复核](reviews/2026-10-11-research-workflows-review.md)。当前未完成项持续列于[路线](ROADMAP.md)。

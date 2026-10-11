@@ -10,6 +10,8 @@
 
 已有基础包括本地导入、精确源值保存、数据版本、图表、JSON/Parquet 导出、备份恢复，以及价格通道、ATR、量能、路径效率、确认拐点、分钟聚合和当前池筛选。新增日线算法的定义及评审见 [实施方案](docs/plans/2026-10-11-research-workflows.md)、[算法研究](docs/research/026-causal-signals-and-evaluation.md)和[独立复核](docs/reviews/2026-10-11-research-workflows-review.md)。
 
+第二批已完成内部紧凑读取和[分钟采样诊断 A](docs/research/028-intraday-research-candidates.md#9-a-纯函数实现记录2026-10-11)。紧凑读取保留公开查询、导出、精确源值与研究身份；分钟 A 仅为已复核的单日期来源模板纯函数，尚未接入 API 或界面，也不提供实时分钟功能。自动取数适配器仍在独立设计评审，腾讯/新浪真实来源材料及有界批量采集另行验证，不计入本批实现通过项。
+
 一套 Python + TypeScript/React 代码库支持 Linux 与 Windows 的通用研究功能；通达信客户端调用和原生进程控制保留 Windows 专用适配器。仓库为私有仓库，真实行情、账户信息、密钥和本地运行文件均不提交。
 
 ## 安装与运行
@@ -111,15 +113,16 @@ npm run build
 Pop-Location
 ```
 
-2026-10-11 当前工作区验证：
+2026-10-11 第二批冻结版本验证（03:54–03:55 UTC，源码与测试前后哈希一致）：
 
-- Linux Python 全套：**1,274 通过、0 失败、49 跳过、1 项警告**，用时 44.72 s。48 项因缺少私有真实样本跳过，1 项为 Windows 原生进程证据；警告为锁定依赖中的 Starlette/httpx 弃用提示。
+- Linux Python 全套：**1,446 通过、0 失败、49 跳过、1 项警告**，用时 55.34 s。48 项因缺少私有真实样本跳过，1 项为 Windows 原生进程证据；警告为锁定依赖中的 Starlette/httpx 弃用提示。
 - 前端：**72 通过、0 失败、0 跳过**，TypeScript 与 Vite 生产构建通过。构建仍提示主包超过 500 kB，并有 npm 环境配置警告；不据此声称首次交互性能达标。
-- [实现后独立复核](docs/qualification/research-implementation-review.md)：9 项对抗测试及合计 160 项定向测试通过，来源证券冲突、复权冲突和已隔离来源资格传递问题已关闭。该范围未发现未解决的阻断项。
+- [首版实现复核](docs/qualification/research-implementation-review.md)已关闭来源冲突和隔离资格问题；[紧凑读取复核](docs/reviews/2026-10-11-compact-research-reads-review.md)300 项定向测试通过；[分钟 A 复核](docs/reviews/2026-10-11-intraday-candidate-review.md)接受限定纯函数，相关 124 项测试通过。这些定向结果已包含在全套中，不累计相加。
+- [性能复验](docs/qualification/research-performance.md#内部紧凑读取复验当前实现)：39 次正式 ASGI 请求通过，完整/紧凑读取结果、来源原件和身份一致，主矩阵响应与旧基准逐字节相等。200,000 行集合中，10×20,000 的中位耗时由 15.298 s 降至 11.988 s，50×4,000 由 14.719 s 降至 12.888 s；各三次测量，仍有十余秒等待，未含真实网络或浏览器。
 
-上述结果覆盖首版研究实现、HTTP 边界和 Linux 通用修复；跳过项不能计为通过，前端单测及构建也不代替真实浏览器操作。
+上述结果来自本地冻结版本验证，仓库尚未配置 GitHub CI。它们覆盖首版研究、内部紧凑读取、分钟 A 纯函数、HTTP 边界和 Linux 通用修复；跳过项不能计为通过，前端单测及构建也不代替真实浏览器操作。
 
-尚未完成：真实浏览器操作、5,000/20,000 行真实 HTTP 与最大集合性能的完整验收、Windows 原生回归、用户真实导出的逐字段对账，以及严格样本外预测增量。[浏览器验收](docs/qualification/research-browser.md)已获用户授权，但同环境 Chromium 在创建页面前遭本地 socket 权限拒绝，支持的提权重试仍失败；页面未加载、无界面截图，须在具备相应权限的受支持环境补验。性能扩展验证进行中。数据单位、复权、日历、成员历史和历史可得性未知时继续标示限制。首版双股和集合仅允许同一市场，沪/深/京归入同一 A 股市场；跨市场同步规则另行研究。
+尚未完成：真实浏览器操作、实际 socket/网络 HTTP、并发等待/尾延迟与峰值内存、Windows 原生回归、用户真实导出的逐字段对账，以及严格样本外预测增量。[浏览器验收](docs/qualification/research-browser.md)已获用户授权，但同环境 Chromium 在创建页面前遭本地 socket 权限拒绝，支持的提权重试仍失败；页面未加载、无界面截图，须在具备相应权限的受支持环境补验。合成性能的有限优化保留条件已通过，交互响应目标仍未验收。数据单位、复权、日历、成员历史和历史可得性未知时继续标示限制。首版双股和集合仅允许同一市场，沪/深/京归入同一 A 股市场；跨市场同步规则另行研究。
 
 “计算正确”“真实来源兼容”“有预测或交易价值”分别验收。本轮研究按来源记录做历史描述；因果算法不使用未来柱，也不能证明当前拿到的历史版本在当时已经可得。事件后续价格变化不等于成交收益，双股偏离不等于协整或套利，所选样本广度不等于全市场或历史行业指数。
 
@@ -128,6 +131,7 @@ Pop-Location
 - [当前路线](docs/ROADMAP.md)：近期交付、后续研究和未完成条件
 - [总体方案](docs/MASTER_PLAN.md) / [架构](docs/ARCHITECTURE.md)：长期范围和现行约定
 - [2026-10-11 实施方案](docs/plans/2026-10-11-research-workflows.md) / [算法定义与文献](docs/research/026-causal-signals-and-evaluation.md) / [竞品工作流研究](docs/research/027-competitor-workflows.md)
-- [首版实现独立复核](docs/qualification/research-implementation-review.md)：问题复现、修复复验与仍未验证的范围
+- [首版实现独立复核](docs/qualification/research-implementation-review.md) / [紧凑读取复核](docs/reviews/2026-10-11-compact-research-reads-review.md) / [性能复验](docs/qualification/research-performance.md)
+- [分钟候选及 A 纯函数](docs/research/028-intraday-research-candidates.md) / [分钟独立复核](docs/reviews/2026-10-11-intraday-candidate-review.md)：B/C 仍为研究候选，A 尚无 HTTP/UI
 - [国内能力矩阵](docs/research/006-domestic-capabilities.md) / [国际能力矩阵](docs/research/007-international-capabilities.md)：广覆盖调研；具体版本与同任务实测仍需补齐
 - 历史记录：[早期架构决策](docs/REVIEW_DECISIONS.md)、[数据格式约定](docs/contracts/INITIAL_DATA_CONTRACT.md)、[存储验收](docs/qualification/evidence-core.md)、[图形验收](docs/qualification/workbench.md)、[HTTP 约定](docs/contracts/WORKBENCH_HTTP.md)。旧计数、性能和平台结论只适用于各报告注明的版本与日期

@@ -97,6 +97,7 @@ def test_preflight_rejects_without_materializing(monkeypatch,tmp_path):
     def forbidden(*args,**kwargs):
         raise AssertionError('over-budget request materialized rows')
     monkeypatch.setattr(EvidenceStore,'query',forbidden)
+    monkeypatch.setattr(EvidenceStore,'_research_query',forbidden)
     async def scenario():
         async with client_for(tmp_path/'store') as client:
             response=await client.get('/api/research/single/'+ids[0])
