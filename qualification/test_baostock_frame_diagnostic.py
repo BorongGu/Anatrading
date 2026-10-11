@@ -1,8 +1,10 @@
-"""D01 uses fake sockets only; no packet or control payload is persisted."""
+"""Synthetic D01 boundaries; these tests do not authenticate historical evidence."""
+import hashlib
 import json
 from pathlib import Path
 import subprocess
 from types import SimpleNamespace
+from unittest.mock import Mock
 import zlib
 
 import pytest
@@ -60,6 +62,81 @@ def fake_clock(monkeypatch):
     clock = Clock()
     monkeypatch.setattr(diagnostic.time, "monotonic", clock)
     return clock
+
+
+@pytest.fixture
+def stub_worker_prerequisites(monkeypatch):
+    """Isolate fake-SDK behavior from private historical files, explicitly per test."""
+    check = Mock(name="synthetic_worker_prerequisites", return_value=None)
+    monkeypatch.setattr(diagnostic, "_check_prerequisites", check)
+    return check
+
+
+@pytest.fixture
+def synthetic_prerequisites(monkeypatch, tmp_path):
+    """Exercise the real checker on temporary bytes, never the historical artifact tree."""
+    root = tmp_path / "synthetic-preflight-root"
+    origin_run = "synthetic-test-only/P01"
+    paths = {
+        "protocol": root / "docs/qualification/FRAME_DIAGNOSTIC_PROTOCOL.md",
+        "origin_status": root / "artifacts/qualification/baostock-acquisition" / origin_run / "status.json",
+    }
+    payloads = {
+        "protocol": b"Synthetic preflight bytes only; not an approved diagnostic protocol.\n",
+        "origin_status": b'{"evidence_kind":"synthetic_test_only","status":"not_historical_evidence"}\n',
+    }
+    for name, path in paths.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payloads[name])
+    monkeypatch.setattr(diagnostic, "ROOT", root)
+    monkeypatch.setattr(diagnostic, "ORIGIN_RUN", origin_run)
+    monkeypatch.setattr(diagnostic, "PROTOCOL_SHA256", hashlib.sha256(payloads["protocol"]).hexdigest())
+    monkeypatch.setattr(diagnostic, "ORIGIN_STATUS_SHA256", hashlib.sha256(payloads["origin_status"]).hexdigest())
+    version = Mock(name="synthetic_sdk_version", return_value="0.9.4")
+    monkeypatch.setattr(diagnostic.importlib.metadata, "version", version)
+    return SimpleNamespace(paths=paths, version=version)
+
+
+@pytest.mark.parametrize("entry", ["_check_prerequisites", "worker", "run"])
+@pytest.mark.parametrize("failure", [
+    "missing_protocol", "missing_origin_status", "changed_protocol", "changed_origin_status", "wrong_sdk",
+])
+def test_real_preflight_rejects_invalid_synthetic_material_before_side_effects(
+    monkeypatch, tmp_path, synthetic_prerequisites, entry, failure,
+):
+    fixture = synthetic_prerequisites
+    if failure == "wrong_sdk":
+        fixture.version.return_value = "0.9.5"
+    else:
+        action, name = failure.split("_", 1)
+        path = fixture.paths[name]
+        if action == "missing":
+            path.unlink()
+        else:
+            path.write_bytes(path.read_bytes() + b"changed synthetic bytes\n")
+    destination, runs = tmp_path / "worker-output", tmp_path / "parent-runs"
+    monkeypatch.setattr(diagnostic, "RUNS", runs)
+    side_effects = []
+    for module, name in ((probe, "worker"), (probe, "save"), (diagnostic.subprocess, "Popen")):
+        blocked = Mock(name=name, side_effect=AssertionError("preflight must reject before " + name))
+        monkeypatch.setattr(module, name, blocked)
+        side_effects.append(blocked)
+
+    with pytest.raises(SystemExit, match="^diagnostic_prerequisites_changed$"):
+        if entry == "worker":
+            diagnostic.worker(destination)
+        else:
+            getattr(diagnostic, entry)()
+
+    fixture.version.assert_called_once_with("baostock")
+    for blocked in side_effects:
+        blocked.assert_not_called()
+    assert not destination.exists() and not runs.exists()
+
+
+def test_real_preflight_accepts_matching_temporary_synthetic_material(synthetic_prerequisites):
+    assert diagnostic._check_prerequisites() is None
+    synthetic_prerequisites.version.assert_called_once_with("baostock")
 
 
 @pytest.mark.parametrize("kind", ["01", "03", "04", "99", "9B"])
@@ -265,11 +342,14 @@ def control_reply(kind):
 
 
 @pytest.mark.parametrize("second_request", [False, True])
-def test_worker_never_writes_page_or_control_payload(monkeypatch, tmp_path, capsys, second_request):
+def test_worker_never_writes_page_or_control_payload(
+    monkeypatch, tmp_path, capsys, second_request, stub_worker_prerequisites,
+):
     sock = Socket([control_reply("01"), frame(), control_reply("03")])
     calls = fake_sdk(monkeypatch, sock, second_request=second_request)
     old_send, old_save = transport.bounded_send, probe.save
     diagnostic.worker(tmp_path)
+    stub_worker_prerequisites.assert_called_once_with()
     status = json.loads((tmp_path / "status.json").read_text())
     assert status["status"] == "diagnostic_incomplete" and status["pages"] == 0
     assert status["requests"] == 1 and status["case"] == "D01"
@@ -284,10 +364,11 @@ def test_worker_never_writes_page_or_control_payload(monkeypatch, tmp_path, caps
     assert capsys.readouterr() == ("", "")
 
 
-def test_control_response_to_market_writes_no_frame_metadata(monkeypatch, tmp_path):
+def test_control_response_to_market_writes_no_frame_metadata(monkeypatch, tmp_path, stub_worker_prerequisites):
     sock = Socket([control_reply("01"), control_reply("01"), control_reply("03")])
     fake_sdk(monkeypatch, sock)
     diagnostic.worker(tmp_path)
+    stub_worker_prerequisites.assert_called_once_with()
     assert not (tmp_path / "frame-summary.json").exists()
     assert all(PRIVATE not in p.read_text() for p in tmp_path.iterdir())
     status = json.loads((tmp_path / "status.json").read_text())
@@ -295,16 +376,17 @@ def test_control_response_to_market_writes_no_frame_metadata(monkeypatch, tmp_pa
     assert status["pages"] == 0 and sock.closed
 
 
-def test_extra_metadata_is_rejected_before_writing(monkeypatch, tmp_path):
+def test_extra_metadata_is_rejected_before_writing(monkeypatch, tmp_path, stub_worker_prerequisites):
     sock = Socket([control_reply("01"), control_reply("03")])
     fake_sdk(monkeypatch, sock)
     monkeypatch.setattr(diagnostic, "observe_frame", lambda *a, **k: {"raw": PRIVATE})
     diagnostic.worker(tmp_path)
+    stub_worker_prerequisites.assert_called_once_with()
     assert not (tmp_path / "frame-summary.json").exists()
     assert all(PRIVATE not in p.read_text() for p in tmp_path.iterdir())
 
 
-def test_parent_kills_and_reaps_at_45_seconds(monkeypatch, tmp_path):
+def test_parent_kills_and_reaps_at_45_seconds(monkeypatch, tmp_path, stub_worker_prerequisites):
     calls = []
 
     class Process:
@@ -325,9 +407,9 @@ def test_parent_kills_and_reaps_at_45_seconds(monkeypatch, tmp_path):
         return Process()
 
     monkeypatch.setattr(diagnostic, "RUNS", tmp_path)
-    monkeypatch.setattr(diagnostic, "_check_prerequisites", lambda: None)
     monkeypatch.setattr(diagnostic.subprocess, "Popen", launch)
     status = diagnostic.run()
+    stub_worker_prerequisites.assert_called_once_with()
     assert status["status"] == "diagnostic_incomplete" and status["pages"] == 0
     assert status["process_state"] == "killed"
     assert calls[1:] == [("wait", 45), ("kill",), ("wait", 5)]
