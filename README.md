@@ -12,7 +12,7 @@
 
 已有基础包括本地导入、精确源值保存、数据版本、图表、JSON/Parquet 导出、备份恢复，以及价格通道、ATR、量能、路径效率、确认拐点、分钟聚合和当前池筛选。新增日线算法的定义及评审见 [实施方案](docs/plans/2026-10-11-research-workflows.md)、[算法研究](docs/research/026-causal-signals-and-evaluation.md)和[独立复核](docs/reviews/2026-10-11-research-workflows-review.md)。
 
-第二批已完成内部紧凑读取和[分钟采样诊断 A](docs/research/028-intraday-research-candidates.md#9-a-纯函数实现记录2026-10-11)。紧凑读取保留公开查询、导出、精确源值与研究身份；分钟 A 仅为已复核的单日期来源模板纯函数，尚未接入 API 或界面，也不提供实时分钟功能。第三批已实现腾讯日线/新浪分钟的有界取数、恢复和离线捕获导入，本地测试与独立实现复核通过；40 份旧真实捕获已完成离线入库对账，新命令的真实联网仍受阻，详见下文。
+第二批已完成内部紧凑读取和[分钟采样诊断 A](docs/research/028-intraday-research-candidates.md#9-a-纯函数实现记录2026-10-11)。紧凑读取保留公开查询、导出、精确源值与研究身份；分钟 A 仅为已复核的单日期来源模板纯函数，尚未接入 API 或界面，也不提供实时分钟功能。第三批已实现腾讯日线/新浪分钟的有界取数、恢复和离线捕获导入，本地测试与独立实现复核通过；40 份旧真实捕获已完成离线入库对账，仓库内采集命令的真实联网成功链路仍未验证；后续仓库外采集另行记录，详见下文。
 
 第四批已通过后端联合回归与独立实现复核：
 
@@ -26,6 +26,8 @@
 第六批实现[一步源价格误差诊断](docs/qualification/forecast-diagnostics.md)，仅为纯函数，无新 API/UI。它把 Kalman、沿用上一收盘价（RW）和滞后 EMA 放在相同来源观察上比较，当前误差只与此前60个共同误差对照。**固定30股、2024-10-11至2026-10-09目标视图中，30/30股票的 Kalman 一步 MAE/RMSE 均高于 RW；三组 RW 经验范围虽更窄，平均区间评分仍略差于既有 EWMA 范围。** 本片定位为可复算的误差审计，保留反例；这些结果不支持算法优势宣传或据此推进经验范围界面，也不能外推为所有 Kalman、趋势描述或其它跨度无效。
 
 第七批[突破事件与滞后路径背景](docs/qualification/swing-event-information.md)把既有突破、此前路径效率（ER）与后5来源步的价格标签连在同一事件账本中，保留未选、失败与遗漏，仅提供纯函数。**固定已见的2026内部描述段，ER≥1/2条件的主“未上涨”比例差为+27.30个百分点，14/30股票有两组支持；在同一14股支持集内只保留22/81个可比较事件，遗漏26/30个上涨事件。** 按预定规则，这个方向不获支持，停止扩展该ER条件，不调参挽救结果。本片价值限于完整连接与失败/遗漏审计，无新 API/UI、前向采集或样本外/交易效力结论。
+
+**数据扩样：原组加深与新组扩展同时推进。** 已取得原30股加新增90股的120份日线原件，覆盖14个自定义业务研究组、29个CAPCO行业大类；银行18股、白酒14股，科创12股和创业12股属于另一个板块标签维度。完整120股独立库已通过入库、重复复用、重开及独立终核，原104阶段库保持不变；当前单次多股请求仍最多50成员。详见[数据扩样资格](docs/qualification/expanded-daily-data.md)。扩样没有改产品代码，034/035的算法证据仍只覆盖原30股，既有负结果和资源未验项不变。
 
 一套 Python + TypeScript/React 代码库支持 Linux 与 Windows 的通用研究功能；通达信客户端调用和原生进程控制保留 Windows 专用适配器。仓库为私有仓库，真实行情、账户信息、密钥和本地运行文件均不提交。
 
@@ -122,10 +124,16 @@ Windows 将可执行文件替换为 `.\.venv\Scripts\anatrading.exe`，其余参
 当前验收分开记录：
 
 - 40 份旧捕获按独立旧记录版本导入、重复复用和关闭重开后逐字段核对通过。保留 38,900 条源行；目标视图 34,205 条，差额为较早日线上下文。分钟数据只是近期窗口。原始数量字符串保留，数量/金额单位未认证，不据此开放量能或 VWAP。
-- 新命令真实联网的首个腾讯日线请求返回 `transport_network_error`，未取得响应、捕获或数据版本；发送计数持久保留为 1，新浪未发，也未重试。具体网络原因尚不确定，旧脚本成功不能证明新命令网络链路通过。
+- 仓库内采集命令真实联网的首个腾讯日线请求返回 `transport_network_error`，未取得响应、捕获或数据版本；发送计数持久保留为 1，新浪未发，也未重试。具体网络原因尚不确定，旧脚本成功不能证明新命令网络链路通过。
 - 当前新采集命令要求可靠的目录级安全读写与同步能力；Windows 会在联网前因能力不足拒绝，尚无 Windows 自动采集通过结论。原有通用导入、存储与研究功能的跨平台范围不变。
 
 详细实现范围与证据见[自动取数方案](docs/plans/2026-10-11-automatic-market-data.md)、[格式和来源验收](docs/qualification/public-market-formats.md)、[新命令真实验收](docs/qualification/public-acquisition.md)、[独立实现复核](docs/reviews/2026-10-11-automatic-market-data-review.md)。没有持续调度、全市场下载、完整历史分钟或来源可用性保证。
+
+### 后续日线扩样
+
+经独立复核的仓库外工具沿已有代理采集腾讯日线，保留默认TLS校验；新增90份实际响应全部取得，合旧30份日线为76,724源行，2024-10-11至2026-10-09目标视图58,045行。14个自定义业务组不等于14个正式行业，当前成员回顾也不代表历史全市场。
+
+原采集阶段75次中74成功、1次网络失败；另行审核批准的补充16次全部成功，其中包含失败项的一次追加尝试。原失败与两阶段账本保留；这不构成仓库内 `acquire-public`/`resume-public` 成功验收。完整120股已在独立新库完成验收，120份数据版本、76,724源行与58,045目标行逐项核对通过，原104股库保持不变。标准捕获格式、运输证据差异、日期缺席与限制见[扩样资格](docs/qualification/expanded-daily-data.md)；未新增分钟历史、调度或产品采集入口。
 
 ## 通达信 Windows 接入
 
@@ -153,7 +161,7 @@ npm run build
 Pop-Location
 ```
 
-2026-10-11 第七批冻结版本验证（115 个 Python 源码/测试文件与本片冻结清单一致）：
+最近一次产品全仓验证为2026-10-11第七批冻结版本（115 个 Python 源码/测试文件与该片冻结清单一致）；本次仓库外数据扩样未改产品，不将旧测试当作扩样重新运行：
 
 - Linux Python 全套：**2,644 通过、0 失败、49 跳过、1 项警告**，用时 94.76 s。48 项因缺少私有真实样本跳过，1 项为 Windows 原生进程证据；警告为锁定依赖中的 Starlette/httpx 弃用提示。
 - [筛选界面验收](docs/qualification/research-filter-ui.md)：全前端 **128 通过、0 失败、0 跳过**，含 15 项独立反例；另 15 类 Python→TypeScript 合成响应桥接通过，TypeScript/Vite 构建及[最终实现复核](docs/reviews/2026-10-11-research-ui-review.md)通过。第七批未改前端，重跑仍为128项及构建通过，54个web源码/测试文件与第六批冻结哈希一致；15类桥接沿用同一界面版本的第四批独立证据。JS 主包 636.49 kB，保留超过 500 kB 的警告；模型/静态组件与桥接测试不证明真实点击、字体、窄屏或加载性能。
@@ -168,7 +176,7 @@ Pop-Location
 
 上述结果来自本地冻结版本验证，仓库尚未配置 GitHub CI。它们覆盖首版研究、内部紧凑读取和集合逐源准备、分钟 A、同伴 A、一步误差诊断与事件连接纯函数、筛选只读 API、有界取数及格式、HTTP 边界和 Linux 通用修复；跳过项不能计为通过，前端单测及构建也不代替真实浏览器操作。
 
-尚未完成：筛选真实浏览器交互及窄屏验收、同伴 A 的 API/UI、筛选 RSS/逐对时延稳定资格与 p95、新取数命令的真实网络成功链路、真实浏览器操作、研究接口的实际 socket/网络 HTTP、并发等待/尾延迟与峰值内存、Windows 原生回归、用户真实导出的逐字段对账，以及严格样本外预测增量。034没有新增API/UI，≤8 MiB诊断内存预算仍未验证，当前负结果不支持直接扩展经验范围界面。035也保持纯函数，ER条件方向不支持；前向来源条件尚未建立，未启动新采集或监控。[浏览器验收](docs/qualification/research-browser.md)已获用户授权，但同环境 Chromium 在创建页面前遭本地 socket 权限拒绝，支持的提权重试仍失败；页面未加载、无界面截图，须在具备相应权限的受支持环境补验。第二批紧凑读取保留条件已通过；第五批逐源准备按后验分阶段工程决定保留，原整体条件仍未通过，交互响应目标仍未验收。数据单位、复权、日历、成员历史和历史可得性未知时继续标示限制。首版双股和集合仅允许同一市场，沪/深/京归入同一 A 股市场；跨市场同步规则另行研究。
+尚未完成：筛选真实浏览器交互及窄屏验收、同伴 A 的 API/UI、筛选 RSS/逐对时延稳定资格与 p95、仓库内采集命令的真实网络成功链路、真实浏览器操作、研究接口的实际 socket/网络 HTTP、并发等待/尾延迟与峰值内存、Windows 原生回归、用户真实导出的逐字段对账，以及严格样本外预测增量。034没有新增API/UI，≤8 MiB诊断内存预算仍未验证，当前负结果不支持直接扩展经验范围界面。035也保持纯函数，ER条件方向不支持；其前向来源条件尚未建立，未启动035前向采集或监控。本次日线扩样仅准备当前取得的历史版本，不补成前向证据。[浏览器验收](docs/qualification/research-browser.md)已获用户授权，但同环境 Chromium 在创建页面前遭本地 socket 权限拒绝，支持的提权重试仍失败；页面未加载、无界面截图，须在具备相应权限的受支持环境补验。第二批紧凑读取保留条件已通过；第五批逐源准备按后验分阶段工程决定保留，原整体条件仍未通过，交互响应目标仍未验收。数据单位、复权、日历、成员历史和历史可得性未知时继续标示限制。首版双股和集合仅允许同一市场，沪/深/京归入同一 A 股市场；跨市场同步规则另行研究。
 
 “计算正确”“真实来源兼容”“有预测或交易价值”分别验收。本轮研究按来源记录做历史描述；因果算法不使用未来柱，也不能证明当前拿到的历史版本在当时已经可得。事件后续价格变化不等于成交收益，双股偏离不等于协整或套利，所选样本广度不等于全市场或历史行业指数。
 
@@ -179,6 +187,7 @@ Pop-Location
 - [2026-10-11 实施方案](docs/plans/2026-10-11-research-workflows.md) / [算法定义与文献](docs/research/026-causal-signals-and-evaluation.md) / [竞品工作流研究](docs/research/027-competitor-workflows.md)
 - [首版实现独立复核](docs/qualification/research-implementation-review.md) / [紧凑读取复核](docs/reviews/2026-10-11-compact-research-reads-review.md) / [性能复验](docs/qualification/research-performance.md)
 - [自动取数方案](docs/plans/2026-10-11-automatic-market-data.md) / [来源研究](docs/research/029-automated-ashare-data.md) / [格式与来源验收](docs/qualification/public-market-formats.md) / [新命令真实验收](docs/qualification/public-acquisition.md) / [独立复核](docs/reviews/2026-10-11-automatic-market-data-review.md)
+- [120股日线扩样资格](docs/qualification/expanded-daily-data.md)：原组加深与新组扩展、采集/入库分层及来源限制；不升级30股算法验收
 - [分钟候选及 A 纯函数](docs/research/028-intraday-research-candidates.md) / [分钟独立复核](docs/reviews/2026-10-11-intraday-candidate-review.md)：B/C 仍为研究候选，A 尚无 HTTP/UI
 - [同伴 A 定义](docs/research/030-peer-relative-research.md) / [同伴验收](docs/qualification/peer-relative-research.md) / [筛选定义](docs/research/032-explainable-stock-filters.md) / [筛选实现复核](docs/reviews/2026-10-11-explainable-filters-review.md) / [筛选验收](docs/qualification/stock-filters.md)
 - [多股筛选界面验收](docs/qualification/research-filter-ui.md) / [界面独立复核](docs/reviews/2026-10-11-research-ui-review.md)：模型、静态组件及构建通过，真实浏览器未验
