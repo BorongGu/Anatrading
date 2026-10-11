@@ -1,6 +1,6 @@
 # Anatrading 架构
 
-更新：2026-10-11。目标见[总体方案](MASTER_PLAN.md)，本轮边界见[实施方案](plans/2026-10-11-research-workflows.md)与[编码前独立复核](reviews/2026-10-11-research-workflows-review.md)。本文区分已有基础、已实现的首版研究模块和后续设计；当前第二批内部紧凑读取与分钟 A 纯函数通过冻结 Linux 回归和限定复核，完整验收仍按项目分别报告。首版基础见[实现后独立复核](qualification/research-implementation-review.md)。
+更新：2026-10-11。目标见[总体方案](MASTER_PLAN.md)，本轮边界见[实施方案](plans/2026-10-11-research-workflows.md)与[编码前独立复核](reviews/2026-10-11-research-workflows-review.md)。本文区分已有基础、已实现的首版研究模块和后续设计；内部紧凑读取、分钟 A 纯函数及第三批有界采集/格式通过冻结 Linux 回归与限定独立复核；第三批旧真实捕获离线兼容通过，新运输真实网络仍阻断，完整验收按项目分别报告。首版基础见[实现后独立复核](qualification/research-implementation-review.md)。
 
 ## 1. 一套本地内核
 
@@ -19,6 +19,8 @@
 | 文件或区域 | 职责和状态 |
 |---|---|
 | `formats.py`、`models.py`、`numeric.py` | 已有格式解码、原值和数值边界；保留未知语义与错误 |
+| `public_market.py`、`formats.py` | 已实现腾讯日线/新浪分钟严格捕获及独立 legacy 解码；原值、未知量额单位和旧四格式边界保留 |
+| `public_acquisition.py`、`public_transport.py`、`public_http_worker.py`、`cli.py` | 已实现固定源有界任务、隔离运输监督、持久发送预算、恢复和 CLI；本地故障注入通过，真实新链路首发网络失败 |
 | `store.py` | 已有原件、DuckDB、版本、查询、导出、备份恢复；已补 POSIX 锁、SQL 范围过滤及内部 `_research_query` 紧凑投影；公开查询/导出保持不变，Linux 回归通过，Windows 原生待验 |
 | `tdx_*.py` | 已有通达信来源与适配功能；原生客户端操作属 Windows 专用，真实兼容以各来源报告为准 |
 | 现有 `price_channel`、`true_range`、量能、路径、拐点、分钟等模块 | 已有描述计算；按各自研究定义复用 |
@@ -32,7 +34,7 @@
 
 文件名保持兼容。界面把 `snapshot_id` 称为“数据版本”，不迁移既有数据库标识、`query_id`、CLI命令和导出协议。逻辑职责可以由少量文件承担，第二个真实实现出现后再提取必要共用代码。
 
-腾讯/新浪自动取数适配器仍在独立设计评审；仓库外来源观察和有界采集不构成本批产品接入，也不扩大以上模块的已验收范围。
+腾讯/新浪有界取数已完成独立实现复核。40 份旧真实捕获的离线导入/重复复用/重开对账通过；新 CLI 真实首发为 `transport_network_error`，未形成响应、捕获或数据版本。两种证据分别报告，不将旧采集脚本成功视为新运输通过。
 
 ## 3. 原始数据与版本
 
@@ -110,6 +112,16 @@ SQL范围下推必须保持旧语义：`label=NULL`不被cutoff悄悄排除、�
 - 采用离线一致备份：停止新写入、完成/取消在途作业、正常关闭数据库后复制DB与所有引用原件/清单，恢复到新空目录并核对。不完整恢复拒绝打开；崩溃状态不得丢弃WAL。[DuckDB并发](https://duckdb.org/docs/current/connect/concurrency)、[WAL](https://duckdb.org/docs/current/operations_manual/footprint_of_duckdb/files_created_by_duckdb)、[CHECKPOINT](https://duckdb.org/docs/current/sql/statements/checkpoint)
 - Authorization、Cookie、登录响应、密钥和短期签名URL不进入原件、清单或日志。客户端适配仅使用明确行情方法，不开放任意方法或账户/交易入口。
 
+### 有界公开来源采集
+
+固定腾讯日线、新浪 1m/5m 最近窗口请求；不接收任意 URL、不重定向、不继承环境代理/凭据/CA，不自动换源。父进程监督独立 worker；15 秒单次截止、180 秒命令截止及最多 10 次发送，发送预算先持久化，跨恢复累计。可信来源限制状态按独立 blocked 记录停止；网络异常不能推断为限流。详见[接入方案](plans/2026-10-11-automatic-market-data.md)和[实现复核](reviews/2026-10-11-automatic-market-data-review.md)。
+
+计划、日志、发送预留与原件使用受限目录操作、禁止符号链接跟随并同步落盘；能力不足在联网前拒绝。当前 Windows 缺少此新路径所需能力，返回 `durability_unsupported`，未建立 Windows 自动采集资格。唯一写者沿用 Store，恢复优先核对已有捕获/提交结果，不能把未知结果当作未提交后重新发送。
+
+严格网络捕获使用 `public-market-capture-v1`；旧原件离线重建为 `public-market-legacy-reconstruction-v1`，合同与 raw/batch/snapshot 身份不同，明确头数量未记录、运输证据未建立。legacy 不可被网络恢复接管。腾讯较早上下文完整入库，目标视图仅显式映射原序号，不改变完整 query 或研究前缀；数量 token 保留，未核单位的数量/金额列为 NULL。
+
+当前真实首发在隔离 worker 中返回净化的 `transport_network_error`，持久发送计数为 1；该记录不能定位 DNS、路由、CA 或来源原因。无响应/捕获/数据版本，新浪未发且未重试。详细证据见[新命令真实验收](qualification/public-acquisition.md)。后续须在受支持的环境条件下另行验证，不因旧网络脚本可用而降低隔离或运输要求。
+
 ## 9. 日历、复权与后续交易评价
 
 这些是后续能力必须满足的设计条件，不代表当前全部实现：
@@ -129,6 +141,6 @@ SQL范围下推必须保持旧语义：`label=NULL`不被cutoff悄悄排除、�
 
 每个模块验独立手算或参考实现、异常边界、前缀不变、真实源字段对账。发布分别报告Linux和Windows、真实样本/跳过、前端单测/构建与真实浏览器、纯公式与HTTP性能。既有真实样本只证明来源报告中的范围；合成数据不能证明真实兼容或预测价值。
 
-当前 Linux Python 全套 1,446 通过、0 失败、49 跳过（48 项私有真实样本、1 项 Windows 原生进程证据）、1 项依赖弃用警告；前端 72 项通过且构建通过。冻结全套用时 55.34 s，源码与测试前后哈希一致。紧凑读取独立复验 300 项、分钟 A 相关 124 项通过，属于全套的重叠子集。39 次正式 ASGI 性能请求及完整/紧凑差分通过，200,000 行集合中位数降至 11.988/12.888 s；公开来源/导出/研究身份不变，合成保留条件已通过。详见[性能记录](qualification/research-performance.md)，实际网络、并发/尾延迟、峰值内存与浏览器性能仍待验。[真实浏览器](qualification/research-browser.md)已获用户授权，但同环境 Chromium 本地 socket 权限遭拒，支持的提权重试仍失败，界面操作未跑；Windows 原生、私有真实来源、分钟 A 的 API/UI 集成及预测价值仍有未验项目，不能合并为全部通过。
+当前 Linux Python 全套 1,937 通过、0 失败、49 跳过（48 项私有真实样本、1 项 Windows 原生进程证据）、1 项依赖弃用警告；前端本片未修改，最近一次 72 项通过且构建通过。第三批冻结全套用时 68.86 s；全部 public 测试 455 项通过，其中独立对抗 173 项。40 份旧捕获仅取得限定离线格式/Store资格，新真实网络首发失败单列。紧凑读取独立复验 300 项、分钟 A 相关 124 项通过，属于全套的重叠子集。39 次正式 ASGI 性能请求及完整/紧凑差分通过，200,000 行集合中位数降至 11.988/12.888 s；公开来源/导出/研究身份不变，合成保留条件已通过。详见[性能记录](qualification/research-performance.md)，实际网络、并发/尾延迟、峰值内存与浏览器性能仍待验。[真实浏览器](qualification/research-browser.md)已获用户授权，但同环境 Chromium 本地 socket 权限遭拒，支持的提权重试仍失败，界面操作未跑；Windows 原生、私有真实来源、分钟 A 的 API/UI 集成及预测价值仍有未验项目，不能合并为全部通过。
 
 原有格式与HTTP细节见[实施决定](contracts/IMPLEMENTATION_DECISIONS.md)、[HTTP约定](contracts/WORKBENCH_HTTP.md)；本轮完整验收集合见[独立复核](reviews/2026-10-11-research-workflows-review.md)。当前未完成项持续列于[路线](ROADMAP.md)。
