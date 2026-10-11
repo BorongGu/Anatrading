@@ -4,6 +4,7 @@ Filtered estimates condition on a frozen source prefix. They establish neither
 historical source availability nor prediction, execution or strategy returns.
 """
 from math import exp, isfinite, log, sqrt
+from typing import NamedTuple
 
 from .event_study import event_report, validate_event_parameters
 from .numeric import decimal_text
@@ -61,13 +62,39 @@ def _update(level, slope, p00, p01, p11, y):
     return level, slope, p00, p01, p11, innovation, variance
 
 
-def _causal_series(bars):
-    series = []
+class _Prior(NamedTuple):
+    origin_date: str
+    origin_ordinal: int
+    origin_observations: int
+    model_segment_id: int
+    mK: float
+    mR: float
+    mE: float
+    S: float
+    v_pre: float | None
+
+
+def _capture_prior(origin_date, origin_ordinal, observations, segment_id,
+                   level, slope, p00, p01, p11, ema, previous_y, variance_post):
+    """An immutable snapshot made before reading the current observation."""
+    return _Prior(origin_date, origin_ordinal, observations, segment_id,
+                  level + slope, previous_y, ema,
+                  (p00 + 2 * p01 + p11 + _Q_LEVEL) + _R, variance_post)
+
+
+def _causal_rows(bars, *, capture_prior=False):
+    """The legacy scalar recurrence; optional priors never enter its catch."""
     active = False
     segment_id, observations = 0, 0
+    origin_date = origin_ordinal = None
     next_reset_reason = "initial_observation"
     level = slope = p00 = p01 = p11 = ema = previous_y = variance_post = None
     for bar in bars:
+        # Even a bad current bar cannot change the preceding active state.
+        # Capture is outside the legacy numeric catch and is off by default.
+        prior = (_capture_prior(origin_date, origin_ordinal, observations, segment_id,
+                                level, slope, p00, p01, p11, ema, previous_y, variance_post)
+                 if capture_prior and active else None)
         row = dict(date=bar["date"], ordinal=bar["ordinal"],
                    close=decimal_text(bar["close"]) if bar["close"] is not None else None,
                    segment_id=None, segment_observations=0, warmup=False, status="invalid",
@@ -76,7 +103,7 @@ def _causal_series(bars):
         if bar["reason"] is not None:
             active = False
             next_reset_reason = bar["reason"]
-            series.append(row)
+            yield row, prior
             continue
         try:
             value = float(bar["close"])
@@ -128,8 +155,13 @@ def _causal_series(bars):
             next_reset_reason = "numerical_failure"
             row.update(**dict.fromkeys(_ESTIMATES), reason="numerical_failure", status="invalid",
                        segment_id=None, segment_observations=0, warmup=False)
-        series.append(row)
-    return series
+        if capture_prior and row["reason"] is None:
+            origin_date, origin_ordinal = bar["date"], bar["ordinal"]
+        yield row, prior
+
+
+def _causal_series(bars):
+    return [row for row, _ in _causal_rows(bars)]
 
 
 def signal_report(query, lookback=20, horizon=5, test_start=None):
