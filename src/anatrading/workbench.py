@@ -7,6 +7,7 @@ from decimal import Decimal
 import hashlib
 import inspect
 import json
+import os
 from pathlib import Path
 import re
 import secrets
@@ -19,6 +20,7 @@ from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse, Response
 from starlette.staticfiles import StaticFiles
 
+from .research_api import register_research_routes
 from .formats import FORMAT_IDS
 from .candle_geometry import geometry_report
 from .models import DecodeError
@@ -401,7 +403,8 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
     async def config(request: Request):
         _parameters(request, set())
         return dict(csrf_token=token, formats=list(FORMAT_IDS), max_upload_bytes=_MAX_UPLOAD,
-                    max_query_rows=_MAX_ROWS, mode="retrospective", data_root_id=data_root_id(root))
+                    max_query_rows=_MAX_ROWS, mode="retrospective", data_root_id=data_root_id(root),
+                    capabilities=dict(file_import=True, daily_research=True, tdx_client=os.name == "nt"))
 
     @app.post("/api/shutdown")
     async def shutdown(request: Request):
@@ -844,6 +847,8 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
         return Response(content, media_type="application/json",
                         headers={"X-Query-Id": query_id, "X-Geometry-Id": geometry_id, "X-Content-SHA256": digest,
                                  "Content-Disposition": f'attachment; filename="anatrading-{geometry_id}.json"'})
+
+    register_research_routes(app, owner, _parameters, _RequestError)
 
     directory = Path(web_directory) if web_directory is not None else Path(__file__).resolve().parents[2] / "web/dist"
     if directory.is_dir():

@@ -22,7 +22,6 @@ from anatrading.store import EvidenceStore, StoreError
 from anatrading.formats import FORMAT_IDS
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="The v1 store targets Windows OS locks")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FORMAT = "tdx-public-text-v1"

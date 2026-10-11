@@ -2,7 +2,6 @@
 from decimal import Decimal
 import hashlib
 import json
-import os
 from pathlib import Path
 import struct
 
@@ -15,7 +14,6 @@ from anatrading.models import VERSIONS
 from anatrading.store import EvidenceStore, StoreError
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows operation locks")
 TEXT = "tdx-public-text-v1"
 FIELDS = ("open", "high", "low", "close", "volume", "amount")
 

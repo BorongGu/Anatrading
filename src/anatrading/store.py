@@ -29,29 +29,41 @@ class StoreError(RuntimeError):
 
 
 class _DirectoryLock:
-    """One OS lock spans both database access and closed-database file operations."""
+    """One local-filesystem OS lock spans database and closed-database operations.
+
+    Keep the lock file after close: unlinking it lets another process lock a new
+    inode while a previous opener still holds the old one.
+    """
     def __init__(self, root):
-        if os.name != "nt":
-            raise StoreError("windows_required")
-        import msvcrt
+        if os.name == "nt":
+            import msvcrt
+            self._unlock = lambda fd: msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            acquire = lambda fd: msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            self._unlock = lambda fd: fcntl.flock(fd, fcntl.LOCK_UN)
+            acquire = lambda fd: fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         self.stream = (root / ".operation.lock").open("a+b")
-        self.stream.seek(0, os.SEEK_END)
-        if self.stream.tell() == 0:
-            self.stream.write(b"0")
-            self.stream.flush()
         try:
+            if os.name == "nt":
+                self.stream.seek(0, os.SEEK_END)
+                if self.stream.tell() == 0:
+                    self.stream.write(b"0")
+                    self.stream.flush()
             self.stream.seek(0)
-            msvcrt.locking(self.stream.fileno(), msvcrt.LK_NBLCK, 1)
+            acquire(self.stream.fileno())
         except OSError:
             self.stream.close()
             raise StoreError("data_directory_busy") from None
+        except BaseException:
+            self.stream.close()
+            raise
 
     def close(self):
-        import msvcrt
         if not self.stream.closed:
             try:
                 self.stream.seek(0)
-                msvcrt.locking(self.stream.fileno(), msvcrt.LK_UNLCK, 1)
+                self._unlock(self.stream.fileno())
             finally:
                 self.stream.close()
 
@@ -77,6 +89,18 @@ def _identity(value):
 
 def _utcnow():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _validate_label_cutoff(cutoff, metadata):
+    if cutoff is None:
+        return
+    try:
+        pattern = r"[0-9]{4}-[0-9]{2}-[0-9]{2}" if metadata["period"] == "1d" else r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
+        if not isinstance(cutoff, str) or not re.fullmatch(pattern, cutoff):
+            raise ValueError
+        datetime.fromisoformat(cutoff)
+    except (ValueError, KeyError):
+        raise StoreError("invalid_label_cutoff") from None
 
 
 def _digest(path):
@@ -378,6 +402,28 @@ class EvidenceStore:
                 [anchor, anchor, *parameters]).fetchone()
             return dict(previous_label=previous, next_label=following)
 
+    def query_row_count(self, snapshot_id, cutoff=None):
+        """Preflight source-row budget only; a subsequent query still verifies raw bytes.
+
+        Unlocated records count toward the budget at every cutoff. This reads
+        stored metadata and a SQL count without materializing any observations.
+        """
+        if not isinstance(snapshot_id, str) or not re.fullmatch("[0-9a-f]{64}", snapshot_id):
+            raise StoreError("invalid_snapshot_id")
+        with self._mutex:
+            found = self.db.execute(
+                "SELECT s.batch_id,b.metadata_json FROM snapshots s JOIN batches b USING(batch_id) WHERE s.snapshot_id=?",
+                [snapshot_id]).fetchone()
+            if found is None:
+                raise StoreError("snapshot_not_found")
+            batch_id, metadata_json = found
+            _validate_label_cutoff(cutoff, json.loads(metadata_json))
+            where, parameters = "batch_id=?", [batch_id]
+            if cutoff is not None:
+                where += " AND (label IS NULL OR label<=?)"
+                parameters.append(cutoff)
+            return self.db.execute("SELECT count(*) FROM observations WHERE " + where, parameters).fetchone()[0]
+
     @staticmethod
     def _quality(rows):
         counts = defaultdict(lambda: Counter(pass_=0, fail=0, not_evaluated=0))
@@ -403,25 +449,32 @@ class EvidenceStore:
             batch_id, sha, manifest_json, metadata_json, batch_checks, batch_rows, size = found
             self._verify_raw(sha, size)
             manifest, metadata = json.loads(manifest_json), json.loads(metadata_json)
+            _validate_label_cutoff(cutoff, metadata)
+            # Count across the entire batch, even when the selected ordinal range
+            # excludes all unlocated records. NULL labels survive every cutoff.
+            all_unlocated = self.db.execute(
+                "SELECT count(*) FROM observations WHERE batch_id=? AND label IS NULL", [batch_id]
+            ).fetchone()[0]
+            conditions, parameters = ["batch_id=?"], [batch_id]
+            if ordinal_start is not None:
+                if ordinal_start > 9223372036854775807:
+                    conditions.append("FALSE")
+                else:
+                    conditions.append("ordinal>=?")
+                    parameters.append(ordinal_start)
+            if ordinal_end is not None:
+                conditions.append("ordinal<=?")
+                parameters.append(min(ordinal_end, 9223372036854775807))
             if cutoff is not None:
-                try:
-                    pattern = r"[0-9]{4}-[0-9]{2}-[0-9]{2}" if metadata["period"] == "1d" else r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}"
-                    if not isinstance(cutoff, str) or not re.fullmatch(pattern, cutoff):
-                        raise ValueError
-                    datetime.fromisoformat(cutoff)
-                except (ValueError, KeyError):
-                    raise StoreError("invalid_label_cutoff") from None
-            cursor = self.db.execute("SELECT * FROM observations WHERE batch_id=? ORDER BY label NULLS LAST,ordinal", [batch_id])
+                conditions.append("(label IS NULL OR label<=?)")
+                parameters.append(cutoff)
+            cursor = self.db.execute(
+                "SELECT * FROM observations WHERE " + " AND ".join(conditions)
+                + " ORDER BY label NULLS LAST,ordinal", parameters)
             names = [item[0] for item in cursor.description]
             selected, unlocated = [], []
-            all_unlocated = 0
             for values in cursor.fetchall():
                 item = dict(zip(names, values))
-                all_unlocated += item["label"] is None
-                if (ordinal_start is not None and item["ordinal"] < ordinal_start) or (ordinal_end is not None and item["ordinal"] > ordinal_end):
-                    continue
-                if item["label"] is not None and cutoff is not None and item["label"] > cutoff:
-                    continue
                 row = {key: item[key] for key in ("ordinal", "locator", "source_label", "label")}
                 row.update(tokens=json.loads(item["tokens_json"]), checks=json.loads(item["checks_json"]),
                            values={key: None if item["source_" + key] is None else decimal_text(item["source_" + key]) for key in VALUE_FIELDS},

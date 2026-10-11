@@ -3,6 +3,8 @@ import type { GeometryEnvelope, SelectionDraft } from './types.ts';
 
 const explanations: Record<string, string> = {
   connection_error: '连接中断，请确认本地服务仍在运行。',
+  platform_unsupported: '当前环境不支持此客户端操作，可通过原始文件导入行情。',
+
   invalid_response: '服务返回格式无法识别。',
   invalid_tdx_http_capture: '通达信分钟记录的请求或原文无法识别。',
   invalid_tdx_http_response: '通达信返回的证券、请求编号或状态不匹配。',

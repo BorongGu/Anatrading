@@ -18,7 +18,6 @@ from anatrading.store import EvidenceStore
 from anatrading.workbench import create_app
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows store locks")
 ORIGIN = "http://127.0.0.1:8765"
 TEXT = FORMAT_IDS[0]
 PRIVATE = "SYNTHETIC_PRIVATE_PAYLOAD_NOT_FOR_LOGS"
@@ -177,6 +176,7 @@ def test_config_and_static_are_local_and_api_is_uncached(tmp_path):
             assert response.headers["cache-control"] == "no-store"
             assert response.json() == {"csrf_token": auth["X-Anatrading-Token"], "formats": list(FORMAT_IDS),
                                        "max_upload_bytes": 16777216, "max_query_rows": 20000, "mode": "retrospective",
+                                       "capabilities": {"file_import": True, "daily_research": True, "tdx_client": os.name == "nt"},
                                        "data_root_id": hashlib.sha256(str((tmp_path / "root").resolve()).casefold().encode()).hexdigest()}
             assert (await client.get("/")).status_code == 200
             assert (await client.get("/docs")).status_code == 404

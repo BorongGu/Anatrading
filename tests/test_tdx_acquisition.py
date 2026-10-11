@@ -2,7 +2,6 @@
 import importlib
 import hashlib
 import json
-import os
 import socket
 import struct
 import threading
@@ -15,7 +14,6 @@ from anatrading.store import EvidenceStore, StoreError, _DirectoryLock
 from anatrading.workbench import create_app
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows acquisition locks")
 SYMBOL = "600059.SH"
 TARGET = "2026-09-30"
 

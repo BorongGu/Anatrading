@@ -5,10 +5,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-import pytest
 
-
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows evidence store")
 PROJECT = Path(__file__).resolve().parents[1]
 
 

@@ -13,7 +13,6 @@ import anatrading.workbench as module
 from anatrading.store import EvidenceStore, StoreError
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows data-root locks")
 ORIGIN = "http://127.0.0.1:8765"
 TEXT = "tdx-public-text-v1"
 PRIVATE = "SYNTHETIC_HTTP_PRIVATE_MARKER_813"
