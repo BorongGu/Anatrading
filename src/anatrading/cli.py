@@ -34,6 +34,16 @@ def _parser():
     acquire.add_argument("--symbol", choices=["600059.SH", "000001.SZ"], required=True)
     acquire.add_argument("--target-date", required=True, help="需要实际观察的源日期 YYYY-MM-DD")
     acquire.add_argument("--port", type=_port, default=8765)
+    public = commands.add_parser("acquire-public", help="按显式股票声明有界获取腾讯日线或新浪分钟并保存原件")
+    public.add_argument("--source", choices=["tencent", "sina"], required=True)
+    public.add_argument("--symbol", required=True, help="显式代码与交易所，例如601577.SH；不据代码验证品类")
+    public.add_argument("--asset-type", choices=["stock"], required=True, help="用户声明，保留为assumed")
+    public.add_argument("--period", choices=["1d", "1m", "5m"], required=True)
+    public.add_argument("--start")
+    public.add_argument("--end")
+    public.add_argument("--count", type=int, help="仅新浪，默认10，最多240")
+    resume = commands.add_parser("resume-public", help="校验并恢复一个既有有界取数任务，不替换参数")
+    resume.add_argument("run_id", help="原任务的32位小写十六进制ID")
     due = commands.add_parser("acquire-tdx-due", help="执行有限日线计划的到期槽或只读恢复")
     due.add_argument("--plan", type=Path, required=True, help="已核验的私有计划绝对路径")
     recovery = commands.add_parser("recover-tdx", help="核证原客户端会话终态并只封结旧刷新，不下载")
@@ -77,6 +87,22 @@ def _parser():
 
 
 def _run(arguments):
+    if arguments.command in {"acquire-public", "resume-public"}:
+        from .public_acquisition import acquire_public, resume_public
+
+        requested = False
+        def request_cancel(signum, frame):
+            nonlocal requested
+            requested = True
+        previous = signal.signal(signal.SIGINT, request_cancel)
+        try:
+            if arguments.command == "resume-public":
+                return resume_public(arguments.root, arguments.run_id, _cancelled=lambda: requested)
+            return acquire_public(arguments.root, source=arguments.source, symbol=arguments.symbol,
+                                  asset_type=arguments.asset_type, period=arguments.period, start=arguments.start,
+                                  end=arguments.end, count=arguments.count, _cancelled=lambda: requested)
+        finally:
+            signal.signal(signal.SIGINT, previous)
     if arguments.command == "recover-tdx":
         from .tdx_recovery import recover
 
@@ -158,6 +184,7 @@ def _run(arguments):
 
 def main(argv=None):
     from .tdx_acquisition import AcquireError
+    from .public_acquisition import PublicAcquisitionError
 
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
@@ -165,7 +192,7 @@ def main(argv=None):
     arguments = _parser().parse_args(argv)
     try:
         result = _run(arguments)
-    except (StoreError, DecodeError, NumericError, AcquireError) as error:
+    except (StoreError, DecodeError, NumericError, AcquireError, PublicAcquisitionError) as error:
         result = {"status": "error", "error_code": error.code}
     except OSError:
         result = {"status": "error", "error_code": "storage_io_error"}
@@ -178,7 +205,7 @@ def main(argv=None):
     status = result.get("status") if isinstance(result, dict) else None
     return 130 if status in {"cancelled", "interrupted"} else 2 if status in {
         "error", "failed", "rejected", "not_covered", "refresh_unknown", "publication_unknown", "dispatch_unknown",
-        "shutdown_unknown"} else 0
+        "shutdown_unknown", "failed_transient", "failed_terminal", "blocked", "partial"} else 0
 
 
 if __name__ == "__main__":

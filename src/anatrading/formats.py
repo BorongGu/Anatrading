@@ -9,8 +9,9 @@ import struct
 
 from .models import Check, Decoded, DecodeError, NonMarketPayload, SourceRow, VALUE_FIELDS
 from .numeric import NumericError, decimal_value, integer_value
+from .public_market import PUBLIC_FORMAT_IDS, capture_rows, preflight_capture, public_contract, validate_capture
 
-FORMAT_IDS = ("tdx-public-text-v1", "tdx-public-day-v1", "baostock-decoded-v0.9.4", "tdx-http-market-v1")
+FORMAT_IDS = ("tdx-public-text-v1", "tdx-public-day-v1", "baostock-decoded-v0.9.4", "tdx-http-market-v1", *PUBLIC_FORMAT_IDS)
 _DECLARATIONS = {"instrument", "venue", "asset_type", "volume_unit", "amount_unit"}
 _BAO_FIELDS = {"date", "time", "code", *VALUE_FIELDS, "adjustflag"}
 _NEGATIVE_DAY = "aa27dfce8bd24a75f4d07697c4c787f905a26b7a3999a3c76cf30b24ef9c2357"
@@ -52,6 +53,8 @@ def preflight(raw: bytes, format_id: str) -> None:
         _bao_envelope(raw)
     if format_id == FORMAT_IDS[3]:
         _tdx_http_envelope(raw)
+    if format_id in PUBLIC_FORMAT_IDS:
+        preflight_capture(raw, format_id)
 
 
 def _http_json(raw):
@@ -180,10 +183,25 @@ def _minute_label(date_token, time_token, *, bao=False):
         return None
 
 
-def _row(ordinal, locator, source_label, label, tokens, inputs=None):
+def _row(ordinal, locator, source_label, label, tokens, inputs=None, *, volume_policy=None):
     values, checks = {}, []
     for field in VALUE_FIELDS:
         value = (inputs if inputs is not None else tokens).get(field)
+        if field == "volume" and volume_policy == "unstandardized":
+            values[field] = None
+            outcome, reason = "pass", None
+            if value is None or isinstance(value, str) and not value.strip():
+                outcome, reason = "not_evaluated", "missing"
+            else:
+                try:
+                    if decimal_value(value) < 0:
+                        raise NumericError("negative_source_quantity")
+                except NumericError as error:
+                    outcome, reason = "fail", error.code
+            checks.append(Check("source_quantity_decimal", outcome, reason))
+            checks.append(Check("numeric.volume", "not_evaluated" if outcome == "pass" else outcome,
+                                "source_quantity_not_normalized" if outcome == "pass" else reason))
+            continue
         if value is None or isinstance(value, str) and not value.strip():
             values[field] = None
             checks.append(Check(f"numeric.{field}", "not_evaluated", "missing"))
@@ -198,11 +216,11 @@ def _row(ordinal, locator, source_label, label, tokens, inputs=None):
     checks.append(Check("label", "pass" if label is not None else "fail",
                         None if label is not None else "invalid_source_label"))
     row = SourceRow(ordinal, locator, source_label, label, tokens, values, checks)
-    _quality(row)
+    _quality(row, volume_policy=volume_policy)
     return row
 
 
-def _quality(row):
+def _quality(row, *, volume_policy=None):
     values, checks = row.values, row.checks
     prices = [values[field] for field in ("open", "high", "low", "close")]
     if all(value is not None for value in prices):
@@ -215,6 +233,11 @@ def _quality(row):
     volume, amount = values["volume"], values["amount"]
     checks.append(Check("nonnegative_amount", "not_evaluated", "invalid_or_missing_amount")
                   if amount is None else Check("nonnegative_amount", "pass" if amount >= 0 else "fail"))
+    if volume_policy == "unstandardized":
+        checks.extend(Check(name, "not_evaluated", "source_quantity_not_normalized")
+                      for name in ("zero_volume_amount", "conditional_price_bounds", "conditional_price_bounds_cent"))
+        checks.append(Check("standard_units", "not_evaluated", "instrument_identity_and_source_semantics_unverified"))
+        return
     checks.append(Check("zero_volume_amount", "not_evaluated", "invalid_or_missing_volume_or_amount")
                   if volume is None or amount is None else
                   Check("zero_volume_amount", "fail" if volume == 0 and amount != 0 else "pass"))
@@ -377,8 +400,18 @@ def decode(raw: bytes, format_id: str, interpretation: dict | None = None) -> De
         raise DecodeError("invalid_interpretation")
     if type(raw) is not bytes:
         raise DecodeError("invalid_raw_type")
-    metadata, rows = {FORMAT_IDS[0]: _text, FORMAT_IDS[1]: _day, FORMAT_IDS[2]: _bao,
-                      FORMAT_IDS[3]: _tdx_http}[format_id](raw)
+    if format_id in PUBLIC_FORMAT_IDS:
+        capture = validate_capture(raw, format_id)
+        if not capture.payload:
+            raise DecodeError("empty_public_market_result")
+        expected = {"instrument": capture.symbol, "venue": capture.symbol[-2:], "asset_type": "stock"}
+        if any(key not in expected or value != expected[key] for key, value in interpretation.items()):
+            raise DecodeError("conflicting_public_interpretation")
+        metadata, specifications = capture_rows(capture)
+        rows = [_row(**specification, volume_policy="unstandardized") for specification in specifications]
+    else:
+        metadata, rows = {FORMAT_IDS[0]: _text, FORMAT_IDS[1]: _day, FORMAT_IDS[2]: _bao,
+                          FORMAT_IDS[3]: _tdx_http}[format_id](raw)
     raw_hash = hashlib.sha256(raw).hexdigest()
     metadata.update(instrument_id=None, interpretation=dict(interpretation), interpretation_status="assumed",
                     source_claims_status="assumed", raw_sha256=raw_hash, quarantined=raw_hash == _NEGATIVE_DAY)
@@ -406,6 +439,8 @@ def decode(raw: bytes, format_id: str, interpretation: dict | None = None) -> De
                 Check("source_order", "fail" if previous is not None and row.label < previous else "pass"),
             ])
             previous = row.label
+    if format_id in PUBLIC_FORMAT_IDS:
+        return Decoded(public_contract(format_id, capture_version=capture.envelope["capture_version"]), metadata, rows, checks)
     contract = dict(format_id=format_id, version="2",
                     raw_kind="http_capture_bundle" if format_id == FORMAT_IDS[3] else
                              "sdk_decoded_text" if format_id == FORMAT_IDS[2] else "original_file",
