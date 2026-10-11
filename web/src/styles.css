@@ -824,3 +824,75 @@ button, summary, a, tr[tabindex] { touch-action: manipulation; }
   .raw-data .export-panel .button-group { gap: 7px; } .raw-data .export-panel button { padding: 8px 9px; }
 }
 .research-scope { margin: -12px 0 23px; }
+
+/* 有限条件研究：沿用原视觉与系统字体，保持单套可聚焦控件。 */
+.filter-universe-setup input:not([type="checkbox"]), .filter-universe-setup select, .filter-universe-setup button,
+.filter-results button { font-size: 14px; min-height: 40px; }
+.filter-universe-setup .dataset-choice { min-height: 40px; }
+.filter-universe-setup summary, .filter-results summary { font-size: 14px; min-height: 40px; padding-top: 9px; padding-bottom: 9px; }
+.filter-editor { border-top: 1px solid var(--line); padding-top: 20px; margin: 0 0 18px; }
+.filter-editor > .section-heading { gap: 16px; align-items: start; }
+.filter-editor h3 { margin: 0; }
+.filter-editor p { margin: 7px 0 12px; }
+.filter-group { border: 1px solid var(--line-strong); border-radius: 5px; padding: 16px; margin: 14px 0; min-width: 0; }
+.filter-group legend { padding: 0 7px; color: var(--ink); font-weight: 500; }
+.filter-atom { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(190px, 1fr) auto; align-items: start; gap: 14px; margin: 0 0 15px; }
+.filter-atom > button { margin-top: 25px; min-height: 40px; }
+.filter-atom label { min-width: 0; }
+.filter-atom small { display: block; font-size: 13px; line-height: 1.6; padding-top: 5px; overflow-wrap: anywhere; }
+.filter-atom [aria-invalid="true"] { border-color: var(--cinnabar); }
+.filter-run button, .filter-view button, .filter-group button { min-height: 40px; }
+.filter-run { flex-wrap: wrap; }
+.selected-versions { margin: 14px 0; font-size: 13px; }
+.selected-versions ul { list-style: none; padding: 0; }
+.selected-versions li { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0; }
+.selected-versions li span { min-width: 0; }
+.selected-versions code { display: block; overflow-wrap: anywhere; }
+.research-request-status:empty { margin: 0; }
+.research-request-status { font-size: 14px; line-height: 1.6; color: var(--ink-soft); }
+.filter-rule-summary { margin: 20px 0; line-height: 1.7; }
+.filter-rule-summary p { margin: 8px 0; }
+.filter-view { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 10px; }
+.filter-view [aria-pressed="true"] { border-color: var(--ink); color: var(--ink); background: var(--paper-deep); }
+.filter-table { width: 100%; }
+.filter-table table { width: 100%; table-layout: fixed; }
+.filter-table th, .filter-table td { white-space: normal; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; vertical-align: top; }
+.filter-table thead th:nth-child(1) { width: 12%; }
+.filter-table thead th:nth-child(2) { width: 18%; }
+.filter-table thead th:last-child { width: 24%; }
+.filter-table small { display: block; font-size: 13px; font-weight: normal; line-height: 1.6; margin-top: 4px; }
+.filter-table .selection-state { font-weight: 600; }
+.filter-table .state-undetermined { color: var(--amber); }
+.filter-row-toggle { display: block; margin-top: 8px; padding-left: 0; text-align: left; min-height: 40px; white-space: normal; }
+.filter-detail-row > td { background: var(--paper); padding: 20px; }
+.filter-evidence { min-width: 0; font-size: 14px; line-height: 1.65; }
+.filter-evidence h4 { margin: 6px 0 10px; font-size: 15px; }
+.filter-evidence > section { padding: 10px 0 18px; border-bottom: 1px solid var(--line); }
+.filter-evidence ul { margin: 10px 0; padding-left: 22px; }
+.filter-evidence li { margin: 12px 0; }
+.filter-proof li > span, .filter-proof li > small { display: block; }
+.filter-proof strong { font-weight: 500; }
+.filter-source { margin: 18px 0; }
+.filter-source code, .filter-results code { overflow-wrap: anywhere; white-space: normal; }
+.filter-semantic { display: grid; gap: 4px; margin: 15px 0; }
+.filter-semantic span, .filter-semantic small { display: block; overflow-wrap: anywhere; }
+.filter-source .metadata-entry { display: contents; }
+.reason-point { display: inline-block; margin: 4px 12px 0 0; font-variant-numeric: tabular-nums; }
+@media (max-width: 600px) {
+  .filter-atom { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .filter-atom > button { margin-top: 0; justify-self: start; }
+  .filter-group { padding: 12px; }
+  .filter-editor > .section-heading { flex-direction: column; }
+  .filter-table table, .filter-table tbody { display: block; }
+  .filter-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .filter-table tr { display: grid; grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--line-strong); padding: 12px 0; }
+  .filter-table td, .filter-table th { display: block; border: 0; padding: 7px 0; text-align: left; min-width: 0; }
+  .filter-table [data-label]::before { content: attr(data-label); display: block; color: var(--muted); font-size: 13px; font-weight: normal; }
+  .filter-table .filter-detail-row { border-top: 0; padding: 0 0 15px; }
+  .filter-detail-row > td { padding: 14px; }
+  .filter-source .metadata-list { grid-template-columns: minmax(0, 1fr); }
+  .filter-source .metadata-list dd { margin: 0 0 10px; }
+  .selected-versions li { align-items: start; }
+}
+
+.filter-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

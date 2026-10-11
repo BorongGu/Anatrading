@@ -4,6 +4,7 @@ import { checkedFetch, explain, jsonRequest, verifiedExportBlob, verifiedGeometr
 import { assertReply, Generation, minuteReadNotice, queryParameters } from './model.ts';
 import { SingleResearch } from './SingleResearch.tsx';
 import { CrossResearch } from './CrossResearch.tsx';
+import { createUniverseDraft } from './universe-request.ts';
 import { SourceChart } from './SourceChart.tsx';
 import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
 import { VolumeAnalysis } from './VolumeAnalysis.tsx';
@@ -33,6 +34,7 @@ function snapshotName(snapshot: Snapshot): string {
 
 export default function App() {
   const [workspace, setWorkspace] = useState<'single' | 'pair' | 'universe' | 'data'>('single');
+  const [universeDraft, setUniverseDraft] = useState(createUniverseDraft);
   const [detailed, setDetailed] = useState(false);
   const [dataTools, setDataTools] = useState(false);
   const [config, setConfig] = useState<Config | null>(null);
@@ -327,7 +329,7 @@ export default function App() {
           {snapshot && <SnapshotEvidence snapshot={snapshot} />}
           </>}
         </>}
-        {(workspace === 'pair' || workspace === 'universe') && <CrossResearch key={workspace} kind={workspace} snapshots={snapshots} onImport={() => changeWorkspace('data')} onOpen={(id, cutoff) => void loadQuery({ ...emptySelection, snapshot: id, cutoff })} />}
+        {(workspace === 'pair' || workspace === 'universe') && <CrossResearch key={workspace} kind={workspace} universeDraft={universeDraft} onUniverseDraftChange={setUniverseDraft} snapshots={snapshots} onImport={() => changeWorkspace('data')} onOpen={(id, cutoff) => void loadQuery({ ...emptySelection, snapshot: id, cutoff })} />}
         {workspace === 'data' && <>
           <div className="workspace-intro"><span className="eyebrow">本地数据</span><h1>数据管理</h1><p>保存原始文件，确认来源与身份，再进入研究。</p></div>
           <div className="data-management-grid"><section className="panel data-import"><h2>导入行情</h2>
