@@ -14,7 +14,6 @@ from test_tdx_acquisition import encoded, environment, module
 from test_tdx_schedule import NOW, plan, read_control, schedule
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows recovery locks")
 ENTRIES = ["recover", "acquire", "due"]
 
 

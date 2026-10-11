@@ -10,7 +10,6 @@ from test_cli import run_cli
 from test_workbench import ORIGIN, row, running, source, upload
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows store locks")
 
 
 def export_parameters(view, **selection):

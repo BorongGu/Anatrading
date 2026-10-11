@@ -294,3 +294,37 @@ def test_native_current_process_readonly_creation_and_state(module):
         "state": "alive", "creation_filetime": tick,
         "census_count": None, "census_complete": None, "open_error": None,
     }
+
+
+def test_windows_structures_have_fixed_binary_field_widths(module):
+    assert ctypes.sizeof(module._FILETIME) == 8
+    assert module._FILETIME.dwLowDateTime.offset == 0
+    assert module._FILETIME.dwHighDateTime.offset == 4
+    stamp = module._FILETIME(0x89ABCDEF, 0x01234567)
+    assert bytes(stamp) == bytes.fromhex("ef cd ab 89 67 45 23 01")
+    if ctypes.sizeof(ctypes.c_void_p) == 8:
+        assert ctypes.sizeof(module._PROCESSENTRY32W) == 568
+        expected = {"dwSize": 0, "cntUsage": 4, "th32ProcessID": 8,
+                    "th32DefaultHeapID": 16, "th32ModuleID": 24, "cntThreads": 28,
+                    "th32ParentProcessID": 32, "pcPriClassBase": 36,
+                    "dwFlags": 40, "szExeFile": 44}
+        assert {name: getattr(module._PROCESSENTRY32W, name).offset for name in expected} == expected
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Checks refusal on non-Windows hosts")
+def test_non_windows_native_entrypoints_fail_before_access(module, tmp_path, monkeypatch):
+    import anatrading.tdx_acquisition as acquisition
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Windows-only operation reached an OS or network call")
+
+    monkeypatch.setattr(module.ctypes, "WinDLL", forbidden, raising=False)
+    monkeypatch.setattr(acquisition.subprocess, "run", forbidden)
+    monkeypatch.setattr(acquisition, "_file_hash", forbidden)
+    monkeypatch.setattr(acquisition, "_http", forbidden)
+    for invoke in (lambda: module.process_observation(42),
+                   lambda: acquisition._client_identity(tmp_path),
+                   lambda: acquisition.acquire(tmp_path / "root", tmp_path / "client", "600059.SH", "2021-01-01")):
+        with pytest.raises(AcquireError, match="windows_required"):
+            invoke()
+    assert list(tmp_path.iterdir()) == []

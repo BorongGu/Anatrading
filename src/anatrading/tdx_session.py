@@ -15,13 +15,19 @@ _STARTED = re.compile(
 
 
 class _PROCESSENTRY32W(ctypes.Structure):
+    # Windows LLP64 widths are fixed even when inspecting/testing this module on
+    # an LP64 host. ctypes.wintypes uses host c_long/c_wchar on non-Windows.
     _fields_ = [
-        ("dwSize", wintypes.DWORD), ("cntUsage", wintypes.DWORD),
-        ("th32ProcessID", wintypes.DWORD), ("th32DefaultHeapID", ctypes.c_size_t),
-        ("th32ModuleID", wintypes.DWORD), ("cntThreads", wintypes.DWORD),
-        ("th32ParentProcessID", wintypes.DWORD), ("pcPriClassBase", wintypes.LONG),
-        ("dwFlags", wintypes.DWORD), ("szExeFile", wintypes.WCHAR * 260),
+        ("dwSize", ctypes.c_uint32), ("cntUsage", ctypes.c_uint32),
+        ("th32ProcessID", ctypes.c_uint32), ("th32DefaultHeapID", ctypes.c_size_t),
+        ("th32ModuleID", ctypes.c_uint32), ("cntThreads", ctypes.c_uint32),
+        ("th32ParentProcessID", ctypes.c_uint32), ("pcPriClassBase", ctypes.c_int32),
+        ("dwFlags", ctypes.c_uint32), ("szExeFile", ctypes.c_uint16 * 260),
     ]
+
+
+class _FILETIME(ctypes.Structure):
+    _fields_ = [("dwLowDateTime", ctypes.c_uint32), ("dwHighDateTime", ctypes.c_uint32)]
 
 
 def creation_filetime(started):
@@ -48,7 +54,7 @@ def _kernel():
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         kernel.OpenProcess.restype = wintypes.HANDLE
-        kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
+        kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(_FILETIME)] * 4)]
         kernel.GetProcessTimes.restype = wintypes.BOOL
         kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
         kernel.WaitForSingleObject.restype = wintypes.DWORD
@@ -120,7 +126,7 @@ def process_observation(pid):
             return _missing(kernel, pid)
         try:
             _remaining()
-            stamps = [wintypes.FILETIME() for _ in range(4)]
+            stamps = [_FILETIME() for _ in range(4)]
             _remaining()
             valid = kernel.GetProcessTimes(handle, *(ctypes.byref(stamp) for stamp in stamps))
             _remaining()

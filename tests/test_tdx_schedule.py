@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 import hashlib
 import importlib
 import json
-import os
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -13,7 +12,6 @@ from test_tdx_acquisition import day, encoded, environment, module
 from anatrading.store import EvidenceStore, StoreError
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows acquisition locks")
 NOW = datetime(2026, 10, 8, 10, tzinfo=timezone.utc)
 MARKER = b"anatrading-tdx-dispatch-v1\n"
 

@@ -12,7 +12,6 @@ from anatrading.store import EvidenceStore
 from test_workbench import row, source, upload
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows Store ownership")
 ORIGIN = "http://127.0.0.1:8765"
 
 

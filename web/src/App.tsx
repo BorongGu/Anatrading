@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { checkedFetch, explain, jsonRequest, verifiedExportBlob, verifiedGeometryExportBlob } from './api.ts';
 import { assertReply, Generation, minuteReadNotice, queryParameters } from './model.ts';
+import { SingleResearch } from './SingleResearch.tsx';
+import { CrossResearch } from './CrossResearch.tsx';
 import { SourceChart } from './SourceChart.tsx';
 import { RecordDetails, UnitEvidence } from './RecordDetails.tsx';
 import { VolumeAnalysis } from './VolumeAnalysis.tsx';
@@ -26,10 +28,13 @@ const declarationNames = { instrument: '证券代码', venue: '市场', asset_ty
 const statusNames: Record<string, string> = { committed: '已提交', rejected: '已拒绝', failed: '失败', interrupted: '曾中断', running: '进行中', cancelled: '已取消' };
 function snapshotName(snapshot: Snapshot): string {
   const m = snapshot.metadata;
-  return [m.source_name, m.source_code ?? m.interpretation?.instrument ?? '身份未核实', m.period ?? '周期未知'].filter(Boolean).join(' · ');
+  return [m.source_name, m.source_code ?? m.interpretation?.instrument ?? '身份未核实', m.period === '1d' ? '日线' : m.period === '1m' ? '分钟线' : m.period ?? '周期未知'].filter(Boolean).join(' · ');
 }
 
 export default function App() {
+  const [workspace, setWorkspace] = useState<'single' | 'pair' | 'universe' | 'data'>('single');
+  const [detailed, setDetailed] = useState(false);
+  const [dataTools, setDataTools] = useState(false);
   const [config, setConfig] = useState<Config | null>(null);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [attempts, setAttempts] = useState<Attempt[]>([]);
@@ -71,7 +76,7 @@ export default function App() {
     abort.current?.abort();
     abort.current = null;
     replyRef.current = null;
-    setReply(null); setSelected(null); setPage(0); setScope('located'); setExporting(null); setIssue(''); setPhase('dirty');
+    setReply(null); setSelected(null); setChannelReport(null); setPivotReport(null); setDetailed(false); setPage(0); setScope('located'); setExporting(null); setIssue(''); setPhase('dirty');
     return generation;
   }, []);
   const chartError = useCallback(() => { invalidate(); setIssue(explain(new Error('chart_render_failed'))); setPhase('error'); }, [invalidate]);
@@ -111,6 +116,7 @@ export default function App() {
     selectionRef.current = next; setSelection(next); invalidate();
   }
   async function loadQuery(next: SelectionDraft, catalog = snapshots) {
+    setWorkspace('single');
     selectionRef.current = next; setSelection(next);
     const generation = invalidate();
     if (!next.snapshot || !config) return;
@@ -151,7 +157,7 @@ export default function App() {
         await loadQuery({ ...emptySelection, snapshot: attempt.snapshot_id }, catalog);
       }
     } catch (error) {
-      setNotice(`导入结果待核对。${explain(error)} 请刷新尝试账本确认终态，勿按网络错误判断提交结果。`);
+      setNotice(`导入结果待核对。${explain(error)} 请刷新导入记录确认终态，勿按网络错误判断提交结果。`);
     } finally { setImporting(false); }
   }
 
@@ -177,7 +183,7 @@ export default function App() {
         if (!daily && received && replyRef.current === received) setNotice(minuteReadNotice(received.query));
       }
     } catch (error) {
-      setNotice(`${explain(error)} 若连接中断，请刷新尝试账本核对读取结果。`);
+      setNotice(`${explain(error)} 若连接中断，请刷新导入记录核对读取结果。`);
     } finally { setImporting(false); }
   }
 
@@ -221,18 +227,24 @@ export default function App() {
   const pageSize = 50;
   const pageCount = Math.max(1, Math.ceil(tableRows.length / pageSize));
 
+  function changeWorkspace(next: typeof workspace) {
+    if (next === workspace) return;
+    invalidate(); setWorkspace(next);
+    if (next === 'single' && selectionRef.current.snapshot) void loadQuery(selectionRef.current);
+  }
   return <div className="app-shell">
-    <header className="topbar"><a className="brand" href="/" aria-label="Anatrading 首页"><span className="brand-mark">A</span><span>Anatrading<small>数据证据工作台</small></span></a>
-      <div className="header-status"><span className="local-dot" />本机 · 单快照 · 历史回顾</div></header>
-    <div className="workspace">
-      <aside className="sidebar">
-        <div className="section-heading"><h2>数据快照</h2><button className="quiet" onClick={() => void refreshCatalog()} disabled={!config || importing}>刷新</button></div>
-        <p className="subtle">按原件与合同独立保存，切换时重新核验。</p>
-        <label>筛选来源<input value={snapshotFilter} onChange={event => setSnapshotFilter(event.target.value)} placeholder="证券代码、名称或快照ID" /></label>
-        <p className="subtle">共 {snapshots.length} 份快照；匹配 {matchingSnapshots.length} 份，显示前 {visibleSnapshots.length} 份。</p>
-        <label className="field-label" htmlFor="snapshot">选择快照</label>
+    <header className="topbar"><a className="brand" href="/" aria-label="Anatrading 首页"><span className="brand-mark">A</span><span>Anatrading<small>股票研究工作台</small></span></a>
+      <nav className="workspace-nav" aria-label="研究工作区">{([['single', '个股研究'], ['pair', '双股对比'], ['universe', '多股研究'], ['data', '数据管理']] as const).map(([value, label]) => <button key={value} aria-current={workspace === value ? 'page' : undefined} onClick={() => changeWorkspace(value)}>{label}</button>)}</nav>
+      <span className="header-status"><span className="local-dot" />本地运行</span></header>
+    <div className={`workspace ${workspace === 'single' && snapshots.length ? '' : 'wide-workspace'}`}>
+      {workspace === 'single' && !!snapshots.length && <aside className="sidebar">
+        <div className="section-heading"><h2>行情数据</h2><button className="quiet" onClick={() => void refreshCatalog()} disabled={!config || importing}>刷新</button></div>
+        <p className="subtle">选择日线判断趋势，选择分钟线复盘时机。</p>
+        <label>筛选来源<input value={snapshotFilter} onChange={event => setSnapshotFilter(event.target.value)} placeholder="证券代码、名称或版本 ID" /></label>
+        <p className="subtle">共 {snapshots.length} 份数据；匹配 {matchingSnapshots.length} 份，显示前 {visibleSnapshots.length} 份。</p>
+        <label className="field-label" htmlFor="snapshot">选择数据版本</label>
         <select id="snapshot" value={selection.snapshot} disabled={!config} onChange={event => void loadQuery({ ...emptySelection, snapshot: event.target.value })}>
-          <option value="">请选择数据快照</option>
+          <option value="">请选择行情数据</option>
           {snapshot && !visibleSnapshots.includes(snapshot) && <option value={snapshot.snapshot_id}>{snapshotName(snapshot)} · 当前选择</option>}
           {visibleSnapshots.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 8)}</option>)}
         </select>
@@ -242,9 +254,98 @@ export default function App() {
             <strong>{snapshotName(item)}</strong><span>{formatNames[item.manifest.contract?.format_id ?? ''] ?? item.manifest.contract?.format_id ?? '来源未注明'}</span>
             <small>{item.row_count.toLocaleString()} 条源记录 · {item.snapshot_id.slice(0, 8)}</small>
           </button>)}
-          {!snapshots.length && <div className="sidebar-empty">尚无已提交快照。<br />先导入一份支持的原始文件。</div>}
+          {!snapshots.length && <div className="sidebar-empty">尚无已导入行情。<br />先导入一份支持的原始文件。</div>}
         </div>
-        <details className="import-panel" open><summary>自动读取通达信数据</summary>
+        <button className="manage-data-link" onClick={() => changeWorkspace('data')}>＋ 导入与管理数据</button>
+      </aside>}
+      <main className="main-content" id="main-content">
+        {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="收起通知" onClick={() => setNotice('')}>×</button></div>}
+        {issue && <div className="error-banner" role="alert">{issue}</div>}
+        <div className="research-disclaimer"><span className="status-dot" />历史回顾<span>当前数据可能包含事后修订；复权、单位与历史可得性按来源资格解释。</span></div>
+        {workspace === 'single' && <>
+          <div className="workspace-intro single-intro"><div><span className="eyebrow">个股研究</span><h1>{snapshot ? snapshotName(snapshot) : snapshots.length ? '选一只股票，读懂它的变化' : '从你的第一份行情开始'}</h1></div>{snapshot && <span className="badge">{snapshot.metadata.period === '1d' ? '日线' : snapshot.metadata.period === '1m' ? '分钟线' : '来源记录'} · {snapshot.row_count.toLocaleString()} 条</span>}</div>
+          {!snapshots.length ? <section className="panel onboarding"><div className="onboarding-copy"><span className="eyebrow">欢迎使用 Anatrading</span><h2>把行情变成<br />可以核对的研究。</h2><p>导入本地行情，从趋势、历史事件到股票之间的关系。每个结果都保留计算条件与缺失原因。</p><button className="primary" onClick={() => changeWorkspace('data')}>导入第一份行情 <span aria-hidden="true">↗</span></button><p className="subtle">支持通达信文本、日线 .day 等已审格式</p></div><ol className="onboarding-steps"><li><span>01</span><div><h3>准备行情</h3><p>原始文件独立保存，价格精度与来源声明保留。</p></div></li><li><span>02</span><div><h3>明确问题</h3><p>看一只股票、比较两只，或研究自己的股票集合。</p></div></li><li><span>03</span><div><h3>核对证据</h3><p>把结果、计算条件与尚未验证的假设放在一起。</p></div></li></ol></section> : <>
+        <form className="panel query-toolbar" onSubmit={event => { event.preventDefault(); void loadQuery(selectionRef.current); }}>
+          <label className="cutoff-input">研究截止<input value={selection.cutoff} placeholder="留空查看全部；日线填写 YYYY-MM-DD" disabled={!snapshot} onChange={event => editSelection({ cutoff: event.target.value })} /></label>
+          <label>记录起序号<input inputMode="numeric" value={selection.start} placeholder="不限" disabled={!snapshot} onChange={event => editSelection({ start: event.target.value })} /></label>
+          <label>记录止序号<input inputMode="numeric" value={selection.end} placeholder="不限" disabled={!snapshot} onChange={event => editSelection({ end: event.target.value })} /></label>
+          <button className="primary" disabled={!snapshot || !config || phase === 'loading'}>{phase === 'loading' ? '核验中…' : '更新图表'}</button>
+          <div className="navigation-buttons">
+            <button type="button" className="quiet" disabled={!reply?.navigation.previous_label} onClick={() => reply?.navigation.previous_label && void loadQuery({ ...selectionRef.current, cutoff: reply.navigation.previous_label })}>← 上一记录</button>
+            <button type="button" className="quiet" disabled={!reply?.navigation.next_label} onClick={() => reply?.navigation.next_label && void loadQuery({ ...selectionRef.current, cutoff: reply.navigation.next_label })}>下一记录 →</button>
+            <button type="button" className="quiet" disabled={!snapshot || !selection.cutoff} onClick={() => void loadQuery({ ...selectionRef.current, cutoff: '' })}>全部记录</button>
+          </div>
+        </form>
+        {!reply && <section className="panel empty-state" aria-live="polite"><div className="empty-glyph" aria-hidden="true"><i /><i /><i /></div><h2>{phase === 'loading' ? '正在核验原件并读取当前选择' : phase === 'error' ? '当前结果已阻断' : selection.snapshot ? '等待应用当前选择' : '选择一份行情，开始研究'}</h2>
+          <p>{phase === 'loading' ? '旧图、详情与导出已清除。' : '图表、精确字段与导出由同一个查询驱动。图形最多读取 20,000 条；更长文件可填写记录序号范围。'}</p></section>}
+        {reply && q && <>
+          <section className="selection-summary" aria-label="当前数据窗口">
+            <div><span className="field-label">当前选择 · 可定位</span><strong>{q.counts.selected_rows.toLocaleString()}<small> 条</small></strong></div>
+            <div><span className="field-label">当前选择 · 无法定位</span><strong>{q.counts.unlocated_rows.toLocaleString()}<small> 条</small></strong></div>
+            <div className="range-summary"><span className="field-label">选择内源标签范围</span><code>{q.rows[0]?.label ?? '空'} → {q.rows.at(-1)?.label ?? '空'}</code><small>缩放仅改变可视区域，不改变选择与导出</small></div>
+          </section>
+          <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} pivots={pivotReport?.radius === pivotRadius ? pivotReport : null} />
+          {selected && <section className="panel detail-panel"><div className="section-heading"><h2>选中记录</h2><button className="quiet" onClick={() => setSelected(null)}>收起</button></div><RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /></section>}
+          {q.metadata.period === '1d' && <SingleResearch key={q.query_id} query={q} />}
+          {q.metadata.period === '1m' && <p className="inline-note">分钟线使用现有量能、聚合与日线背景研究；未应用日线趋势模型。</p>}
+          <section className="panel expandable-section"><button className="section-toggle" aria-expanded={detailed} onClick={() => setDetailed(!detailed)}><span><strong>{q.metadata.period === '1m' ? '分钟研究与详细指标' : '展开详细指标'}</strong><small>价格通道、波动、量能、路径、缺口与拐点</small></span><span aria-hidden="true">{detailed ? '−' : '+'}</span></button></section>
+          {detailed && <div className="advanced-analysis">
+          {q.metadata.period === '1m' && <VolumeAnalysis query={q} selected={selected} />}
+          {q.metadata.period === '1d' && <PriceChannel query={q} selected={selected} lookback={channelLookback} onLookbackSelect={setChannelLookback} report={channelReport} onReport={setChannelReport} />}
+          {q.metadata.period === '1d' && <VolatilityAnalysis query={q} selected={selected} period={atrPeriod} onPeriodSelect={setAtrPeriod} />}
+          {q.metadata.period === '1d' && <DailyVolume query={q} selected={selected} lookback={dailyVolumeLookback} onLookbackSelect={setDailyVolumeLookback} />}
+          {q.metadata.period === '1d' && <PathEfficiency query={q} selected={selected} lookback={efficiencyLookback} onLookbackSelect={setEfficiencyLookback} />}
+          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <GapAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} />}
+          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <PivotAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} radius={pivotRadius} onRadiusSelect={setPivotRadius} report={pivotReport} onReport={setPivotReport} />}
+          {q.metadata.period === '1m' && <MinuteAggregation key={q.query_id} query={q} selected={selected} onChoose={chooseRow} />}
+          {q.metadata.period === '1d' && <SourceActions key={q.query_id} query={q} onChoose={chooseRow} />}
+          {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} dailyVolumeLookback={dailyVolumeLookback} onDailyVolumeLookbackSelect={setDailyVolumeLookback} efficiencyLookback={efficiencyLookback} onEfficiencyLookbackSelect={setEfficiencyLookback} />}
+          {q.metadata.period === '1m' && <MinuteDailyReconciliation query={q} dailySnapshot={backgroundSnapshot} />}
+          </div>}
+          <details className="panel raw-data"><summary>原始记录、精确字段与导出</summary>
+          <section className="export-panel"><div><strong>导出当前选择</strong><p>{q.counts.selected_rows} 条定位 ＋ {q.counts.unlocated_rows} 条无法定位 · 保留原字段、质量与版本</p><code title={q.query_id}>Q {q.query_id}</code></div>
+            <div className="button-group"><button disabled={!!exporting} onClick={() => void exportSelection('json')}>{exporting === 'json' ? '校验中…' : '下载 JSON'}</button><button disabled={!!exporting} onClick={() => void exportSelection('parquet')}>{exporting === 'parquet' ? '校验中…' : '下载 Parquet'}</button><button disabled={!!exporting} onClick={() => void exportSelection('geometry')}>{exporting === 'geometry' ? '校验中…' : '导出K线结构JSON'}</button></div>
+          </section>
+          <section className="records-panel">
+            <div className="section-heading"><h2>精确字段</h2><span className="subtle">字符串原值 · 点击行或使用键盘查看</span></div>
+            <div className="tabs" role="tablist" aria-label="记录范围"><button role="tab" aria-selected={scope === 'located'} onClick={() => { setScope('located'); setPage(0); }}>可定位 {q.counts.selected_rows}</button>
+              <button role="tab" aria-selected={scope === 'unlocated'} onClick={() => { setScope('unlocated'); setPage(0); }}>无法定位 {q.counts.unlocated_rows}</button></div>
+            {scope === 'unlocated' && <p className="inline-note">这些记录受源序号范围过滤，无法归入任何截止标签；仍属于当前查询和导出。</p>}
+            <div className="table-scroll"><table><thead><tr><th>源序号 / 标签</th>{fields.map(field => <th key={field}>{fieldNames[field]}</th>)}<th>状态</th></tr></thead>
+              <tbody>{tableRows.slice(page * pageSize, (page + 1) * pageSize).map(row => <tr key={row.ordinal} tabIndex={0} aria-selected={selected?.ordinal === row.ordinal} onClick={() => chooseRow(row)}
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); chooseRow(row); } }}>
+                <th><span>#{row.ordinal}</span><code>{row.label ?? '无法定位'}</code></th>{fields.map(field => <td key={field}><code className={row.values[field] === null ? 'missing' : ''}>{row.values[field] ?? '∅'}</code></td>)}
+                <td><span className={row.checks.some(check => check.outcome === 'fail') ? 'check-fail' : 'muted'}>{row.checks.some(check => check.outcome === 'fail') ? '检查未通过' : '查看资格'}</span></td>
+              </tr>)}</tbody></table>{!tableRows.length && <p className="table-empty">此范围暂无记录。</p>}</div>
+            <div className="pagination"><span>表格每页 {pageSize} 条；完整选择仍为 {tableRows.length} 条</span><div className="button-group"><button className="quiet" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>{page + 1} / {pageCount}</span><button className="quiet" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>下一页</button></div></div>
+          </section>
+          <section className="detail-panel"><div className="section-heading"><h2>固定记录详情</h2>{selected && <button className="quiet" onClick={() => setSelected(null)}>清除</button>}</div>
+            {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
+          <QualityDetails query={q} />
+          </details>
+        </>}
+          {snapshot && <SnapshotEvidence snapshot={snapshot} />}
+          </>}
+        </>}
+        {(workspace === 'pair' || workspace === 'universe') && <CrossResearch key={workspace} kind={workspace} snapshots={snapshots} onImport={() => changeWorkspace('data')} onOpen={(id, cutoff) => void loadQuery({ ...emptySelection, snapshot: id, cutoff })} />}
+        {workspace === 'data' && <>
+          <div className="workspace-intro"><span className="eyebrow">本地数据</span><h1>数据管理</h1><p>保存原始文件，确认来源与身份，再进入研究。</p></div>
+          <div className="data-management-grid"><section className="panel data-import"><h2>导入行情</h2>
+        <details className="import-panel" open><summary>导入原始文件</summary>
+          <form onSubmit={importFile}>
+            <label>文件格式<select value={format} disabled={!config || importing} onChange={event => setFormat(event.target.value)}>
+              {(config?.formats ?? Object.keys(formatNames)).map(value => <option value={value} key={value}>{formatNames[value] ?? value}</option>)}
+            </select></label>
+            <label className="file-picker">选择本地文件<input type="file" disabled={importing || !config} onChange={event => setFile(event.target.files?.[0] ?? null)} /></label>
+            <p className="subtle">单文件 ≤16 MiB；请选择对应来源格式。文件名仅用于显示。</p>
+            <details><summary>补充证券身份与单位（按声明解释）</summary><div className="declarations">
+              {Object.entries(declarationNames).map(([key, name]) => <label key={key}>{name}<input value={declarations[key] ?? ''} disabled={importing} onChange={event => setDeclarations({ ...declarations, [key]: event.target.value })} /></label>)}
+            </div><p className="subtle">声明不能验证永久身份或覆盖来源证据。</p></details>
+            <button className="primary import-button" disabled={!config || importing || !file}>{importing ? '导入中…' : '核验并导入'}</button>
+          </form>
+        </details>
+{config?.capabilities?.tdx_client ? <>
+        <details className="import-panel"><summary>自动读取通达信数据</summary>
           <form onSubmit={readMinuteData}>
             <label>数据来源<select value={readSource} onChange={event => setReadSource(event.target.value)} disabled={!config || importing}>
               <option value="daily_cache">日线 · 原始缓存整数</option><option value="minute_http">1分钟 · 本地行情接口</option>
@@ -259,90 +360,43 @@ export default function App() {
             <button className="primary" disabled={!config || importing}>{importing ? '处理中…' : '读取并查看K线'}</button>
           </form>
         </details>
-        <details className="import-panel" open={!snapshots.length}><summary>导入原始文件</summary>
-          <form onSubmit={importFile}>
-            <label>文件格式<select value={format} disabled={!config || importing} onChange={event => setFormat(event.target.value)}>
-              {(config?.formats ?? Object.keys(formatNames)).map(value => <option value={value} key={value}>{formatNames[value] ?? value}</option>)}
-            </select></label>
-            <label className="file-picker">选择本地文件<input type="file" disabled={importing || !config} onChange={event => setFile(event.target.files?.[0] ?? null)} /></label>
-            <p className="subtle">单文件 ≤16 MiB；请选择对应来源格式。文件名仅用于显示。</p>
-            <details><summary>可选解释声明 · assumed</summary><div className="declarations">
-              {Object.entries(declarationNames).map(([key, name]) => <label key={key}>{name}<input value={declarations[key] ?? ''} disabled={importing} onChange={event => setDeclarations({ ...declarations, [key]: event.target.value })} /></label>)}
-            </div><p className="subtle">声明不能验证永久身份或覆盖来源证据。</p></details>
-            <button className="primary import-button" disabled={!config || importing || !file}>{importing ? '导入中…' : '核验并导入'}</button>
-          </form>
-        </details>
-        <details className="attempts-panel"><summary>导入尝试账本（{attempts.length}）</summary><button className="quiet" disabled={!config || importing} onClick={() => void refreshCatalog()}>刷新终态</button>
+</> : <p className="inline-note">当前环境可导入行情文件。通达信客户端自动读取仅在 Windows 本机环境可用。</p>}
+        <details className="attempts-panel"><summary>导入记录（{attempts.length}）</summary><button className="quiet" disabled={!config || importing} onClick={() => void refreshCatalog()}>刷新记录</button>
           <p className="subtle">导入中不承诺实时更新。回执丢失后以账本核对。</p>
           <ol className="attempt-list">{attempts.slice().reverse().map(attempt => <li key={attempt.attempt_id}>
             <strong>{statusNames[attempt.status] ?? attempt.status}</strong><span>{attempt.filename ?? attempt.format_id}</span>
             <code>{attempt.attempt_id}</code>{attempt.error_code && <span className="amber">{attempt.error_code}</span>}
           </li>)}</ol>
         </details>
-      </aside>
-
-      <main className="main-content">
-        <div className="page-heading"><h1>{snapshot ? snapshotName(snapshot) : '从一份原始数据开始'}</h1><span className="badge amber-badge">历史回顾 · 可能包含事后修订</span></div>
-        {notice && <div className="notice" role="status"><span>{notice}</span><button aria-label="收起通知" onClick={() => setNotice('')}>×</button></div>}
-        {issue && <div className="error-banner" role="alert">{issue}</div>}
-        {snapshot && <SnapshotEvidence snapshot={snapshot} />}
-        <form className="panel query-toolbar" onSubmit={event => { event.preventDefault(); void loadQuery(selectionRef.current); }}>
-          <label className="cutoff-input">源标签截止<input value={selection.cutoff} placeholder="全部源标签；或 2020-12-15T14:08" disabled={!snapshot} onChange={event => editSelection({ cutoff: event.target.value })} /></label>
-          <label>源序号起<input inputMode="numeric" value={selection.start} placeholder="不限" disabled={!snapshot} onChange={event => editSelection({ start: event.target.value })} /></label>
-          <label>源序号止<input inputMode="numeric" value={selection.end} placeholder="不限" disabled={!snapshot} onChange={event => editSelection({ end: event.target.value })} /></label>
-          <button className="primary" disabled={!snapshot || !config || phase === 'loading'}>{phase === 'loading' ? '核验中…' : '应用选择'}</button>
-          <div className="navigation-buttons">
-            <button type="button" className="quiet" disabled={!reply?.navigation.previous_label} onClick={() => reply?.navigation.previous_label && void loadQuery({ ...selectionRef.current, cutoff: reply.navigation.previous_label })}>← 上一标签</button>
-            <button type="button" className="quiet" disabled={!reply?.navigation.next_label} onClick={() => reply?.navigation.next_label && void loadQuery({ ...selectionRef.current, cutoff: reply.navigation.next_label })}>下一标签 →</button>
-            <button type="button" className="quiet" disabled={!snapshot || !selection.cutoff} onClick={() => void loadQuery({ ...selectionRef.current, cutoff: '' })}>全部标签</button>
-          </div>
-        </form>
-        {!reply && <section className="panel empty-state" aria-live="polite"><div className="empty-glyph" aria-hidden="true"><i /><i /><i /></div><h2>{phase === 'loading' ? '正在核验原件并读取当前选择' : phase === 'error' ? '当前结果已阻断' : selection.snapshot ? '等待应用当前选择' : '选择快照，开始历史回顾'}</h2>
-          <p>{phase === 'loading' ? '旧图、详情与导出已清除。' : '图表、精确字段与导出由同一个查询驱动。超过 20,000 条时请填写源序号窗口。'}</p></section>}
-        {reply && q && <>
-          <section className="selection-summary" aria-label="当前数据窗口">
-            <div><span className="field-label">当前选择 · 可定位</span><strong>{q.counts.selected_rows.toLocaleString()}<small> 条</small></strong></div>
-            <div><span className="field-label">当前选择 · 无法定位</span><strong>{q.counts.unlocated_rows.toLocaleString()}<small> 条</small></strong></div>
-            <div className="range-summary"><span className="field-label">选择内源标签范围</span><code>{q.rows[0]?.label ?? '空'} → {q.rows.at(-1)?.label ?? '空'}</code><small>缩放仅改变可视区域，不改变选择与导出</small></div>
-          </section>
-          <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} pivots={pivotReport?.radius === pivotRadius ? pivotReport : null} />
-          <section className="panel export-panel"><div><strong>导出当前选择</strong><p>{q.counts.selected_rows} 条定位 ＋ {q.counts.unlocated_rows} 条无法定位 · 保留原字段、质量与版本</p><code title={q.query_id}>Q {q.query_id}</code></div>
-            <div className="button-group"><button disabled={!!exporting} onClick={() => void exportSelection('json')}>{exporting === 'json' ? '校验中…' : '下载 JSON'}</button><button disabled={!!exporting} onClick={() => void exportSelection('parquet')}>{exporting === 'parquet' ? '校验中…' : '下载 Parquet'}</button><button disabled={!!exporting} onClick={() => void exportSelection('geometry')}>{exporting === 'geometry' ? '校验中…' : '导出K线结构JSON'}</button></div>
-          </section>
-          <section className="panel records-panel">
-            <div className="section-heading"><h2>精确字段</h2><span className="subtle">字符串原值 · 点击行或使用键盘查看</span></div>
-            <div className="tabs" role="tablist" aria-label="记录范围"><button role="tab" aria-selected={scope === 'located'} onClick={() => { setScope('located'); setPage(0); }}>可定位 {q.counts.selected_rows}</button>
-              <button role="tab" aria-selected={scope === 'unlocated'} onClick={() => { setScope('unlocated'); setPage(0); }}>无法定位 {q.counts.unlocated_rows}</button></div>
-            {scope === 'unlocated' && <p className="inline-note">这些记录受源序号范围过滤，无法归入任何截止标签；仍属于当前查询和导出。</p>}
-            <div className="table-scroll"><table><thead><tr><th>源序号 / 标签</th>{fields.map(field => <th key={field}>{fieldNames[field]}</th>)}<th>状态</th></tr></thead>
-              <tbody>{tableRows.slice(page * pageSize, (page + 1) * pageSize).map(row => <tr key={row.ordinal} tabIndex={0} aria-selected={selected?.ordinal === row.ordinal} onClick={() => chooseRow(row)}
-                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); chooseRow(row); } }}>
-                <th><span>#{row.ordinal}</span><code>{row.label ?? '无法定位'}</code></th>{fields.map(field => <td key={field}><code className={row.values[field] === null ? 'missing' : ''}>{row.values[field] ?? '∅'}</code></td>)}
-                <td><span className={row.checks.some(check => check.outcome === 'fail') ? 'check-fail' : 'muted'}>{row.checks.some(check => check.outcome === 'fail') ? '检查未通过' : '查看资格'}</span></td>
-              </tr>)}</tbody></table>{!tableRows.length && <p className="table-empty">此范围暂无记录。</p>}</div>
-            <div className="pagination"><span>表格每页 {pageSize} 条；完整选择仍为 {tableRows.length} 条</span><div className="button-group"><button className="quiet" disabled={page === 0} onClick={() => setPage(page - 1)}>上一页</button><span>{page + 1} / {pageCount}</span><button className="quiet" disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)}>下一页</button></div></div>
-          </section>
-          <section className="panel detail-panel"><div className="section-heading"><h2>固定记录详情</h2>{selected && <button className="quiet" onClick={() => setSelected(null)}>清除</button>}</div>
-            {selected ? <RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} /> : <p className="subtle">点击图中记录或表格行。原字段作为纯文本保留；二进制金额显示精确解码值及原始位。</p>}</section>
-          {q.metadata.period === '1m' && <VolumeAnalysis query={q} selected={selected} />}
-          {q.metadata.period === '1d' && <PriceChannel query={q} selected={selected} lookback={channelLookback} onLookbackSelect={setChannelLookback} report={channelReport} onReport={setChannelReport} />}
-          {q.metadata.period === '1d' && <VolatilityAnalysis query={q} selected={selected} period={atrPeriod} onPeriodSelect={setAtrPeriod} />}
-          {q.metadata.period === '1d' && <DailyVolume query={q} selected={selected} lookback={dailyVolumeLookback} onLookbackSelect={setDailyVolumeLookback} />}
-          {q.metadata.period === '1d' && <PathEfficiency query={q} selected={selected} lookback={efficiencyLookback} onLookbackSelect={setEfficiencyLookback} />}
-          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <GapAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} />}
-          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <PivotAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} radius={pivotRadius} onRadiusSelect={setPivotRadius} report={pivotReport} onReport={setPivotReport} />}
-          {q.metadata.period === '1m' && <MinuteAggregation key={q.query_id} query={q} selected={selected} onChoose={chooseRow} />}
-          {q.metadata.period === '1d' && <SourceActions key={q.query_id} query={q} onChoose={chooseRow} />}
-          {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} dailyVolumeLookback={dailyVolumeLookback} onDailyVolumeLookbackSelect={setDailyVolumeLookback} efficiencyLookback={efficiencyLookback} onEfficiencyLookbackSelect={setEfficiencyLookback} />}
-          {q.metadata.period === '1m' && <MinuteDailyReconciliation query={q} dailySnapshot={backgroundSnapshot} />}
-          <QualityDetails query={q} />
+          </section><section className="panel data-catalog">
+        <div className="section-heading"><h2>行情数据</h2><button className="quiet" onClick={() => void refreshCatalog()} disabled={!config || importing}>刷新</button></div>
+        <p className="subtle">选择日线判断趋势，选择分钟线复盘时机。</p>
+        <label>筛选来源<input value={snapshotFilter} onChange={event => setSnapshotFilter(event.target.value)} placeholder="证券代码、名称或版本 ID" /></label>
+        <p className="subtle">共 {snapshots.length} 份数据；匹配 {matchingSnapshots.length} 份，显示前 {visibleSnapshots.length} 份。</p>
+        <label className="field-label" htmlFor="snapshot">选择数据版本</label>
+        <select id="snapshot" value={selection.snapshot} disabled={!config} onChange={event => void loadQuery({ ...emptySelection, snapshot: event.target.value })}>
+          <option value="">请选择行情数据</option>
+          {snapshot && !visibleSnapshots.includes(snapshot) && <option value={snapshot.snapshot_id}>{snapshotName(snapshot)} · 当前选择</option>}
+          {visibleSnapshots.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 8)}</option>)}
+        </select>
+        <div className="snapshot-list">
+          {visibleSnapshots.map(item => <button className={`snapshot-card ${selection.snapshot === item.snapshot_id ? 'active' : ''}`} key={item.snapshot_id}
+            onClick={() => void loadQuery({ ...emptySelection, snapshot: item.snapshot_id })}>
+            <strong>{snapshotName(item)}</strong><span>{formatNames[item.manifest.contract?.format_id ?? ''] ?? item.manifest.contract?.format_id ?? '来源未注明'}</span>
+            <small>{item.row_count.toLocaleString()} 条源记录 · {item.snapshot_id.slice(0, 8)}</small>
+          </button>)}
+          {!snapshots.length && <div className="sidebar-empty">尚无已导入行情。<br />先导入一份支持的原始文件。</div>}
+        </div>
+          </section></div>
+          {config?.capabilities?.tdx_client && <><button className="quiet" aria-expanded={dataTools} onClick={() => setDataTools(!dataTools)}>{dataTools ? '收起' : '展开'}通达信批量覆盖与参考数据</button>{dataTools && <>
+            <DailyCoverage onSelect={(snapshot, sourceDate, windows) => {
+              if (windows) { setChannelLookback(windows.channel_lookback); setDailyVolumeLookback(windows.volume_lookback); setEfficiencyLookback(windows.efficiency_lookback); }
+              void loadQuery({ ...emptySelection, snapshot, cutoff: sourceDate ?? '' });
+            }} />
+            <ReferenceData config={config} />
+          </>}</>}
         </>}
-        <DailyCoverage onSelect={(snapshot, sourceDate, windows) => {
-          if (windows) { setChannelLookback(windows.channel_lookback); setDailyVolumeLookback(windows.volume_lookback); setEfficiencyLookback(windows.efficiency_lookback); }
-          void loadQuery({ ...emptySelection, snapshot, cutoff: sourceDate ?? '' });
-        }} />
-        <ReferenceData config={config} />
-        <footer>本地研究工具 · 单快照证据切片<span>图表由 <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a> 提供 · <a href="/licenses/lightweight-charts.LICENSE.txt" target="_blank" rel="noreferrer">Apache 2.0</a> · <a href="/licenses/lightweight-charts.NOTICE.txt" target="_blank" rel="noreferrer">NOTICE</a></span></footer>
+        <footer>Anatrading · 本地股票研究<span>图表由 <a href="https://www.tradingview.com/" target="_blank" rel="noreferrer">TradingView Lightweight Charts™</a> 提供 · <a href="/licenses/lightweight-charts.LICENSE.txt" target="_blank" rel="noreferrer">Apache 2.0</a> · <a href="/licenses/lightweight-charts.NOTICE.txt" target="_blank" rel="noreferrer">NOTICE</a></span></footer>
       </main>
     </div>
   </div>;
@@ -352,7 +406,7 @@ export function SnapshotEvidence({ snapshot }: { snapshot: Snapshot }) {
   const contract = snapshot.manifest.contract;
   const meta = snapshot.metadata;
   const adjustment = contract?.source_semantics?.fields?.adjustment;
-  return <section className="panel evidence-panel">
+  return <details className="panel evidence-panel"><summary>来源资格、单位与数据版本</summary>
     <div className="evidence-pills"><span>规范身份 <b>{meta.instrument_id ?? 'unknown'}</b></span><span>复权口径 <b>{adjustment?.value == null ? '未注明' : String(adjustment.value)}</b> · {adjustment?.status ?? 'unknown'}</span><span>闭合 / 可得时点 <b>{contract?.temporal_semantics?.status ?? 'unknown'}</b></span></div>
     <div className="evidence-pills unit-qualifications"><UnitEvidence contract={contract} /></div>
     <p className="inline-note">源数量 / 源金额：单位未核实，规范股数 / 元未赋值。</p>
@@ -360,7 +414,7 @@ export function SnapshotEvidence({ snapshot }: { snapshot: Snapshot }) {
     <details><summary>来源、资格与完整哈希</summary><p className="subtle">仅展示单快照源值；源代码不构成永久身份。单位、柱闭合及历史可得性未验证时，不推断可交易信号。</p><dl className="metadata-list"><dt>来源格式</dt><dd>{contract?.format_id}</dd><dt>快照</dt><dd><code>{snapshot.snapshot_id}</code></dd><dt>原件 SHA-256</dt><dd><code>{snapshot.manifest.raw_sha256}</code></dd><dt>资格</dt><dd>{snapshot.manifest.qualification ?? 'source_evidence_retrospective_only'}</dd></dl>
       <details><summary>完整 manifest / metadata（来源原文）</summary><pre>{JSON.stringify({ manifest: snapshot.manifest, metadata: snapshot.metadata }, null, 2)}</pre></details>
     </details>
-  </section>;
+  </details>;
 }
 
 function QualityDetails({ query }: { query: Query }) {

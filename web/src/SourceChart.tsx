@@ -34,7 +34,7 @@ export function SourceChart({ reply, onChoose, onError, visibleBars, channel = n
     try {
       chart = createChartEx(host.current, new SequenceAxis(plot.labels), {
         autoSize: true,
-        layout: { background: { type: ColorType.Solid, color: '#fffdf8' }, textColor: '#6b6656', fontSize: 11, attributionLogo: true },
+        layout: { background: { type: ColorType.Solid, color: '#fffdf8' }, textColor: '#6b6656', fontSize: 13, attributionLogo: true },
         grid: { vertLines: { color: '#f1eee2' }, horzLines: { color: '#ece7d8' } },
         rightPriceScale: { borderColor: '#e0dac8', scaleMargins: { top: 0.1, bottom: 0.08 } },
         timeScale: { borderColor: '#e0dac8', ignoreWhitespaceIndices: false, enableConflation: false,
@@ -101,7 +101,7 @@ export function SourceChart({ reply, onChoose, onError, visibleBars, channel = n
   }, [reply, pivotPlot, onError]);
 
   return <section className="panel chart-panel" aria-label="源 OHLC 与源数量图">
-    <div className="section-heading"><div><h2>源 OHLC <span className="muted">/ 源数量</span></h2><p>源记录序列 · 等距不代表时间间隔 · 坐标为近似显示</p></div>
+    <div className="section-heading"><div><h2>价格 <span className="muted">/ 数量（来源单位）</span></h2><p>源记录序列 · 等距不代表时间间隔 · 坐标为近似显示</p></div>
       <button className="quiet" onClick={() => chartRef.current?.timeScale().fitContent()} disabled={!reply.query.rows.length}>恢复视图</button></div>
     <div className="chart-legend"><span><i className="red-dot" />收 &gt; 开</span><span><i className="green-dot" />收 &lt; 开</span><span>灰色：相等 / 未知 · 方向取精确比较</span><span className="amber">状态行：0 数量为零 · ∅ 数量缺失 · ! 问题提示（位置不表示数量）</span></div>
     {channelPlot && <p className="subtle">前 {channel?.lookback} 个来源日期区间：蓝色上界 · 棕色下界 · 阶梯线连接来源序列 · {channelPlot.skipped} 条因未定义或显示限制未绘制，跨缺口不连线。</p>}

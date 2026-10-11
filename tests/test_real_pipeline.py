@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 from decimal import Context, Decimal, Inexact, InvalidOperation, Overflow, Rounded, localcontext
 import hashlib
 import json
-import os
 from pathlib import Path
 
 import pyarrow as pa
@@ -22,7 +21,6 @@ import pytest
 from anatrading.store import EvidenceStore
 
 
-pytestmark = pytest.mark.skipif(os.name != "nt", reason="The first store contract requires Windows OS locking")
 ROOT = Path(__file__).resolve().parents[1]
 FIELDS = ("open", "high", "low", "close", "volume", "amount")
 EXACT = Context(prec=128, traps=[Inexact, Rounded, Overflow, InvalidOperation])

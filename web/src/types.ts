@@ -193,7 +193,7 @@ export interface DailyBackgroundReport {
   latest_source_date: string | null; calendar_gap_days: number | null; daily: Reply;
   requested_rows: number | null; context_unlocated_rows: number;
 }
-export interface Config { csrf_token: string; formats: string[]; max_upload_bytes: number; max_query_rows: number; mode: string }
+export interface Config { csrf_token: string; formats: string[]; max_upload_bytes: number; max_query_rows: number; mode: string; capabilities?: { file_import: boolean; daily_research: boolean; tdx_client: boolean } }
 export interface ReferenceReport {
   method_id: 'tdx-reference-view-v1'; kind: 'calendar' | 'actions'; target: string; source_method: string;
   selection: { start: string; end: string }; qualification: 'unverified_source_reference'; coverage: 'unverified';

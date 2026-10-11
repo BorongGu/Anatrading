@@ -1,0 +1,102 @@
+import { useEffect, useRef, useState } from 'react';
+import { jsonRequest } from './api.ts';
+import { Generation } from './model.ts';
+import { assertResearchReply, buildResearchRequest, explainResearch, formatEstimate, formatPercent, isDailySnapshot, researchReason, snapshotName } from './research-model.ts';
+import { EstimatePlot, Metric, ResearchProvenance } from './ResearchResults.tsx';
+import type { Snapshot } from './types.ts';
+import type { PairResult, ResearchEnvelope, UniverseResult } from './research-types.ts';
+
+type CrossKind = 'pair' | 'universe';
+export function CrossResearch({ kind, snapshots, onImport, onOpen }: {
+  kind: CrossKind; snapshots: Snapshot[]; onImport: () => void; onOpen: (id: string, cutoff: string) => void;
+}) {
+  const daily = snapshots.filter(isDailySnapshot);
+  const [left, setLeft] = useState(daily[0]?.snapshot_id ?? '');
+  const [right, setRight] = useState(daily[1]?.snapshot_id ?? '');
+  const [ids, setIds] = useState<string[]>([]);
+  const [filter, setFilter] = useState('');
+  const [cutoff, setCutoff] = useState('');
+  const [lookback, setLookback] = useState('20');
+  const [groupName, setGroupName] = useState('');
+  const [report, setReport] = useState<ResearchEnvelope<PairResult | UniverseResult> | null>(null);
+  const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [issue, setIssue] = useState('');
+  const gate = useRef(new Generation()); const abort = useRef<AbortController | null>(null);
+  function invalidate() { gate.current.invalidate(); abort.current?.abort(); setReport(null); setIssue(''); setPhase('idle'); }
+  useEffect(() => () => { gate.current.invalidate(); abort.current?.abort(); }, []);
+  async function load() {
+    invalidate(); const generation = gate.current.current();
+    try {
+      const request = buildResearchRequest(kind, kind === 'pair' ? [left, right] : ids, cutoff, Number(lookback));
+      const controller = new AbortController(); abort.current = controller; setPhase('loading');
+      const result = await jsonRequest<ResearchEnvelope<PairResult | UniverseResult>>(request.path, { signal: controller.signal });
+      if (!gate.current.isCurrent(generation)) return;
+      assertResearchReply(result, request.expected); setReport(result); setPhase('ready');
+    } catch (error) { if (gate.current.isCurrent(generation)) { setIssue(explainResearch(error)); setPhase('error'); } }
+  }
+  const filtered = daily.filter(item => snapshotName(item).toLowerCase().includes(filter.trim().toLowerCase()));
+  return <>
+    <div className="workspace-intro"><span className="eyebrow">{kind === 'pair' ? '关系研究' : '横截面研究'}</span><h1>{kind === 'pair' ? '双股对比' : '多股研究'}</h1>
+      <p>{kind === 'pair' ? '对齐两只股票的共同日期，观察相对强弱、收益相关与价格偏离。' : '在同一截止日查看所选股票的动量、波动、回撤与样本广度。'}</p></div>
+    {daily.length < 2 ? <section className="panel workflow-empty"><div className="empty-step">01</div><h2>先准备至少两份日线行情</h2><p>选择可识别、不同证券的数据版本。分钟数据保留在个股研究中。</p><button className="primary" onClick={onImport}>导入日线数据</button></section> : <>
+      <section className="panel research-setup"><div className="section-heading"><h2>选择研究范围</h2><span className="subtle">日线 · 同一截止日期</span></div>
+        <form onSubmit={event => { event.preventDefault(); void load(); }}>
+          {kind === 'pair' ? <div className="pair-selectors"><label>左侧股票 A（被解释侧）<select value={left} onChange={event => { setLeft(event.target.value); invalidate(); }} required><option value="">请选择</option>{daily.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 6)}</option>)}</select></label>
+            <span className="comparison-sign" aria-hidden="true">↔</span><label>右侧股票 B（解释侧）<select value={right} onChange={event => { setRight(event.target.value); invalidate(); }} required><option value="">请选择</option>{daily.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 6)}</option>)}</select></label></div> : <>
+            <div className="universe-selection-heading"><label>筛选已导入日线<input value={filter} onChange={event => setFilter(event.target.value)} placeholder="证券代码或来源名称" /></label><div><strong>已选 {ids.length} / 50</strong><button type="button" className="quiet" disabled={!ids.length} onClick={() => { setIds([]); invalidate(); }}>清空</button></div></div>
+            <div className="universe-picker">{filtered.map(item => <label className={`dataset-choice${ids.includes(item.snapshot_id) ? ' selected' : ''}`} key={item.snapshot_id}><input type="checkbox" checked={ids.includes(item.snapshot_id)} disabled={!ids.includes(item.snapshot_id) && ids.length >= 50} onChange={event => { setIds(event.target.checked ? [...ids, item.snapshot_id] : ids.filter(id => id !== item.snapshot_id)); invalidate(); }} /><span><strong>{snapshotName(item)}</strong><small>{item.row_count.toLocaleString()} 条记录 · {item.snapshot_id.slice(0, 8)}</small></span></label>)}</div>
+            {!filtered.length && <p className="subtle">没有匹配的日线数据。</p>}
+          </>}
+          <div className="research-controls cross-controls"><label>统一截止日期<input type="date" required value={cutoff} onChange={event => { setCutoff(event.target.value); invalidate(); }} /></label><label>观察窗口<input type="number" min={kind === 'pair' ? '5' : '2'} max="252" required value={lookback} onChange={event => { setLookback(event.target.value); invalidate(); }} /><small>来源记录数</small></label>
+            {kind === 'universe' && <label>集合名称（可选）<input value={groupName} maxLength={80} onChange={event => setGroupName(event.target.value)} placeholder="如：我的自选样本" /></label>}
+            <button className="primary" disabled={phase === 'loading' || (kind === 'universe' && ids.length < 2)}>{phase === 'loading' ? '核验并计算中…' : kind === 'pair' ? '比较两只股票' : '研究所选股票'}</button></div>
+        </form>
+        <p className="inline-note">{kind === 'pair' ? '仅比较同一市场的不同证券。不填补缺日；坏行与重复日期会中断滚动窗口。' : '每只股票必须在截止当日有有效价格；缺失时保留空值。重复证券的数据版本会被拒绝。集合名称不代表已验证的行业归属。'}</p>
+      </section>
+      {issue && <p className="error-banner" role="alert">{issue}</p>}
+      {phase === 'loading' && <div className="panel research-loading" role="status">正在核验来源并计算，较早的结果已清除。</div>}
+      {!report && phase === 'idle' && <div className="workflow-hint"><span>接下来</span><p>{kind === 'pair' ? '选好两份日线数据与截止日期，即可查看共同样本和关系指标。' : '勾选 2–50 只股票，指定截止日期后，按可复算的动量分项排序。'}</p></div>}
+      {report && (kind === 'pair' ? <PairResults report={report as ResearchEnvelope<PairResult>} cutoff={cutoff} lookback={Number(lookback)} /> : <UniverseResults report={report as ResearchEnvelope<UniverseResult>} cutoff={cutoff} lookback={Number(lookback)} name={groupName} onOpen={onOpen} />)}
+    </>}
+  </>;
+}
+
+export function PairResults({ report, cutoff, lookback }: { report: ResearchEnvelope<PairResult>; cutoff: string; lookback: number }) {
+  const result = report.result; const row = result.series.at(-1); const a = result.alignment;
+  return <section className="panel research-panel"><div className="section-heading"><div><span className="eyebrow">研究结果</span><h2>{result.roles.left.symbol} <span className="muted">与</span> {result.roles.right.symbol}</h2></div><span className="badge">截止 {cutoff}</span></div>
+    <div className="count-strip"><span>共同日期 {a.common_dates}</span><span>有效共同日期 {a.valid_common_dates}</span><span>仅 A 有记录 {a.left_only_dates}</span><span>仅 B 有记录 {a.right_only_dates}</span></div>
+    {row ? <>
+      <p className="subtle">最后共同记录：{row.date}{row.date !== cutoff ? '。截止当天没有共同记录，以下只描述这个已标明的历史时点。' : ''}</p>
+      <div className="metric-grid four"><Metric label="区间收益相关" value={formatEstimate(row.return_correlation)} detail={`${row.n_returns} 个共同区间 · 含当前区间`} reason={row.correlation_reason} />
+        <Metric label="区间收益 β" value={formatEstimate(row.return_beta)} detail="A 对 B · 含当前区间" reason={row.return_beta_reason} />
+        <Metric label="价格残差偏离" value={formatEstimate(row.residual_deviation, 2)} detail={`此前 ${row.n_prices} 对价格拟合 · 尺度倍数`} reason={row.deviation_reason} accent />
+        <Metric label="相对强弱 A / B" value={formatPercent(row.relative_strength)} detail={`基准 ${result.baseline?.date ?? '不可用'}`} reason={row.relative_strength_reason} /></div>
+      <div className="research-columns"><article className="research-subsection"><h3>相对价格路径</h3><EstimatePlot label="A 相对 B 的价格变化" percent series={[{ name: 'A / B 相对强弱', color: '#395a66', points: result.series.map(item => ({ date: item.date, value: item.relative_strength })) }]} /></article>
+        <article className="research-subsection"><h3>此前拟合的当期偏离</h3><EstimatePlot label="历史滚动价格残差偏离" series={[{ name: '残差 / 训练残差尺度', color: '#a27f47', points: result.series.map(item => ({ date: item.date, value: item.residual_deviation })) }]} /></article></div>
+      <div className="explanation-grid"><div><h3>相关与 β</h3><p>用最近 {lookback} 个共同日期区间的对数收益。相关范围为 −1 到 1；收益 β 为 A 对 B 的协方差除以 B 的收益方差。</p><p className="subtle">实际收益范围：{row.returns_start_date ?? '不可计算'} → {row.returns_end_date ?? '不可计算'}</p></div>
+        <div><h3>偏离不等于回归机会</h3><p>以前 {lookback} 对对数价格拟合 A = α + β × B，当期价格不参与拟合。价格 β = {formatEstimate(row.log_price_beta)}，是弹性，不是固定对冲股数。</p><p className="subtle">训练范围：{row.price_start_date ?? '不可计算'} → {row.price_end_date ?? '不可计算'}。未做协整或均值回归检验。</p></div></div>
+      {row.reason && <p className="inline-note amber">{researchReason(row.reason)}</p>}{row.coverage_reason && <p className="inline-note amber">{researchReason(row.coverage_reason)}</p>}
+    </> : <p className="research-loading">截止范围没有共同日期，不能计算关系。</p>}
+    <details className="calculation-note"><summary>对齐与异常记录</summary><div className="table-scroll"><table><thead><tr><th>来源</th><th>源记录</th><th>重复日期</th><th>无效日期</th><th>无法定位</th></tr></thead><tbody>{([['A', a.left], ['B', a.right]] as const).map(([name, side]) => <tr key={name}><th>{name}</th><td>{side.source_rows}</td><td>{side.duplicate_groups}</td><td>{side.invalid_groups}</td><td>{side.unlocated_rows}</td></tr>)}</tbody></table></div></details>
+    <ResearchProvenance report={report} />
+  </section>;
+}
+
+export function UniverseResults({ report, cutoff, lookback, name, onOpen }: { report: ResearchEnvelope<UniverseResult>; cutoff: string; lookback: number; name: string; onOpen: (id: string, cutoff: string) => void }) {
+  const result = report.result; const b = result.breadth;
+  return <section className="panel research-panel"><div className="section-heading"><div><span className="eyebrow">所选股票样本</span><h2>{name.trim() || '多股研究结果'}</h2></div><span className="badge">截止 {cutoff}</span></div>
+    <div className="metric-grid four"><Metric label="所选证券" value={String(b.selected)} detail={`${b.cutoff_present} 只在截止当日有记录`} /><Metric label="有效期末覆盖" value={`${b.cutoff_valid} / ${b.selected}`} detail="分母为全部所选证券" />
+      <Metric label="正动量占比" value={formatPercent(b.positive_momentum_fraction, 1)} detail={`${b.positive} 只为正 / ${b.momentum_valid} 只动量有效`} accent /><Metric label="动量有效覆盖" value={`${b.momentum_valid} / ${b.selected}`} detail={`无结果 ${b.selected - b.momentum_valid} 只`} /></div>
+    <div className="section-heading table-heading"><h3>按动量从高到低</h3><span className="subtle">{lookback} 个来源区间 · 并列同名次</span></div>
+    <div className="table-scroll universe-table"><table><thead><tr><th>名次</th><th>证券</th><th>动量</th><th>收益波动</th><th>最大回撤</th><th>实际来源区间</th><th>操作</th></tr></thead><tbody>{result.members.map(member => <tr key={member.snapshot_id}>
+      <td>{member.rank ?? '—'}</td><th><strong>{member.identity.symbol}</strong><small>{member.identity.market === 'CN_A' ? 'A 股' : member.identity.market} · {researchReason(member.identity.qualification)}</small></th>
+      <td><strong>{formatPercent(member.momentum)}</strong>{member.momentum_reason && <small className="amber">{researchReason(member.momentum_reason)}</small>}</td>
+      <td>{formatPercent(member.volatility)}{member.volatility_reason && <small className="amber">{researchReason(member.volatility_reason)}</small>}</td>
+      <td>{formatPercent(member.max_drawdown)}{member.max_drawdown_reason && <small className="amber">{researchReason(member.max_drawdown_reason)}</small>}</td>
+      <td>{member.start_date ?? '—'} → {member.end_date ?? '—'}<small>{member.n_prices} 个价格 · {member.n_returns} 个收益</small></td><td><button className="quiet" onClick={() => onOpen(member.snapshot_id, cutoff)}>查看个股 ↗</button></td>
+    </tr>)}</tbody></table></div>
+    <div className="explanation-grid"><div><h3>三个原始分项</h3><p>动量 = 当前收盘价 ÷ 前 {lookback} 条记录的收盘价 − 1。波动为这些相邻对数收益的样本标准差，不年化。回撤是窗口内相对此前高点的最大跌幅。</p></div><div><h3>覆盖决定怎样解释广度</h3><p>缺截止当日价不回退到各自末日。各证券的实际窗口起点可能不同。当前所选成员做历史回顾存在选择偏差，不能当作历史全市场或行业指数。</p></div></div>
+    <details className="calculation-note"><summary>各指标的有效与缺失数量</summary><div className="table-scroll"><table><thead><tr><th>指标</th><th>有效</th><th>缺失</th><th>无效</th><th>历史不足</th></tr></thead><tbody>{Object.entries(b.metrics).map(([key, metric]) => <tr key={key}><th>{{ momentum: '动量', volatility: '波动', max_drawdown: '回撤' }[key] ?? key}</th><td>{metric.eligible}</td><td>{metric.missing}</td><td>{metric.invalid}</td><td>{metric.short_history}</td></tr>)}</tbody></table></div></details>
+    <ResearchProvenance report={report} />
+  </section>;
+}
