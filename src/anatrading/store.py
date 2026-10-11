@@ -144,10 +144,36 @@ ROW_SCHEMA = pa.schema([
 ])
 
 
+# Only columns consumed by reading are required. Extra columns, constraints and
+# column order do not change the read contract; no initialization is needed.
+_READ_COLUMNS = {
+    "app_meta": {"key": "VARCHAR", "value": "VARCHAR"},
+    "raw_objects": {"sha": "VARCHAR", "byte_length": "BIGINT"},
+    "attempts": {name: "VARCHAR" for name in (
+        "attempt_id", "started_at", "status", "format_id", "filename",
+        "raw_sha256", "batch_id", "snapshot_id", "error_code")},
+    "batches": {**{name: "VARCHAR" for name in (
+        "batch_id", "raw_sha256", "manifest_json", "metadata_json", "checks_json")},
+        "row_count": "BIGINT"},
+    "snapshots": {"snapshot_id": "VARCHAR", "batch_id": "VARCHAR"},
+    "observations": {**{name: "VARCHAR" for name in (
+        "batch_id", "locator", "source_label", "label", "tokens_json", "checks_json")},
+        "ordinal": "BIGINT", **{"source_" + name: "BIGINT" if name == "volume" else "DECIMAL(38,18)"
+                                for name in VALUE_FIELDS}},
+}
+_RESERVED_FILES = ("research.duckdb", "research.duckdb.wal", "research.duckdb.wal.checkpoint",
+                   "research.duckdb.wal.recovery", ".restore-incomplete", ".operation.lock")
+
+
 class EvidenceStore:
-    def __init__(self, root, checkpoint=None):
+    def __init__(self, root, checkpoint=None, *, read_only=False):
         self.root = Path(root).resolve()
-        self.root.mkdir(parents=True, exist_ok=True)
+        self.read_only = read_only
+        if read_only:
+            if not self.root.is_dir():
+                raise StoreError("database_missing")
+        else:
+            self.root.mkdir(parents=True, exist_ok=True)
         self._mutex = threading.RLock()
         self._checkpoint = checkpoint or (lambda stage: None)
         self.db = None
@@ -155,6 +181,15 @@ class EvidenceStore:
         try:
             if (self.root / ".restore-incomplete").exists():
                 raise StoreError("restore_incomplete")
+            if read_only:
+                if not (self.root / "research.duckdb").is_file():
+                    raise StoreError("database_missing")
+                try:
+                    self.db = duckdb.connect(str(self.root / "research.duckdb"), read_only=True)
+                    self._validate_read_schema()
+                except duckdb.Error:
+                    raise StoreError("database_error") from None
+                return
             self.db = duckdb.connect(str(self.root / "research.duckdb"))
             self._initialize()
             self.db.execute("UPDATE attempts SET status='committed', error_code=NULL WHERE status='running' AND snapshot_id IN (SELECT snapshot_id FROM snapshots)")
@@ -209,6 +244,27 @@ class EvidenceStore:
                 volume_shares BIGINT CHECK(volume_shares>=0), amount_cny DECIMAL(38,18), PRIMARY KEY(batch_id,ordinal));
         """)
 
+    def _validate_read_schema(self):
+        columns = defaultdict(dict)
+        for table, column, kind in self.db.execute("""
+            SELECT c.table_name,c.column_name,c.data_type
+            FROM information_schema.columns c JOIN information_schema.tables t
+              USING (table_catalog,table_schema,table_name)
+            WHERE c.table_catalog=current_database() AND c.table_schema='main'
+              AND t.table_type='BASE TABLE'
+        """).fetchall():
+            columns[table][column] = kind
+        if any(columns[table].get(column) != kind
+               for table, required in _READ_COLUMNS.items() for column, kind in required.items()):
+            raise StoreError("unsupported_schema")
+        versions = self.db.execute("SELECT value FROM app_meta WHERE key='schema'").fetchall()
+        if versions != [(VERSIONS["schema"],)]:
+            raise StoreError("unsupported_schema")
+
+    def _require_writable(self):
+        if self.read_only:
+            raise StoreError("read_only_store")
+
     def _raw_path(self, sha):
         if not re.fullmatch("[0-9a-f]{64}", sha):
             raise StoreError("invalid_object_id")
@@ -249,6 +305,7 @@ class EvidenceStore:
         return dict(zip([item[0] for item in cursor.description], cursor.fetchone()))
 
     def _resolve_attempt(self, attempt_id, rollback=False):
+        self._require_writable()
         if rollback:
             try:
                 self.db.execute("ROLLBACK")
@@ -266,15 +323,18 @@ class EvidenceStore:
                 raise StoreError("import_outcome_unavailable") from None
 
     def import_bytes(self, raw, format_id, filename="source", interpretation=None, cancelled=None):
+        self._require_writable()
         if not isinstance(raw, bytes):
             raise StoreError("invalid_import_spec")
         return self._import(raw, format_id, filename, interpretation, cancelled)
 
     def import_file(self, path, format_id, filename=None, interpretation=None, cancelled=None):
+        self._require_writable()
         path = Path(path)
         return self._import(path, format_id, filename or path.name, interpretation, cancelled)
 
     def _import(self, material, format_id, filename, interpretation, cancelled):
+        self._require_writable()
         interpretation = dict(interpretation or {})
         allowed = {"instrument", "venue", "asset_type", "volume_unit", "amount_unit"}
         if format_id not in FORMAT_IDS or set(interpretation) - allowed or any(not isinstance(v, str) for v in interpretation.values()):
@@ -552,17 +612,26 @@ class EvidenceStore:
                     "quality": self._quality(selected), "unlocated_quality": self._quality(unlocated),
                     "batch_checks": json.loads(batch_checks), "totals": totals}
 
+    def _export_path(self, snapshot_id, query_id, destination, extension):
+        path = Path(destination) if destination else self.root / "exports" / snapshot_id / (query_id + extension)
+        if self.read_only:
+            resolved = path.resolve(strict=False)
+            if any(resolved.is_relative_to((self.root / name).resolve(strict=False)) for name in _RESERVED_FILES):
+                raise StoreError("export_destination_reserved")
+        return path
+
     def export_json(self, snapshot_id, destination=None, **selection):
         with self._mutex:
             result = self.query(snapshot_id, **selection)
+            path = self._export_path(snapshot_id, result["query_id"], destination, ".json")
             content = _json(result).encode("utf-8")
-            path = Path(destination) if destination else self.root / "exports" / snapshot_id / (result["query_id"] + ".json")
             _publish_bytes(path, content)
             return {"path": str(path), "sha256": hashlib.sha256(content).hexdigest(), "query_id": result["query_id"]}
 
     def export_parquet(self, snapshot_id, destination=None, **selection):
         with self._mutex:
             result = self.query(snapshot_id, **selection)
+            path = self._export_path(snapshot_id, result["query_id"], destination, ".parquet")
             records = []
             for scope in ("rows", "unlocated"):
                 for row in result[scope]:
@@ -578,11 +647,11 @@ class EvidenceStore:
             stream = pa.BufferOutputStream()
             pq.write_table(table, stream)
             content = stream.getvalue().to_pybytes()
-            path = Path(destination) if destination else self.root / "exports" / snapshot_id / (result["query_id"] + ".parquet")
             _publish_bytes(path, content)
             return {"path": str(path), "sha256": hashlib.sha256(content).hexdigest(), "query_id": result["query_id"]}
 
     def backup(self, destination):
+        self._require_writable()
         with self._mutex:
             destination = Path(destination).resolve()
             if destination == self.root or self.root.is_relative_to(destination) or destination.is_relative_to(self.root):

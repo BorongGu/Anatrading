@@ -65,11 +65,14 @@ def _parser():
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
     for name in ("instrument", "venue", "asset-type", "volume-unit", "amount-unit"):
         ingest.add_argument("--" + name, help="来源解释声明，保留为 assumed")
-    commands.add_parser("snapshots", help="列出已提交快照")
-    commands.add_parser("attempts", help="列出导入尝试及结果")
+    read_only_help = "只读打开已有数据库，不初始化或恢复导入；仍持目录排他锁，export 仍写导出文件"
+    for name, help_text in (("snapshots", "列出已提交快照"), ("attempts", "列出导入尝试及结果")):
+        command = commands.add_parser(name, help=help_text)
+        command.add_argument("--read-only", action="store_true", help=read_only_help)
     for name, help_text in (("query", "输出精确源值与质量报告"), ("export", "导出相同查询范围"),
                             ("candle-geometry", "输出单根源K线的精确几何与有理比例")):
         command = commands.add_parser(name, help=help_text)
+        command.add_argument("--read-only", action="store_true", help=read_only_help)
         command.add_argument("snapshot_id")
         command.add_argument("--cutoff", help="含边界的源标签上限：日线 YYYY-MM-DD，分钟 YYYY-MM-DDTHH:MM")
         command.add_argument("--ordinal-start", type=int)
@@ -133,7 +136,7 @@ def _run(arguments):
         return stop(arguments.root, port=arguments.port)
     if arguments.command == "restore":
         return EvidenceStore.restore(arguments.backup, arguments.destination)
-    with EvidenceStore(arguments.root) as store:
+    with EvidenceStore(arguments.root, read_only=getattr(arguments, "read_only", False)) as store:
         if arguments.command == "read-tdx-daily-cache":
             from .tdx_daily import read_daily_cache
 
