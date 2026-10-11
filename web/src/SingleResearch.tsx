@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { HistoricalPathResearch } from './HistoricalPathResearch.tsx';
 import { jsonRequest } from './api.ts';
 import { Generation } from './model.ts';
 import { assertResearchReply, buildResearchRequest, explainResearch, formatEstimate, formatPercent, researchReason } from './research-model.ts';
@@ -30,7 +31,7 @@ export function SingleResearch({ query }: { query: Query }) {
   const result = report?.result; const latest = result?.series.at(-1);
   const evaluation = result?.events;
   const part = evaluation?.partitions[partition] ?? evaluation?.partitions.descriptive ?? evaluation;
-  return <section className="panel research-panel" aria-label="日线趋势与历史事件">
+  return <><section className="panel research-panel" aria-label="日线趋势与历史事件">
     <div className="section-heading"><div><span className="eyebrow">日线研究</span><h2>趋势与历史事件</h2></div><span className="badge">因果计算 · 描述性统计</span></div>
     <form className="research-controls" onSubmit={event => { event.preventDefault(); void load(); }}>
       <label>突破观察窗<input type="number" min="2" max="252" required value={lookback} onChange={event => { setLookback(event.target.value); invalidate(); }} /><small>此前来源记录数</small></label>
@@ -77,7 +78,7 @@ export function SingleResearch({ query }: { query: Query }) {
       <ResearchProvenance report={report} />
     </>}
     {report && !latest && <p className="research-loading">截止范围内没有可研究的日线记录。</p>}
-  </section>;
+  </section><HistoricalPathResearch query={query} /></>;
 }
 
 export function DistributionTable({ event, baseline }: { event: Distribution; baseline: Distribution }) {
