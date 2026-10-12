@@ -1,5 +1,5 @@
 import { GroupEndpointResults } from './GroupEndpointResults.tsx';
-import { groupReason } from './group-endpoint-model.ts';
+import { explainGroupEndpointError } from './group-endpoint-model.ts';
 import { TwoGroupResults } from './TwoGroupResults.tsx';
 import { explanationReasons } from './two-group-model.ts';
 import { useEffect, useRef, useState } from 'react';
@@ -92,7 +92,7 @@ export function UniverseResearch({ snapshots, onImport, onOpen, draft: controlle
             {draft.mode === 'existing' && <label>观察窗口<input id="universe-lookback" type="number" min="2" max="252" step="1" required value={draft.lookback} aria-invalid={errorTarget === 'universe-lookback' || undefined} aria-describedby={errorTarget === 'universe-lookback' ? 'universe-lookback-hint universe-error-summary' : 'universe-lookback-hint'} onChange={event => edit({ lookback: event.target.value })} /><small id="universe-lookback-hint">来源区间；每股实际起点可能不同</small></label>}
             <label>集合名称（可选）<input value={draft.groupName} maxLength={80} onChange={event => edit({ groupName: event.target.value }, false)} placeholder="如：我的自选样本" /></label></div>
           {draft.mode === 'existing' && <FilterEditor draft={draft.filter} onChange={filter => edit({ filter })} inputError={requestState.error instanceof FilterInputError ? requestState.error : undefined} />}
-          {requestState.status === 'error' && <p className="error-banner" role="alert" id="universe-error-summary" tabIndex={-1}>{draft.mode === 'group_endpoints' && requestState.error instanceof Error && groupReason(requestState.error.message) || draft.mode === 'explanation' && requestState.error instanceof Error && explanationReasons[requestState.error.message] || explainFilter(requestState.error)}</p>}
+          {requestState.status === 'error' && <p className="error-banner" role="alert" id="universe-error-summary" tabIndex={-1}>{draft.mode === 'group_endpoints' && explainGroupEndpointError(requestState.error) || draft.mode === 'explanation' && requestState.error instanceof Error && explanationReasons[requestState.error.message] || explainFilter(requestState.error)}</p>}
           <div className="button-group filter-run"><button id="universe-run" className="primary" disabled={busy || draft.ids.length < (draft.mode === 'existing' ? 2 : 4) || !!unavailable.length}>{busy ? '核验并计算中…' : requestState.status === 'error' ? '按当前输入重试' : draft.mode === 'group_endpoints' ? '核对共同端点单组' : draft.mode === 'explanation' ? '解释全部所选成员' : draft.filter.enabled ? '按条件研究' : '研究所选股票'}</button>
             {busy && <button type="button" onClick={() => controller().cancel()}>取消等待</button>}</div>
         </form>
