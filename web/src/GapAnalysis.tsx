@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { checkedFetch, explain } from './api.ts';
+import { checkedFetch } from './api.ts';
+import { explainAnalysisError } from './analysis-errors.ts';
 import { assertGapReport } from './model.ts';
 import type { GapEvent, GapReport, Query, Row } from './types.ts';
 
@@ -38,7 +39,7 @@ export function GapAnalysis({ query, selected, onChoose }: { query: Query; selec
       const value = JSON.parse(text) as GapReport;
       assertGapReport(query, value);
       setReport(value); setBody(text);
-    } catch (error) { if (!controller.signal.aborted) setIssue(explain(error)); }
+    } catch (error) { if (!controller.signal.aborted) setIssue(explainAnalysisError(error, 'current_version')); }
     finally { if (!controller.signal.aborted) setLoading(false); }
   }
   const current = report?.query_id === query.query_id ? report : null;

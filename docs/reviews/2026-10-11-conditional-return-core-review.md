@@ -78,7 +78,7 @@
 - `tests/test_conditional_return.py`：`02c0e49cec523b9908bd4247ff042a7d814243cf03e8a43035290fd2ed30a86c`
 - `tests/test_conditional_return_adversarial.py`：`24ca73a7682ed75e8c15cb32298c62326e60a916b06e05d8c9a3932f5140ca9d`
 
-独立运行证据位于仓库外 `/workspace/shared/verification/conditional-return-review-20261011/`，包括 `red.log`、`independent-resolution-red.log`、`independent-fixed.log`、`independent-final.log`；所有TMPDIR及pytest basetemp均在该片专用目录，没有覆盖旧归档。只有合成测试及审查文档由审查者新增，核心和主测试由作者维护。
+独立运行证据位于仓库外 `<private-evidence-root>/verification/conditional-return-review-20261011/`，包括 `red.log`、`independent-resolution-red.log`、`independent-fixed.log`、`independent-final.log`；所有TMPDIR及pytest basetemp均在该片专用目录，没有覆盖旧归档。只有合成测试及审查文档由审查者新增，核心和主测试由作者维护。其中 `<private-evidence-root>` 为历史私有目录的脱敏占位，需由证据持有者映射，并非仓库相对路径或公开下载地址。
 
 ## 8. 冻结后完整回归与有限发布建议
 

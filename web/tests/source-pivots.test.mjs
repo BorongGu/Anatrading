@@ -82,6 +82,11 @@ test('component distinguishes selected confirmation bar from the earlier extreme
   assert.match(text, /2026-09-05 · 源序号5作为中心：右侧来源窗口尚未齐备/);
   assert.match(text, /在当前标签确认高点，极值中心为 2026-09-03 · 源序号3，源价 6/);
   assert.match(text, /中心记录类型／精确源价来源窗口确认记录确认延迟/);
+  assert.match(text, /基于当前数据版本的回顾判断/);
+  assert.match(text, /闭合、当时可得及复权可比性未核/);
+  assert.match(text, /尚未验证去噪效果或预测价值/);
+  assert.match(text, /固定数据版本和对应来源窗口内比较，来源修订后另存版本/);
+  assert.doesNotMatch(text, /快照|合同|门禁|数据证据工作台/);
 });
 
 test('component renders extreme price text exactly without Number conversion', () => {

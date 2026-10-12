@@ -203,7 +203,7 @@ N/L用Fraction；ER=abs(N)/L或显式零路径约定。E精确比较`2*abs(N)>=L
 - 修复后module SHA `ab8f3c38a65baf3fed85a2169fd16209ad757e5a093cf5568594243ecbf3a303`。独立受影响复核：作者83、反方21、旧相关62，共166通过、1项既有私有ER样本缺失skip。skip不计真实验收。
 - 负责人批准先完成全仓回归与源码/fixture冻结；随后真实worker独占Store执行固定一次重放，资源负载排在真实之后，另开CPU窗口。实现审查通过不预判真实方向，也不授权按结果调参。
 
-仓库外证据根为`/workspace/shared/anatrading-swing-event-information-2026-10-11/`（test-first、oracle、regression、performance）；独立审查证据根为`/workspace/shared/anatrading-swing-review-2026-10-11/`。原件和逐事件真实账本均不入库。资源脚本先经静态审查、A gate AST核对，任何真实/资源最终结果另记本片资格文档，未跑项目不算通过。
+仓库外证据根为`<private-evidence-root>/anatrading-swing-event-information-2026-10-11/`（test-first、oracle、regression、performance）；独立审查证据根为`<private-evidence-root>/anatrading-swing-review-2026-10-11/`。原件和逐事件真实账本均不入库。资源脚本先经静态审查、A gate AST核对，任何真实/资源最终结果另记本片资格文档，未跑项目不算通过。其中 `<private-evidence-root>` 为历史私有目录的脱敏占位，需由证据持有者映射，并非仓库相对路径或公开下载地址。
 
 
 ## 12. 执行完成及停止决定（运行后补记）

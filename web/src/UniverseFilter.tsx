@@ -89,7 +89,7 @@ function SourceDetails({ member, report }: { member: Member; report: FilterEnvel
     <p>身份：{researchReason(source.identity.qualification)}。源日期可定位性：{member.source_gate === 'pass' ? '可定位；交易日历完整性仍未核' : '存在无法定位日期的记录'}。</p>
     <dl className="metadata-list"><dt>数据版本</dt><dd><code>{source.snapshot_id}</code></dd><dt>完整来源查询</dt><dd><code>{source.query_id}</code></dd>
       <dt>原件哈希</dt><dd><code>{sourceText(source.raw_sha256)}</code></dd><dt>来源格式</dt><dd>{sourceText(contract.format_id)}</dd>
-      <dt>来源合同</dt><dd><code>{sourceText(contract.source_contract_id)}</code></dd><dt>合同版本</dt><dd>{sourceText(contract.contract_version)}</dd><dt>解码版本</dt><dd>{sourceText(contract.versions)}</dd>
+      <dt>来源规则编号</dt><dd><code>{sourceText(contract.source_contract_id)}</code></dd><dt>规则版本</dt><dd>{sourceText(contract.contract_version)}</dd><dt>解码版本</dt><dd>{sourceText(contract.versions)}</dd>
       <dt>来源说明作用域</dt><dd>{sourceText(contract.semantics_scope)}</dd></dl>
     <p className="subtle">known 表示来源定义的状态，仍需同时看本样本适用性。请求未复权不等于复权口径已核；捕获时间不能充作历史可得时间。</p>
     {Object.entries(contract.semantics).map(([key, semantic]) => <div className="filter-semantic" key={key}><strong>{semanticLabels[key] ?? key}</strong>

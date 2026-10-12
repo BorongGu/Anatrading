@@ -17,10 +17,12 @@
 
 ## 可复现证据
 
+以下 `$EVIDENCE_ROOT` 是读者自行设置的仓库外私有证据根，无默认值。执行示例前须将环境变量 `EVIDENCE_ROOT` 设为实际可访问的绝对路径，并确认 `anatrading-test-logs` 子目录存在；未设置时不能直接运行。后续 `--baseline` 还须指向对应首轮基准文件。这些历史证据不随仓库提供，也未提供公开下载地址。
+
 ```sh
 .venv/bin/python qualification/research_benchmark.py --sizes 5000 20000 --repeats 3 \
-  > /workspace/shared/anatrading-test-logs/research-benchmark-final.json \
-  2> /workspace/shared/anatrading-test-logs/research-benchmark-final.log
+  > "$EVIDENCE_ROOT/anatrading-test-logs/research-benchmark-final.json" \
+  2> "$EVIDENCE_ROOT/anatrading-test-logs/research-benchmark-final.log"
 ```
 
 脚本默认测 W20/W252，并额外测 10×20,000、50×4,000 的两个总量上限集合，集合均使用 W252。原始运行日志在仓库外保存，不提交个人行情、本地数据库或运行产物。
@@ -81,7 +83,7 @@
 
 ## 独立热点剖析
 
-正式计时结束后，另用同一合成生成器对 **2×20,000 行** 做一次 `cProfile`，日志为 `/workspace/shared/anatrading-test-logs/research-profile.log`，复现脚本为同目录 `profile-research.py`。这不是 200,000 行的阶段占比测量；插桩会显著增加 Python 调用成本，以下时间仅用于识别热点，不能替换上表延迟，也不能相加重叠的 cumulative 项。
+正式计时结束后，另用同一合成生成器对 **2×20,000 行** 做一次 `cProfile`，日志为 `$EVIDENCE_ROOT/anatrading-test-logs/research-profile.log`，复现脚本为同目录 `profile-research.py`。这不是 200,000 行的阶段占比测量；插桩会显著增加 Python 调用成本，以下时间仅用于识别热点，不能替换上表延迟，也不能相加重叠的 cumulative 项。
 
 - 完整查询插桩总计 3.022 秒：80,006 次 JSON `loads` 累计 1.129 秒；240,012 次 `decimal_text` 累计 0.581 秒；DuckDB `fetchall` 0.398 秒；`exact_sum` 0.185 秒；`_quality` 0.121 秒。行对象重建、JSON 解码和重复数值表示转换有明确成本。
 - 同规模集合插桩总计 1.974 秒：`daily_bars` 累计 1.651 秒，其中 `decimal_value` 0.882 秒；另有日期、身份冲突、截止过滤和覆盖扫描。热点以完整前缀规范化为主，末尾 253 个价格上的集合统计量没有进入前列。
@@ -120,10 +122,10 @@
 
 ```sh
 .venv/bin/python qualification/research_benchmark.py \
-  --baseline /workspace/shared/anatrading-test-logs/research-benchmark-final.json \
+  --baseline "$EVIDENCE_ROOT/anatrading-test-logs/research-benchmark-final.json" \
   --sizes 5000 20000 --repeats 3 \
-  > /workspace/shared/anatrading-test-logs/research-benchmark-compact.json \
-  2> /workspace/shared/anatrading-test-logs/research-benchmark-compact.log
+  > "$EVIDENCE_ROOT/anatrading-test-logs/research-benchmark-compact.json" \
+  2> "$EVIDENCE_ROOT/anatrading-test-logs/research-benchmark-compact.log"
 ```
 
 - 新运行：2026-10-11T03:55:53.289929+00:00 至 2026-10-11T04:04:20.678577+00:00

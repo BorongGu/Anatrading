@@ -15,7 +15,7 @@ direct同轮执行是必要的最小动作资格，避免helper改变模块加�
 
 ## 固定目标、初始只读证据与数据边界
 
-项目 `C:\Users\顾卜荣\Anatrading`，数据根固定其现有 `data/local`，资格端口固定8791；不改8765产品/采集绑定，不使用17709。2026-10-08T12:20:22.2162715Z作者只读Get-NetTCPConnection观察8791监听数0；根方随后另核8791/8765均无listener及Anatrading任务无记录。这仅说明各自观察时刻，正式登记前须重新核精确目标。
+项目 `C:\Users\<user>\Anatrading`（`<user>` 仅为原用户名的脱敏占位），数据根固定其现有 `data/local`，资格端口固定8791；不改8765产品/采集绑定，不使用17709。2026-10-08T12:20:22.2162715Z作者只读Get-NetTCPConnection观察8791监听数0；根方随后另核8791/8765均无listener及Anatrading任务无记录。这仅说明各自观察时刻，正式登记前须重新核精确目标。
 
 真实日线原件 `data/local/acquisition/ad38b26212eb4e7ba6f58a57dc9e2c78/after.day` 本次只读SHA仍 `f9271218e4ae49729d4b38976552432da7bf529aa677a2c89358fa5df6887f30`。目标既有快照固定 `c3f950f6002fa14ea4569e2e7075722a3c4df897628e6d63e6b4e981cbffd39c`，7068行，窗口源序号7066—7068；准入时须实际重新核Store/query与原CAS引用，不能单凭历史文档验收。
 

@@ -55,10 +55,11 @@
 
 下载页的金山/360 认证字样未用作签名证据。本轮签名结果来自实际文件及本机 Windows 信任验证；所读页面仍未提供可对照的原厂 SHA-256 清单。实际哈希用于锁定本次文件，不能冒充原厂发布的哈希。签名和原厂来源已提供文件身份依据，不证明业务功能或数据权限合格。
 
-私有证据还包括同目录的 `new_tdx64.headers.txt`、`new_tdx64.transfer.json`、`new_tdx64.verification.json` 与 `new_tdx64.listing-verification.json`。可用以下等价只读命令复核，不运行 EXE：
+私有证据还包括同目录的 `new_tdx64.headers.txt`、`new_tdx64.transfer.json`、`new_tdx64.verification.json` 与 `new_tdx64.listing-verification.json`。以下为等价只读复核示例，不运行 EXE。先将 `$projectRoot` 中的 `<project-root>` 替换为实际项目根，并确认自行持有该私有安装包；占位不能直接运行，也不表示私有证据可公开下载：
 
 ```powershell
-$clientInstaller = 'C:\Users\顾卜荣\Anatrading\artifacts\client-installers\new_tdx64.exe'
+$projectRoot = '<project-root>'
+$clientInstaller = Join-Path -Path $projectRoot -ChildPath 'artifacts\client-installers\new_tdx64.exe'
 Get-Item -LiteralPath $clientInstaller | Select-Object Length
 Get-FileHash -LiteralPath $clientInstaller -Algorithm SHA256
 $clientSignature = Get-AuthenticodeSignature -LiteralPath $clientInstaller

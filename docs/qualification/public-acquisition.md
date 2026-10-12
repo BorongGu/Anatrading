@@ -32,7 +32,7 @@
 | formats.py | e044749fcd89a533cb7c82c9adcf8223f7b15785ff501f09166b137f01b6fa6a |
 | cli.py | 4db1501cb438bf51f65b05e949cebc7963db5a1270be60013253aa9a6fa266ca |
 
-仓库外证据：`/workspace/shared/anatrading-test-logs/public-acquisition-full-final.log`，同目录 `public-acquisition-final-source-sha256.json` 及 `public-acquisition-final-source-sha256-after.json`。真实数据与日志不提交。
+仓库外证据：`<private-evidence-root>/anatrading-test-logs/public-acquisition-full-final.log`，同目录 `public-acquisition-final-source-sha256.json` 及 `public-acquisition-final-source-sha256-after.json`。真实数据与日志不提交。其中 `<private-evidence-root>` 为历史私有目录的脱敏占位，需由证据持有者映射，并非仓库相对路径或公开下载地址。
 
 覆盖包含：异常输入先行；精确Decimal／NULL；旧四格式完整黄金摘要；新格式query/JSON/Parquet及价格／数量API；错误码和Retry-After边界；401/403/429伴随坏头仍保存来源限制；限制记录发布后ACK丢失；全部发送预算及篡改；单写入者／symlink；请求／身份／版本交换；真实子进程强退出的Store提交边界；Ctrl+C在捕获后与事务内的不同结果；DNS挂起、TLS挂起、慢头／持续慢体／持续IPC输出、超限、子进程terminate/kill及确认回收。网络故障注入使用本地测试进程和假数据，不向真实来源制造异常负载。
 
@@ -52,7 +52,7 @@
 
 离线复查确认：1份reservation、1项journal attempt；HTTP status为NULL，收到字节0、body hash为NULL、complete=false；没有捕获文件、Store import attempt或snapshot。没有运输子进程残留。未执行任何网络重试或附加连通性请求。
 
-仓库外记录：`/workspace/shared/anatrading-test-logs/public-cli-live-20261011/report.json`、`offline-check.json`及该目录CLI stdout/stderr；私有root为 `/workspace/shared/anatrading-private/public-cli-live-20261011`。
+仓库外记录：`<private-evidence-root>/anatrading-test-logs/public-cli-live-20261011/report.json`、`offline-check.json`及该目录CLI stdout/stderr；私有root为 `<private-evidence-root>/anatrading-private/public-cli-live-20261011`。
 
 ## 能确定的环境边界
 
