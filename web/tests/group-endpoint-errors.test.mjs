@@ -4,15 +4,15 @@ import { readFileSync } from 'node:fs';
 import { explain } from '../src/api.ts';
 import * as group from '../src/group-endpoint-model.ts';
 import { explainFilter, ResearchRequestController } from '../src/filter-model.ts';
-import { explanationReasons } from '../src/two-group-model.ts';
+import { explanationReasons, explainExplanationError } from '../src/two-group-model.ts';
 import { createUniverseDraft, prepareUniverseRequest, loadUniverseRequest, universeErrorTarget } from '../src/universe-request.ts';
 
 // Execute the actual banner expression, without implying mounted React or browser coverage.
 const source = readFileSync(new URL('../src/UniverseResearch.tsx', import.meta.url), 'utf8');
 const expression = source.match(/id="universe-error-summary" tabIndex=\{-1\}>\{([^\n]+)\}<\/p>/)?.[1];
 assert.ok(expression, 'the shared request-error banner must be present');
-const evaluate = new Function('draft', 'requestState', 'groupReason', 'explainGroupEndpointError', 'explanationReasons', 'explainFilter', `return (${expression});`);
-const banner = (error, mode = 'group_endpoints') => evaluate({ mode }, { status: 'error', error }, group.groupReason, group.explainGroupEndpointError, explanationReasons, explainFilter);
+const evaluate = new Function('draft', 'requestState', 'groupReason', 'explainGroupEndpointError', 'explainExplanationError', 'explainFilter', `return (${expression});`);
+const banner = (error, mode = 'group_endpoints') => evaluate({ mode }, { status: 'error', error }, group.groupReason, group.explainGroupEndpointError, explainExplanationError, explainFilter);
 
 const recovery = [
   ['raw_object_corrupt', '请恢复正确原件再查询'],

@@ -4,6 +4,7 @@ import {createElement} from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {createServer} from 'vite';
 import {fixture} from './two-group-fixtures.mjs';
+import {assertExplanation, verifyExplanationIdentity} from '../src/two-group-model.ts';
 const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]}});after(()=>server.close());
 const {UniverseResearch,createUniverseDraft}=await server.ssrLoadModule('/src/UniverseResearch.tsx');
 const {TwoGroupResults}=await server.ssrLoadModule('/src/TwoGroupResults.tsx');
@@ -47,4 +48,31 @@ test('SSR table keeps all rows, source prices, limits, decomposition and origina
  const f=fixture();f.reply.members[0].model=null;f.reply.members[0].reasons=['factor_rank_unavailable'];f.reply.counts.model_available=3;
  const html=render(TwoGroupResults,{report:f.reply,onOpen(){}});
  assert.equal((html.match(/打开原始记录/g)||[]).length,4);assert.match(html,/无法分开解释/);assert.match(html,/描述排序，未按波动风险标准化/);assert.match(html,/训练目标基线/);assert.match(html,/数值|容差/);assert.match(html,/交易日历/);assert.match(html,/价格变化（对数）/);assert.match(html,/输入顺序/);
+});
+test('SSR preserves unknown source facts across all reason surfaces as escaped text', async () => {
+ const f = fixture(), codes = ['constructor', '__proto__', 'toString', '未知核验', '<img src=x onerror="alert(1)">'];
+ f.reply.reasons = [...codes];
+ f.reply.status = 'unavailable';
+ f.reply.counts.source_complete = 0;
+ f.reply.counts.model_available = 0;
+ for (const member of f.reply.members) {
+  member.model = null; member.raw_change = null; member.source_complete = false; member.reasons = [...codes];
+  member.training_endpoints[0].reasons = [...codes];
+  member.anomalies = { total: 1, counts: Object.fromEntries(codes.map(code => [code, 1])),
+   examples: [{ date: f.expected.start, ordinal: 61, scope: 'inside_interval', codes: [...codes] }], truncated: false };
+ }
+ assertExplanation(f.reply, f.expected);
+ await verifyExplanationIdentity(f.reply);
+ const saved = structuredClone(f.reply), html = render(TwoGroupResults, { report: f.reply, onOpen() {} });
+ for (const code of codes) {
+  const escaped = renderToStaticMarkup(createElement('span', null, `来源或数值限制：${code}`)).replace(/^<span>|<\/span>$/g, '');
+  assert.equal(html.split(escaped).length - 1, 17, 'report plus member/count/example/training reason text for each row');
+ }
+ assert.doesNotMatch(html, /<img|<script|native code|\[object Object\]/);
+ assert.equal((html.match(/打开原始记录/g) ?? []).length, 4);
+ for (const member of saved.members) {
+  assert.ok(html.includes(member.symbol)); assert.ok(html.includes(member.snapshot_id)); assert.ok(html.includes(member.query_id));
+  assert.ok(html.includes(`源序号 ${member.endpoints.start.ordinal}，收盘 ${member.endpoints.start.close_exact}`));
+ }
+ assert.deepEqual(f.reply, saved, 'rendering does not alter the DTO or source facts');
 });
