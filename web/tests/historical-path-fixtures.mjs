@@ -1,4 +1,5 @@
 // Synthetic frontend contracts only. These fixtures are not market or numeric-oracle evidence.
+import { withSyntheticBridge } from './synthetic-bridge.mjs';
 import { PATH_RULES, PATH_METHOD_ID, buildHistoricalPathRequest, PATH_METHODS } from '../src/historical-path-model.ts';
 export const shown = n => n.toExponential(11).replace(/e([+-])(\d)$/, 'e$10$2');
 export function historicalPathFixture(count = 84, invalid = []) {
@@ -40,16 +41,10 @@ export function historicalPathFixture(count = 84, invalid = []) {
 }
 
 /** Fresh synthetic EvidenceStore → actual ASGI HTTP route; no socket or browser. */
-export async function actualHistoricalPathFixture() {
-  const { execFile } = await import('node:child_process');
-  const { promisify } = await import('node:util');
-  const { mkdir, mkdtemp } = await import('node:fs/promises');
+export async function actualHistoricalPathFixture(consume) {
   const { fileURLToPath } = await import('node:url');
   const { resolve, join } = await import('node:path');
   const repo = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-  const { tmpdir } = await import('node:os');
-  const temporary = process.env.ANATRADING_TEST_TMPDIR ?? tmpdir(); await mkdir(temporary, { recursive: true });
-  const root = await mkdtemp(join(temporary, '041-ui-bridge-'));
   const python = join(repo, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
   const script = `
 import asyncio, json, sys
@@ -65,7 +60,6 @@ async def run():
         print(response.text)
 asyncio.run(run())
 `;
-  const { stdout } = await promisify(execFile)(python, ['-c', script, root], { cwd: repo, maxBuffer: 8 * 1024 * 1024, env: { ...process.env, TMPDIR: root } });
-  const reply = JSON.parse(stdout);
-  return { reply, request: buildHistoricalPathRequest(reply.inputs[0].snapshot_id, reply.parameters.cutoff) };
+  return withSyntheticBridge({ prefix: '041-ui-bridge-', command: python, args: ['-c', script], cwd: repo },
+    reply => consume({ reply, request: buildHistoricalPathRequest(reply.inputs[0].snapshot_id, reply.parameters.cutoff) }));
 }

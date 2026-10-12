@@ -1,3 +1,4 @@
+import { withSyntheticBridge } from './synthetic-bridge.mjs';
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -228,15 +229,9 @@ test('six-day SSR preserves labels, original closes, locators, signed fractions 
 });
 
 test('fresh synthetic Store and in-process HTTP response passes actual frontend hash/DTO checks and SSR', async () => {
-  const { execFile } = await import('node:child_process');
-  const { promisify } = await import('node:util');
-  const { mkdir, mkdtemp } = await import('node:fs/promises');
   const { fileURLToPath } = await import('node:url');
   const { resolve, join } = await import('node:path');
-  const { tmpdir } = await import('node:os');
   const repo = resolve(fileURLToPath(new URL('../..', import.meta.url)));
-  const temporary = process.env.ANATRADING_TEST_TMPDIR ?? tmpdir(); await mkdir(temporary, { recursive: true });
-  const root = await mkdtemp(join(temporary, '045-ui-bridge-'));
   const python = join(repo, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
   const script = `
 import asyncio, json, sys
@@ -263,13 +258,13 @@ async def run():
             print(json.dumps(dict(query=query, report=response.json())))
 asyncio.run(run())
 `;
-  const { stdout } = await promisify(execFile)(python, ['-c', script, root], { cwd: repo, maxBuffer: 4 * 1024 * 1024,
-    env: { ...process.env, TMPDIR: root, TEMP: root, TMP: root } });
-  const f = JSON.parse(stdout); f.request = buildMinuteHistoryRequest(f.query, f.query.rows[0], '14:57', '15:00');
-  validate(f); const { result } = await load(f), output = text(render(MinuteHistoryResults, { report: result }));
-  assert.equal(result.days.length, 6); assert.equal(result.days[0].start[0].tokens.close, '11.30');
-  assert.equal(result.days[0].change.numerator, '-1'); assert.equal(result.days[0].change.denominator, '113');
-  assert.match(output, /源序号 15/); assert.match(output, /-1\/113/); assert.match(output, /名义时钟差 3 分钟/);
+  await withSyntheticBridge({ prefix: '045-ui-bridge-', command: python, args: ['-c', script], cwd: repo, maxBuffer: 4 * 1024 * 1024 }, async f => {
+    f.request = buildMinuteHistoryRequest(f.query, f.query.rows[0], '14:57', '15:00');
+    validate(f); const { result } = await load(f), output = text(render(MinuteHistoryResults, { report: result }));
+    assert.equal(result.days.length, 6); assert.equal(result.days[0].start[0].tokens.close, '11.30');
+    assert.equal(result.days[0].change.numerator, '-1'); assert.equal(result.days[0].change.denominator, '113');
+    assert.match(output, /源序号 15/); assert.match(output, /-1\/113/); assert.match(output, /名义时钟差 3 分钟/);
+  });
 });
 
 function rebind(f) { f.request = buildMinuteHistoryRequest(f.query, f.selected, '14:57', '15:00'); seal(f.report); return f; }

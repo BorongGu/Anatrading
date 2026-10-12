@@ -65,12 +65,13 @@ test('source panel distinguishes exact sorting, displayed rounding and retained 
   assert.match(content, /不把数量、金额或单位核验视为已通过/); assert.doesNotMatch(content, /模型估计使用浮点数/);
 });
 test('fresh synthetic Store→HTTP envelope passes frontend validation and renders actual core paths', async () => {
-  const { reply, request } = await actualHistoricalPathFixture();
-  assertHistoricalPathReply(reply, request.expected);
-  const selected = reply.result.selections.path[0], candidate = reply.result.windows.find(w => w.start_index === selected);
-  const html = render(HistoricalPathResults, { report: reply, selected, onSelect() {}, onReject() {} }), content = text(html);
-  assert.match(content, /2025-03-21 → 2025-04-10/); assert.ok(content.includes(candidate.prices[0]));
-  assert.ok(content.includes(candidate.distance)); assert.ok(content.includes(reply.inputs[0].query_id));
-  assert.match(content, /0%/); assert.doesNotMatch(content, /NaN|Infinity|未识别状态/);
-  assert.match(html, /<svg/); assert.equal(reply.result.query.prices.length, 21);
+  await actualHistoricalPathFixture(async ({ reply, request }) => {
+    assertHistoricalPathReply(reply, request.expected);
+    const selected = reply.result.selections.path[0], candidate = reply.result.windows.find(w => w.start_index === selected);
+    const html = render(HistoricalPathResults, { report: reply, selected, onSelect() {}, onReject() {} }), content = text(html);
+    assert.match(content, /2025-03-21 → 2025-04-10/); assert.ok(content.includes(candidate.prices[0]));
+    assert.ok(content.includes(candidate.distance)); assert.ok(content.includes(reply.inputs[0].query_id));
+    assert.match(content, /0%/); assert.doesNotMatch(content, /NaN|Infinity|未识别状态/);
+    assert.match(html, /<svg/); assert.equal(reply.result.query.prices.length, 21);
+  });
 });
