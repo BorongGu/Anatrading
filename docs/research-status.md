@@ -8,6 +8,8 @@
 
 阶段记录中的“本轮”“当前”和“后续”保留原意，具体范围以对应报告的日期和版本为准；较早计数不与最新全量相加。API或界面接入、离线纯计算、真实来源兼容、浏览器操作和金融效果分别判断。
 
+2026-10-12完成[049同步双窗有符号相关检索](research/049-signed-peer-neighbor-workflow.md)：显式自选2–50版本、目标及精确截止日，共同121端点，前60/当前60全部候选、精确有符号排名/并列及原端点回查。编码前选择简单源收盘变化，明确与旧log相关不等价；完整来源面板不齐则两窗关闭并保留全部成员，常量只影响对应窗。新增批量操作能力，真人效率和市场效果未验。见[限定验收与失败历史](qualification/peer-neighbor-workflow.md)及[实现独审](reviews/2026-10-12-peer-neighbor-implementation.md)。
+
 ## 文档与界面整理
 
 README 将安装和当前能力前置，原有命令、章节入口及以下历史记录保留。[前端文案整理](reviews/2026-10-11-interface-language-review.md)统一使用“数据版本”“来源规则”等称呼，内部键、请求与样式声明未变；最新前端196项通过，类型/构建通过。后端、浏览器和字体布局未在该片重验。
@@ -92,6 +94,8 @@ README 将安装和当前能力前置，原有命令、章节入口及以下历�
 ## 测试与当前边界
 
 复现命令见 [README](../README.md#测试与当前边界)。以下保留各阶段的通过、失败、跳过和未跑项目。
+
+049最终过滤合成Python3287通过/0失败/1 Windows skip/34 deselected，另14真实用例整文件ignore未收集；两新前端可读性整理后全Node482通过/0失败或跳过、TypeScript/Vite通过。此前第一轮Python244失败/2270通过/140 errors/34 deselected（磁盘满导致Pytest内部错误，逐项原因未全展开），第二轮3285通过/2 spawn锁测试失败/1 skip/34 deselected；外部runner缺main守卫导致子进程重跑pytest，修复后第三轮通过，产品锁与期待未改。初次Node fixture日期错误、格式化中途TS1109及独审发现均保留；范围与警告见[049验收](qualification/peer-neighbor-workflow.md)。
 
 本次公开发布前完整回归见 [README](../README.md#测试与当前边界)。045阶段完整产品 `tests` 验证于2026-10-11完成，独立代码复审后冻结重跑；432个受检仓库文件回归前后哈希一致。045的合成接入与修正记录见[研究记录](research/045-minute-label-history.md)及[独立复审](reviews/2026-10-11-minute-label-history-review.md)。043和旧PR16/PR17计数保留为对应阶段证据。阶段针对性检查包含于对应全量集合，不累计相加；扩展 `qualification` 的阶段失败与后续离线修复另列：
 

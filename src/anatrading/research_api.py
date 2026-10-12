@@ -221,6 +221,33 @@ def _calculate_path(store, sid, cutoff, error):
 
 def register_research_routes(app, owner, parse_parameters, error, safe_store_call):
     """Reuse the established local HTTP boundary and error mapping."""
+    @app.get("/api/research/peer-neighbors")
+    async def peer_neighbors(request: Request):
+        from .peer_neighbor_research import peer_neighbor_report, ERRORS
+        p = parse_parameters(request, {"snapshot_ids", "target_snapshot_id", "cutoff"},
+                             ("snapshot_ids", "target_snapshot_id", "cutoff"))
+        if len(p["snapshot_ids"]) > MAX_MEMBERS * 65:
+            raise error("research_member_limit")
+        ids = [_identifier(sid, error) for sid in p["snapshot_ids"].split(",")]
+        if not 2 <= len(ids) <= MAX_MEMBERS:
+            raise error("research_member_limit")
+        if len(set(ids)) != len(ids):
+            raise error("duplicate_snapshot")
+        target = _identifier(p["target_snapshot_id"], error)
+        if target not in ids:
+            raise error("invalid_target")
+        cutoff = _day(p["cutoff"], error)
+        ids.sort()
+        def calculate(store):
+            _research_budget(store, ids, None, error)
+            queries = [store._research_query(sid, cutoff=None) for sid in ids]
+            try:
+                return peer_neighbor_report(queries, target, cutoff)
+            except ValueError as exc:
+                code = str(exc)
+                raise error(code if code in ERRORS else "invalid_research_input") from None
+        return JSONResponse(await owner.call(lambda store: safe_store_call(lambda: calculate(store))))
+
     @app.get("/api/research/group-endpoints")
     async def group_endpoints(request: Request):
         from .peer_relative_research import group_endpoint_report, GROUP_ERRORS
