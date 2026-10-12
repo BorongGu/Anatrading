@@ -8,8 +8,13 @@ import { withSyntheticBridge } from './synthetic-bridge.mjs';
 const seed = `
 const fs = require('node:fs'), path = require('node:path');
 const root = process.argv[1], store = path.join(root, 'store');
-fs.mkdirSync(path.join(store, 'raw', 'aa'), { recursive: true });
+// Windows junctions exercise lstat's symbolic-link rejection without requiring
+// Developer Mode or the Create symbolic links privilege. Targets are absolute.
+const directoryLink = (target, link) => fs.symlinkSync(
+  target, link, process.platform === 'win32' ? 'junction' : 'dir');
+fs.mkdirSync(store);
 fs.mkdirSync(path.join(store, 'staging'));
+fs.mkdirSync(path.join(store, 'raw', 'aa'), { recursive: true });
 fs.writeFileSync(path.join(store, 'research.duckdb'), 'disposable database bytes');
 fs.writeFileSync(path.join(store, '.operation.lock'), 'lock');
 fs.writeFileSync(path.join(store, 'raw', 'aa', 'a'.repeat(64)), 'synthetic input');
@@ -72,7 +77,7 @@ for (const [name, mutation] of [
   ['unexpected root file', "fs.writeFileSync(path.join(root, 'unexpected'), 'keep')"],
   ['staging residue', "fs.writeFileSync(path.join(store, 'staging', 'pending.part'), 'keep')"],
   ['unexpected raw file', "fs.writeFileSync(path.join(store, 'raw', 'aa', 'unexpected'), 'keep')"],
-  ['raw symlink', "fs.symlinkSync('missing', path.join(store, 'raw', 'aa', 'a'.repeat(63) + 'b'))"],
+  ['raw symlink', "directoryLink(path.join(store, 'staging'), path.join(store, 'raw', 'aa', 'a'.repeat(63) + 'b'))"],
   ['database hard link', "fs.linkSync(path.join(store, 'research.duckdb'), path.join(store, 'raw', 'aa', 'a'.repeat(63) + 'b'))"],
   ['lock hard link', "fs.linkSync(path.join(store, '.operation.lock'), path.join(store, 'raw', 'aa', 'a'.repeat(63) + 'b'))"],
   ['raw hard link', "fs.linkSync(path.join(store, 'raw', 'aa', 'a'.repeat(64)), path.join(store, 'raw', 'aa', 'a'.repeat(63) + 'b'))"],
@@ -88,13 +93,13 @@ for (const target of ['research.duckdb', '.operation.lock', 'raw', 'staging']) {
     let script = seed;
     const path = `path.join(store, '${target}')`;
     const replacement = type === 'symlink'
-      ? `fs.symlinkSync('${target === 'raw' ? 'staging' : 'raw'}', ${path});`
+      ? `directoryLink(path.join(store, '${target === 'raw' ? 'staging' : target === 'staging' ? '.' : 'raw'}'), ${path});`
       : target === 'raw' || target === 'staging'
         ? `fs.writeFileSync(${path}, 'unexpected regular file');`
         : `fs.mkdirSync(${path});`;
     if (target === 'raw') {
       script = script.replace("fs.mkdirSync(path.join(store, 'raw', 'aa'), { recursive: true });",
-        "fs.mkdirSync(store);" + replacement).replace("fs.writeFileSync(path.join(store, 'raw', 'aa', 'a'.repeat(64)), 'synthetic input');", '');
+        replacement).replace("fs.writeFileSync(path.join(store, 'raw', 'aa', 'a'.repeat(64)), 'synthetic input');", '');
     } else if (target === 'staging') {
       script = script.replace("fs.mkdirSync(path.join(store, 'staging'));", replacement);
     } else {
