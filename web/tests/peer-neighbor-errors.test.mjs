@@ -5,12 +5,12 @@ import {explain} from '../src/api.ts';
 import {peerReason,explainPeerNeighborError} from '../src/peer-neighbor-model.ts';
 import {explainFilter,ResearchRequestController} from '../src/filter-model.ts';
 import {explainGroupEndpointError,groupReason} from '../src/group-endpoint-model.ts';
-import {explanationReasons} from '../src/two-group-model.ts';
+import {explainExplanationError} from '../src/two-group-model.ts';
 import {createUniverseDraft,prepareUniverseRequest,loadUniverseRequest} from '../src/universe-request.ts';
 const source=readFileSync(new URL('../src/UniverseResearch.tsx',import.meta.url),'utf8');
 const expression=source.match(/id="universe-error-summary" tabIndex=\{-1\}>\{([^\n]+)\}<\/p>/)?.[1];assert.ok(expression);
-const evaluate=new Function('draft','requestState','explainPeerNeighborError','groupReason','explainGroupEndpointError','explanationReasons','explainFilter',`return (${expression});`);
-const banner=error=>evaluate({mode:'peer_neighbors'},{status:'error',error},explainPeerNeighborError,groupReason,explainGroupEndpointError,explanationReasons,explainFilter);
+const evaluate=new Function('draft','requestState','explainPeerNeighborError','groupReason','explainGroupEndpointError','explainExplanationError','explainFilter',`return (${expression});`);
+const banner=error=>evaluate({mode:'peer_neighbors'},{status:'error',error},explainPeerNeighborError,groupReason,explainGroupEndpointError,explainExplanationError,explainFilter);
 const codes=['raw_object_missing','raw_object_corrupt','snapshot_not_found','service_busy','connection_error','service_closing','storage_io_error','internal_error'];
 for(const code of codes)test(`peer request banner retains shared recovery: ${code}`,()=>{const e=new Error(code);assert.equal(banner(e),explain(e));assert.doesNotMatch(banner(e),/来源限制/);});
 test('unknown and prototype request codes keep safe shared fallback; member labels stay plain',()=>{

@@ -1,5 +1,5 @@
-import { canonicalJson } from './filter-model.ts';
-import { jsonRequest } from './api.ts';
+import { canonicalJson, explainFilter } from './filter-model.ts';
+import { jsonRequest, safeCode } from './api.ts';
 export const TWO_GROUP_METHOD = 'two-group-frozen-source-v1';
 export interface ExplanationModel {
   baseline: number; contributions: number[]; explained: number; residual: number;
@@ -149,4 +149,8 @@ export const explanationReasons: Record<string, string> = {
   endpoint_integrity_unknown: '存在日期未知或互相冲突的记录，无法确认区间完整。', missing_endpoint: '所用日期缺少记录。', duplicate_endpoint: '所用日期存在重复记录。', unlocated_endpoint: '所用日期的标签不合格。',
   corporate_action_unresolved: '使用区间存在未解决的公司行动。', halted_endpoint_source_value: '使用日期存在已知停牌。', unsupported_source: '当前仅支持已核对格式的腾讯日线来源。',
 };
-export const explainReason = (code: string) => explanationReasons[code] ?? `来源或数值限制：${code}`;
+export const explainReason = (code: string) => Object.hasOwn(explanationReasons, code) ? explanationReasons[code] : `来源或数值限制：${code}`;
+export function explainExplanationError(error: unknown): string {
+  const code = safeCode(error);
+  return Object.hasOwn(explanationReasons, code) ? explanationReasons[code] : explainFilter(error);
+}
