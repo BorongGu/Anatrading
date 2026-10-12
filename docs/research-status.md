@@ -26,6 +26,8 @@ README 将安装和当前能力前置，原有命令、章节入口及以下历�
 
 ## 功能与研究进展
 
+2026-10-12新增[048共同端点单组](research/048-common-endpoint-group.md)：在既有多股选择中直接指定一组和共同a/b，沿030来源资格，保留N/K、原端点、全部失效行及完整组摘要。它补明确单组入口，不替代020固定池或030目标同伴比较。见[设计审查](reviews/2026-10-12-group-endpoints-design.md)、[实现独审](reviews/2026-10-12-group-endpoints-code-review.md)和[合成工程验收](qualification/group-endpoints.md)。本轮过滤Python3262通过/1 skip/34 deselected，另14真实用例未收集；Node275通过及构建通过，真实/浏览器/效果未验。
+
 本轮已接通三个首版日线研究流程，**Linux 产品回归通过，完整验收仍有开放项**：
 
 1. **个股研究**：趋势估计与 EMA 对照、原始收益波动、固定突破条件，以及同定义历史事件的后续价格变化和失败样本。

@@ -4,7 +4,7 @@ import { fixture } from './two-group-fixtures.mjs';
 import { assertExplanation, sortExplanation, verifyExplanationIdentity } from '../src/two-group-model.ts';
 import { createUniverseDraft, prepareUniverseRequest, loadUniverseRequest } from '../src/universe-request.ts';
 import { ResearchRequestController } from '../src/filter-model.ts';
-function draftFor(f) {return {...createUniverseDraft(),ids:f.expected.ids,cutoff:f.expected.end,lookback:'broken legacy value',filter:{enabled:true,groups:[]},explanation:{enabled:true,start:f.expected.start,roles:Object.fromEntries(f.expected.ids.map((id,i)=>[id,i<2?'A':'B']))}};}
+function draftFor(f) {return {...createUniverseDraft(),ids:f.expected.ids,cutoff:f.expected.end,lookback:'broken legacy value',filter:{enabled:true,groups:[]},mode:'explanation',explanation:{start:f.expected.start,roles:Object.fromEntries(f.expected.ids.map((id,i)=>[id,i<2?'A':'B']))}};}
 test('third mode bypasses old window/filter and makes exactly one validated request',async()=>{
   const f=fixture(),draft=draftFor(f); const old=globalThis.fetch;let calls=[];
   globalThis.fetch=async(url,options)=>{calls.push([url,options]);return Response.json(f.reply)};
