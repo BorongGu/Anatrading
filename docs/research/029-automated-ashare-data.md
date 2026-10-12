@@ -33,7 +33,7 @@
 | 东方财富日线sz000001，2026-09-28～30 | 单次HTTP502，没有有效样本；未重试 | 无成功行情原件 |
 | BaoStock日线探测 | 匿名登录10002007，连接/接收失败标志；0次行情请求，后续5m未运行 | 私有status记录；不是行情样本 |
 
-私有证据根为 `/workspace/shared/anatrading-market-samples/`，各目录名及UTC、完整请求、来源链接、实体字节哈希见 `sample-index.json`。该环境路径只是研究追溯位置，不成为程序运行或测试依赖。真实响应、CSV、个人行情均不提交。`response.bin`是收到的HTTP实体字节，未声称网络/TLS原始包。
+私有证据根为 `<private-evidence-root>/anatrading-market-samples/`，各目录名及UTC、完整请求、来源链接、实体字节哈希见 `sample-index.json`。该环境路径只是研究追溯位置，不成为程序运行或测试依赖。真实响应、CSV、个人行情均不提交。`response.bin`是收到的HTTP实体字节，未声称网络/TLS原始包。其中 `<private-evidence-root>` 为历史私有目录的脱敏占位，需由证据持有者映射，并非仓库相对路径或公开下载地址。
 
 仓库旧BaoStock报告曾有日/5m小样本及两页2784条5m成功。旧环境结果与本次云端登录失败分开；已有格式兼容不等于当前生产采集可用。
 

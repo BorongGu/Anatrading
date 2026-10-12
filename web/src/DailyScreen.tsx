@@ -74,7 +74,7 @@ export function DailyScreen({ runIds, onSelect }: { runIds: string[]; onSelect: 
   const rows = report?.rows.filter(row => (state === 'all' || row.status === state) && row.symbol.toLowerCase().includes(filter.trim().toLowerCase())) ?? [];
   return <div className="detail-panel">
     <h3>当前来源池 · 日线条件筛选</h3>
-    <p className="subtle">使用上方所选批次的固定快照。指定源日期，较早末日不替代；条件全部成立才匹配。留空表示不启用，全部留空仅列出无条件数据记录。</p>
+    <p className="subtle">使用上方所选批次的固定数据版本。按指定来源日期筛选，缺少该日时不使用更早记录替代；条件全部成立才匹配。留空表示不启用，全部留空仅列出无条件数据记录。</p>
     <form onSubmit={read} onChange={() => { setReport(null); setBody(''); }}>
       <fieldset disabled={loading}><div className="exact-grid">
         <label>目标源日期<input type="date" required value={sourceDate} onChange={event => setSourceDate(event.target.value)} /></label>
@@ -103,7 +103,7 @@ export function DailyScreen({ runIds, onSelect }: { runIds: string[]; onSelect: 
           <td>{row.snapshot_id && <button onClick={() => onSelect(row.snapshot_id!,report.parameters.source_date,report.parameters)}>打开日线</button>}</td></tr>;
       })}</tbody></table></div>
       {rows.length > 100 && <div className="pagination"><button disabled={page === 0} onClick={() => setPage(page-1)}>上一页</button><span>第 {page+1}／{Math.ceil(rows.length/100)} 页</span><button disabled={(page+1)*100 >= rows.length} onClick={() => setPage(page+1)}>下一页</button></div>}
-      <details><summary>固定结果身份</summary><code>{report.screen_id}</code><p className="subtle">导出保留全部源池记录、参数、逐项条件、窗口成员、原始哈希及快照；更换原件或参数会产生不同结果身份。</p></details>
+      <details><summary>结果编号</summary><code>{report.screen_id}</code><p className="subtle">导出保留全部源池记录、参数、逐项条件、窗口成员、原始哈希和数据版本；更换原件或参数会生成不同的结果编号。</p></details>
       <DailyFollowup parameters={report.parameters} runIds={report.run_ids} screenId={report.screen_id} onSelect={onSelect} />
     </>}
   </div>;

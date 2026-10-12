@@ -32,7 +32,7 @@
 - Node128通过、0跳过；TypeScript与Vite构建通过，保留636.49 kB主chunk超过500 kB提醒及npm的http-proxy配置警告。本片未改前端；这些结果不证明浏览器交互或加载性能。
 - 额外 `qualification` 单独执行，最终202通过、16失败、另112子用例通过，1.31秒，与首轮相同。16项为8项缺baostock模块、8项缺其包元数据，与039阶段在隔离HEAD复现的既有16项相同；没有安装新依赖，不能称扩展集合通过。
 
-本片所有pytest的TMPDIR与`--basetemp`均使用仓库外 `/workspace/shared/verification/` 下各自的新目录，未覆盖旧失败证据。本次没有再次读取旧first30数据库；其历史hash差异仍原因未知。
+本片所有pytest的TMPDIR与`--basetemp`均使用仓库外 `<private-evidence-root>/verification/` 下各自的新目录，未覆盖旧失败证据。本次没有再次读取旧first30数据库；其历史hash差异仍原因未知。其中 `<private-evidence-root>` 为历史私有目录的脱敏占位，需由证据持有者映射，并非仓库相对路径或公开下载地址。
 
 ## 冻结与未验事项
 

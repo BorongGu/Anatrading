@@ -66,7 +66,7 @@ node --test tests/evidence.test.mjs
 
 另核读 `http-export-audit.json`：主方真实 HTTP 记录了真实分钟截止（4,508＋0）、人工边界（7＋1）及空定位（0＋1）的双格式结果，共 6 个导出文件的大小／SHA。这补充 API 路径证据。
 
-**浏览器落盘续补：** 主方操作页面的 JSON／Parquet 下载后，CUA 两次下载事件等待超时，但页面报告已发起；本审随后独立只读核验 `C:\Users\顾卜荣\Downloads\anatrading-a923b8bf2e9718db6108922e70fb155b16796b7b6ae10eacd251c05e51805cb1.{json,parquet}`：
+**浏览器落盘续补：** 主方操作页面的 JSON／Parquet 下载后，CUA 两次下载事件等待超时，但页面报告已发起；本审随后独立只读核验 `C:\Users\<user>\Downloads\anatrading-a923b8bf2e9718db6108922e70fb155b16796b7b6ae10eacd251c05e51805cb1.{json,parquet}`（`<user>` 仅为原用户名的脱敏占位）：
 
 | 文件 | 独立核验 |
 |---|---|

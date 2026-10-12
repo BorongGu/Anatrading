@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { explain, jsonRequest } from './api.ts';
+import { jsonRequest } from './api.ts';
+import { explainAnalysisError } from './analysis-errors.ts';
 import type { Query, ReconciliationReport, ReconciliationValues } from './types.ts';
 
 const reasons: Record<string, string> = {
@@ -38,7 +39,7 @@ export function MinuteDailyReconciliation({ query, dailySnapshot }: { query: Que
         || result.template_id !== 'observed-600059-240-clocks-v1' || !Array.isArray(result.days)
         || !Array.isArray(result.unreadable_minute_date_ordinals) || !Array.isArray(result.unreadable_daily_date_ordinals)) throw new Error('invalid_query_response');
       setReport(result);
-    }).catch(error => { if (!controller.signal.aborted) setIssue(explain(error)); });
+    }).catch(error => { if (!controller.signal.aborted) setIssue(explainAnalysisError(error, 'minute_selection_and_daily')); });
     return () => controller.abort();
   }, [query, dailySnapshot, multiplier]);
   const current = report?.minute_query_id === query.query_id && report.daily_snapshot_id === dailySnapshot

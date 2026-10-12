@@ -421,7 +421,7 @@ export function SnapshotEvidence({ snapshot }: { snapshot: Snapshot }) {
     <div className="evidence-pills unit-qualifications"><UnitEvidence contract={contract} /></div>
     <p className="inline-note">源数量 / 源金额：单位未核实，规范股数 / 元未赋值。</p>
     {contract?.price_scaling && <p className="inline-note amber">.day 报价：原整数 ÷ 100 · {contract.price_scaling.status ?? 'unknown'}；原整数见记录详情。</p>}
-    <details><summary>来源、资格与完整哈希</summary><p className="subtle">仅展示单快照源值；源代码不构成永久身份。单位、柱闭合及历史可得性未验证时，不推断可交易信号。</p><dl className="metadata-list"><dt>来源格式</dt><dd>{contract?.format_id}</dd><dt>快照</dt><dd><code>{snapshot.snapshot_id}</code></dd><dt>原件 SHA-256</dt><dd><code>{snapshot.manifest.raw_sha256}</code></dd><dt>资格</dt><dd>{snapshot.manifest.qualification ?? 'source_evidence_retrospective_only'}</dd></dl>
+    <details><summary>来源、资格与完整哈希</summary><p className="subtle">仅展示当前数据版本的源值；源代码不构成永久身份。单位、柱闭合及历史可得性未验证时，不推断可交易信号。</p><dl className="metadata-list"><dt>来源格式</dt><dd>{contract?.format_id}</dd><dt>数据版本编号</dt><dd><code>{snapshot.snapshot_id}</code></dd><dt>原件 SHA-256</dt><dd><code>{snapshot.manifest.raw_sha256}</code></dd><dt>资格</dt><dd>{snapshot.manifest.qualification ?? 'source_evidence_retrospective_only'}</dd></dl>
       <details><summary>完整 manifest / metadata（来源原文）</summary><pre>{JSON.stringify({ manifest: snapshot.manifest, metadata: snapshot.metadata }, null, 2)}</pre></details>
     </details>
   </details>;

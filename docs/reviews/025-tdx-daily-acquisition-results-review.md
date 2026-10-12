@@ -18,7 +18,7 @@
 
 两次原身份及各3个前后 observations 全部相同：`D:\tdx_64\TdxW.exe`、PID25140、启动 `2026-10-08T03:19:49.7815869Z`。本反方另读当前 exe/SDK 文件重核指纹，仍为合同固定 SHA。反方未重新探测监听、未声称当前进程运行状态由旧 observation 证明。
 
-root 均为解析后的 `C:\Users\顾卜荣\Anatrading\data\local`，独立计算 root SHA 与 receipt 一致；工作台 session SHA 在两次运行中一致。server helper 源码实际创建该 root 的 workbench，CLI acquire 不开 Store，发布走既有 import；本次保留的 catalog/attempts/query 和产品 root raw CAS 构成固定根发布证据。未以替代数据根导入冒充成功。
+root 均为解析后的 `C:\Users\<user>\Anatrading\data\local`（`<user>` 为原用户名的脱敏占位；root SHA 仍绑定原运行路径），独立计算 root SHA 与 receipt 一致；工作台 session SHA 在两次运行中一致。server helper 源码实际创建该 root 的 workbench，CLI acquire 不开 Store，发布走既有 import；本次保留的 catalog/attempts/query 和产品 root raw CAS 构成固定根发布证据。未以替代数据根导入冒充成功。
 
 | 项目 | 第一轮 | 第二轮 |
 |---|---|---|

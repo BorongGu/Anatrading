@@ -126,6 +126,8 @@ test('source details retain shared-contract applicability, absent/null and legac
   assert.match(content, /CNY/); assert.match(content, /documented_meaning_only/); assert.match(content, /unverified/);
   assert.match(content, /文档定义的单位，本样本适用性未核/); assert.match(content, /来源未提供/); assert.match(content, /明确为空/);
   assert.match(content, /legacy/); assert.match(content, /请求未复权不等于复权口径已核/);
+  assert.match(content, /来源规则编号synthetic-contract/); assert.match(content, /规则版本1/);
+  assert.doesNotMatch(content, /快照|合同|门禁|数据证据工作台/);
 });
 
 test('reason tuples retain null ordinals and explicit omitted counts', async () => {

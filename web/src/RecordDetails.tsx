@@ -1,4 +1,5 @@
 import { AdjacentSourceDetails } from './AdjacentSourceDetails.tsx';
+import { MinuteLabelHistory } from './MinuteLabelHistory.tsx';
 import type { SourceResearchBinding } from './adjacent-source.ts';
 import type { Query } from './types.ts';
 import { fieldNames, fields } from './types.ts';
@@ -17,6 +18,7 @@ export function RecordDetails({ row, contract, geometry, compact = false, source
       </span>)}
     </div>
     {!compact && sourceQuery?.metadata.period === '1d' && <AdjacentSourceDetails query={sourceQuery} row={row} binding={sourceResearch} />}
+    {!compact && sourceQuery && ['1m', '5m'].includes(sourceQuery.metadata.period ?? '') && <MinuteLabelHistory query={sourceQuery} row={row} />}
     {!compact && geometry && <GeometryDetails geometry={geometry} unlocated={row.label === null} />}
     {!compact && <details className="raw-tokens"><summary>原字段 / 原始位（纯文本）</summary>
       <dl><dt>原始源标签</dt><dd><code>{row.source_label ?? '∅'}</code></dd>

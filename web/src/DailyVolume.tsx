@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { explain, jsonRequest } from './api.ts';
+import { jsonRequest } from './api.ts';
+import { explainAnalysisError } from './analysis-errors.ts';
 import type { DailyVolumeReport, Query, Row, VolumeFraction } from './types.ts';
 
 const reasons: Record<string, string> = {
@@ -29,7 +30,7 @@ export function DailyVolume({ query, selected, lookback, onLookbackSelect }: {
         || result.rows.some((row, i) => row.ordinal !== query.rows[i].ordinal)
         || result.unlocated.some((row, i) => row.ordinal !== query.unlocated[i].ordinal)) throw new Error('invalid_query_response');
       setReport(result);
-    }).catch(error => { if (!controller.signal.aborted) setIssue(explain(error)); });
+    }).catch(error => { if (!controller.signal.aborted) setIssue(explainAnalysisError(error, 'current_version')); });
     return () => controller.abort();
   }, [query, lookback]);
   const current = report?.query_id === query.query_id && report.lookback === lookback ? report : null;

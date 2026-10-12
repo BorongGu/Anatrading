@@ -22,7 +22,7 @@
 - 作者新测试预期红灯48项，全部`ModuleNotFoundError`；旧完整golden14项通过。`test-first/freeze.json` SHA-256 `e90c816c91f7505fc1bb6ee6fab9b2f6cde16dac7b128c00ed04ce16490b6c71`，同时保存`PRODUCT_ABSENT`及所有输入/源码/测试hash。
 - 反方独立保存新模块缺失红灯，之后才读实现。未自动刷新golden；生成器阶段手工夹具纠错及失败也在`oracle/pre-freeze-attempts.json`保存。
 
-上述相对证据路径在仓库外根`/workspace/shared/anatrading-swing-event-information-2026-10-11/`；反方日志在`/workspace/shared/anatrading-swing-review-2026-10-11/`。真实原件与逐事件价/账本不入库。
+上述相对证据路径在仓库外根`<private-evidence-root>/anatrading-swing-event-information-2026-10-11/`；反方日志在`<private-evidence-root>/anatrading-swing-review-2026-10-11/`。真实原件与逐事件价/账本不入库。其中 `<private-evidence-root>` 为历史私有目录的脱敏占位，需由证据持有者映射，并非仓库相对路径或公开下载地址。
 
 ## 3. 实现及修复审计
 
@@ -107,7 +107,7 @@
 
 2025Q3反号，已经标记不稳定；不能挑此季度代替主期、删除其它期或据此继续寻阈值。各期全部成员、支持变化、固定主支持诊断、逐信号日数量和各组幅度分布均在完整仓库外报告保留。
 
-真实证据根：`/workspace/shared/anatrading-market-samples/swing-event-information-validation-2026-10-11/final-run/`。运行manifest SHA `6f4d10b75483927e755d46127a7971f37ecce4189b274123c6363de64da748b7`；脚本冻结SHA `aad902ea817182dfe53f49f5a4dc6b11eff24fdf4b5354f0a9e363e6fc2fed52`。最终文件hash如下；未额外重算效果：
+真实证据根：`<private-evidence-root>/anatrading-market-samples/swing-event-information-validation-2026-10-11/final-run/`。运行manifest SHA `6f4d10b75483927e755d46127a7971f37ecce4189b274123c6363de64da748b7`；脚本冻结SHA `aad902ea817182dfe53f49f5a4dc6b11eff24fdf4b5354f0a9e363e6fc2fed52`。最终文件hash如下；未额外重算效果：
 
 | 真实审计入口 | SHA-256 |
 |---|---|
@@ -164,7 +164,7 @@ A为共同旧工作，B保留完整新事件见证。5k/20k每路normalization/c
 
 ### 7.4 资源证据与完整性
 
-仓库外根`/workspace/shared/anatrading-swing-event-information-2026-10-11/performance/`。全部stderr为空；78个结果artifact、50个冻结repo文件、3个harness及4个源/query hash复核一致。所有98个原始产物清单保留，不裁大输出。
+仓库外根`<private-evidence-root>/anatrading-swing-event-information-2026-10-11/performance/`。全部stderr为空；78个结果artifact、50个冻结repo文件、3个harness及4个源/query hash复核一致。所有98个原始产物清单保留，不裁大输出。
 
 | 资源入口 | SHA-256 |
 |---|---|

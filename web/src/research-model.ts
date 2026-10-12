@@ -272,7 +272,7 @@ const reasonNames: Record<string, string> = {
   invalid_test_start: '评价分段日期无效', invalid_research_date: '请输入有效日线日期', invalid_snapshot_id: '数据版本无效',
   duplicate_snapshot: '不能重复选择同一数据版本', research_member_limit: '请选择 2 至 50 个不同证券的数据版本',
   research_row_limit: '研究记录超过上限（单版本 20,000 条、合计 200,000 条），请提前截止日期或减少成员', invalid_research_request: '研究参数无效，请检查选择和日期',
-  invalid_research_response: '研究响应与当前选择或数据合同不符', invalid_research_input: '研究输入不满足计算要求',
+  invalid_research_response: '研究响应与当前选择或数据格式要求不符', invalid_research_input: '研究输入不满足计算要求',
   research_duplicate_symbol: '所选数据含同一证券的多个版本，请每只证券保留一个版本', research_market_unknown: '证券市场无法识别，请核对来源市场或导入声明',
   research_market_mismatch: '证券市场不一致，请选择同一市场的证券', research_identity_conflict: '证券身份声明不一致，请核对来源代码与导入声明',
   retrospective_source_version: '以当前保存的数据版本回顾历史', adjustment_basis_unverified: '复权口径未核',

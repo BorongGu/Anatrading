@@ -30,6 +30,7 @@ from .tdx_acquisition import AcquireError, data_root_id
 from .tdx_market import read_minutes
 from .tdx_daily import read_daily_cache
 from .volume_at_time import volume_report
+from .minute_label_history import endpoint_selection, minute_label_history
 from .price_channel import channel_report
 from .true_range import range_report
 from .daily_volume import daily_volume_report
@@ -627,6 +628,33 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
     async def query(snapshot_id: str, request: Request):
         selection = _selection(_parameters(request, _SELECTION))
         return JSONResponse(await owner.call(lambda store: _query_view(store, snapshot_id, selection)))
+
+    @app.get("/api/minute-label-history/{snapshot_id}")
+    async def source_label_history(snapshot_id: str, request: Request):
+        parameters = _parameters(request, {*_SELECTION, "query_id", "source_date", "start_clock", "end_clock"},
+                                 ("query_id", "source_date", "start_clock", "end_clock"))
+        selection = _selection(parameters)
+        labels = {key: parameters[key] for key in ("source_date", "start_clock", "end_clock")}
+        try:
+            as_of, _ = endpoint_selection(**labels, cutoff=selection.get("cutoff"))
+        except ValueError:
+            raise _RequestError("invalid_request") from None
+
+        def calculate(store):
+            query = _bounded_query(store, snapshot_id, selection)
+            if query["query_id"] != parameters["query_id"]:
+                raise _RequestError("query_id_mismatch", 409)
+            # Full snapshot count is checked before materialization; display
+            # ordinal windows cannot bypass the existing owner/read budget.
+            context = _bounded_query(store, snapshot_id, dict(cutoff=as_of, mode="retrospective"))
+            try:
+                return minute_label_history(query, context, **labels)
+            except ValueError as error:
+                if str(error) in {"query_row_limit", "response_limit"}:
+                    raise _RequestError(str(error)) from None
+                raise _RequestError("invalid_request") from None
+
+        return JSONResponse(await owner.call(calculate))
 
     @app.get("/api/volume/{snapshot_id}")
     async def volume(snapshot_id: str, request: Request):

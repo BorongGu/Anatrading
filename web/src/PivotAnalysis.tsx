@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { checkedFetch, explain } from './api.ts';
+import { checkedFetch } from './api.ts';
+import { explainAnalysisError } from './analysis-errors.ts';
 import { assertPivotReport } from './model.ts';
 import type { PivotReport, Query, Row } from './types.ts';
 
@@ -38,7 +39,7 @@ export function PivotAnalysis({ query, selected, onChoose, radius, onRadiusSelec
       const value = JSON.parse(text) as PivotReport;
       assertPivotReport(query, value, radius);
       onReport(value); setBody(text);
-    } catch (error) { if (!controller.signal.aborted) setIssue(explain(error)); }
+    } catch (error) { if (!controller.signal.aborted) setIssue(explainAnalysisError(error, 'current_version')); }
     finally { if (!controller.signal.aborted) setLoading(false); }
   }
   const current = report?.query_id === query.query_id && report.radius === radius ? report : null;
@@ -60,7 +61,7 @@ export function PivotAnalysis({ query, selected, onChoose, radius, onRadiusSelec
       <option value={2}>2</option><option value={5}>5</option><option value={10}>10</option></select></label></div>
     <p className="subtle">中心高价严格大于、低价严格小于左右各N个源标签内的对应值；并列不选。图标位于右窗齐备的确认源柱，中心位置与确认位置分别记录。</p>
     <button className="primary" disabled={loading} onClick={() => void read()}>{loading ? '计算中…' : '计算当前窗口并标记确认柱'}</button>
-    <p className="inline-note amber">来源窗齐备仅为该快照的追认；闭合、当时可得及复权可比性未核。N个源标签不等同N个交易日／分钟，尚未验证去噪效果或预测价值。</p>
+    <p className="inline-note amber">来源窗口齐备仅是基于当前数据版本的回顾判断；闭合、当时可得及复权可比性未核。N个源标签不等同N个交易日／分钟，尚未验证去噪效果或预测价值。</p>
     {issue && <p className="error-banner">{issue}</p>}
     {current && <>
       <p>截至 {current.as_of_label ?? '无可定位记录'}：所选中心形成 {current.events.filter(e => e.kind === 'high').length} 个严格高点、{current.events.filter(e => e.kind === 'low').length} 个严格低点；同中心可同时成立。</p>
@@ -80,7 +81,7 @@ export function PivotAnalysis({ query, selected, onChoose, radius, onRadiusSelec
       {!current.events.length && <p className="subtle">当前所选中心没有已经齐备且符合严格条件的极值；窗口不足与异常行仍保留在JSON中。</p>}
       {current.events.length > 100 && <div className="pagination"><button disabled={!page} onClick={() => setPage(page - 1)}>上一页</button><span>{page + 1}／{Math.ceil(current.events.length / 100)}</span><button disabled={(page + 1) * 100 >= current.events.length} onClick={() => setPage(page + 1)}>下一页</button></div>}
       <button onClick={download}>导出极值、确认和窗口 JSON</button>
-      <details><summary>算法版本与范围</summary><p>局部点不强制交替，不连接柱内轨迹；同柱高低事件不代表先后。固定快照及窗口内比较，源修订另有版本。</p>
+      <details><summary>算法版本与范围</summary><p>局部点不强制交替，不连接柱内轨迹；同柱高低事件不代表先后。仅在固定数据版本和对应来源窗口内比较，来源修订后另存版本。</p>
         <p>上下文 <code>{current.context_query_id}</code></p><p>分析版本 <code>{current.pivots_id}</code></p></details>
     </>}
   </section>;

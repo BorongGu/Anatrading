@@ -46,7 +46,7 @@ B每次预热真实2个公开query、2次原件verify；N/A/Q digest实际读取
 
 ## 当前证据定位（本地产物不提交）
 
-基目录 `/workspace/shared/verification/pair-stability-036/`：作者/反方红灯、双份旧golden、完整回归日志、183文件freeze、旧设计全文及状态diff、获准资源plan快照、脚本、审批记录、运行原始记录。资源汇总 `resource-run-A4-B640-v1/summary.json` SHA-256 `b17e8ef35b9683f3a9fc001fdb5e077e3dc6d7fa3ffe248a07c9bffe894350fd`。
+基目录 `<private-evidence-root>/verification/pair-stability-036/`：作者/反方红灯、双份旧golden、完整回归日志、183文件freeze、旧设计全文及状态diff、获准资源plan快照、脚本、审批记录、运行原始记录。资源汇总 `resource-run-A4-B640-v1/summary.json` SHA-256 `b17e8ef35b9683f3a9fc001fdb5e077e3dc6d7fa3ffe248a07c9bffe894350fd`。其中 `<private-evidence-root>` 为历史私有目录的脱敏占位，需由证据持有者映射，并非仓库相对路径或公开下载地址。
 
 源码SHA `bfb2ec919b6be8a63fae163c0e00897f33af0589683d2831d8775d30c8d24155`；作者测试 `eb1dfac2cc6c61ff4b94878552652ba57dc56e1941e7f7d96c55aa5b0c9dd36b`；独立测试 `178b8e196e8ad91ea117bd198d808ca532b3065d3403b7d5515a99321178be7c`。资源plan `a29ee7e26f151f74fc1fce000d158b2ca03f9501dea9868f29e18514ac1e9d9a`，脚本 `cad23d983e2288b8e40b454d369bac6be836621b817be8221b5da6939294b60b`。
 
