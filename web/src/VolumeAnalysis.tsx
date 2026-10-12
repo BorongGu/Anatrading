@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { jsonRequest } from './api.ts';
 import { explainAnalysisError } from './analysis-errors.ts';
+import { historicalVolumeMedian } from './volume-median.ts';
 import type { Query, Row, VolumeComparison, VolumeReport } from './types.ts';
 
 const reasons: Record<string, string> = {
@@ -42,31 +43,37 @@ export function VolumeAnalysis({ query, selected }: { query: Query; selected: Ro
     </select></label></div>
     <p className="inline-note amber">回顾已收到值；闭合、单位、覆盖和股份可比性未核。比值依赖历史数量尺度与股份基础可比，预测效力未检验。</p>
     <p className="subtle">按此前 {lookback} 个可读来源日期比较；缺值不补，可读的问题日期不跳。日历未知，日期不可读时历史日期集合完整性未知。累计仅覆盖观测模板 09:31–11:30、13:01–15:00 到当前标签的时槽。</p>
-    {lookback === 2 && <p className="inline-note amber">2日为显式小样本比较，均值容易受单日影响。</p>}
+    <p className="subtle">当前/均量的分母仍为均值，中位数供并列核对。累计包含此前时槽，同一次早槽变化可延续到后续累计。</p>
+    {lookback === 2 && <p className="inline-note amber">2日为显式小样本比较，均值容易受单日影响。2个历史值的中位数与均值相同。</p>}
     {issue ? <p className="error-banner">{issue}</p> : !current ? <p className="subtle">正在计算…</p> : <>
       <p className="subtle">本次选择：同槽比 {current.rows.filter(row => row.regular?.ratio).length} 条、累计比 {current.rows.filter(row => row.cumulative?.ratio).length} 条可计算。</p>
       {(current.excluded_unlocated_rows > 0 || current.outside_template_rows > 0) && <p className="inline-note amber">上下文中 {current.excluded_unlocated_rows} 条标签无法定位、{current.outside_template_rows} 条位于模板外，数量未纳入时槽求和；有可读日期的记录仍占历史日期窗口。</p>}
       {value && focus ? <>
         <p><strong>{focus.label ?? '无法定位'} · 源序号 {focus.ordinal}</strong>{!selected && '（最新所选记录；点击K线可切换）'}</p>
-        <p className="subtle">实际历史日期：{value.history_dates.join('、') || '无'}</p>
-        {value.reason ? <p className="inline-note amber">{reasons[value.reason] ?? value.reason}</p> : <div className="exact-grid">
-          <Comparison title="当日模板累计" value={value.cumulative!} />
-          <Comparison title="本分钟同槽" value={value.regular!} />
+        <p className="subtle">实际历史日期：{Array.isArray(value.history_dates) ? value.history_dates.filter(day => typeof day === 'string').join('、') || '无' : '无法核对'}</p>
+        {typeof value.reason === 'string' ? <p className="inline-note amber">{Object.hasOwn(reasons, value.reason) ? reasons[value.reason] : value.reason}</p> : <div className="exact-grid">
+          <Comparison title="当日模板累计" value={value.cumulative!} kind="cumulative" lookback={current.lookback} currentDate={focus.label?.slice(0, 10) ?? null} historyDates={value.history_dates} />
+          <Comparison title="本分钟同槽" value={value.regular!} kind="regular" lookback={current.lookback} currentDate={focus.label?.slice(0, 10) ?? null} historyDates={value.history_dates} />
         </div>}
       </> : <p className="subtle">当前选择没有记录。</p>}
     </>}
   </section>;
 }
 
-function Comparison({ title, value }: { title: string; value: VolumeComparison }) {
-  return <div><h3>{title}</h3><p>当前源数量 <code>{value.current ?? '∅'}</code></p>
-    <p>历史均量 <code>{value.baseline_mean ? `≈${value.baseline_mean.display}` : '∅'}</code></p>
-    <p>相对均量 <code>{value.ratio ? `≈${value.ratio.display} 倍` : '∅'}</code></p>
-    {value.reason && <p className="amber">{reasons[value.reason] ?? value.reason}</p>}
+function Comparison({ title, value, kind, lookback, currentDate, historyDates }: {
+  title: string; value: VolumeComparison; kind: 'regular' | 'cumulative'; lookback: number;
+  currentDate: string | null; historyDates: string[];
+}) {
+  const median = historicalVolumeMedian(value, { kind, lookback, currentDate, historyDates });
+  return <div><h3>{title}</h3><p>当前源数量 <code>{typeof value?.current === 'string' ? value.current : '∅'}</code></p>
+    <p>历史均量 <code>{typeof value?.baseline_mean?.display === 'string' ? `≈${value.baseline_mean.display}` : '∅'}</code></p>
+    <p>历史中位数（源数量） <code>{median.exact_text ?? '∅'}</code>{median.status === 'available' && '（精确）'}{median.status === 'invalid' && ' · 中位数摘要无法核对'}</p>
+    <p>当前 / 历史均量 <code>{typeof value?.ratio?.display === 'string' ? `≈${value.ratio.display} 倍` : '∅'}</code></p>
+    {typeof value?.reason === 'string' && <p className="amber">{Object.hasOwn(reasons, value.reason) ? reasons[value.reason] : value.reason}</p>}
     <details><summary>历史成员与精确分数</summary>
-      {value.members.map(member => <p key={member.date}>{member.date}：<code>{member.value ?? '∅'}</code>{member.reason && ` · ${reasons[member.reason] ?? member.reason}`}</p>)}
-      {value.baseline_mean && <p>均量 <code>{value.baseline_mean.numerator}/{value.baseline_mean.denominator}</code></p>}
-      {value.ratio && <p>比值 <code>{value.ratio.numerator}/{value.ratio.denominator}</code></p>}
+      {Array.isArray(value?.members) && value.members.filter(member => member && typeof member.date === 'string').map((member, i) => <p key={`${member.date}:${i}`}>{member.date}：<code>{typeof member.value === 'string' ? member.value : '∅'}</code>{typeof member.reason === 'string' && ` · ${Object.hasOwn(reasons, member.reason) ? reasons[member.reason] : member.reason}`}</p>)}
+      {typeof value?.baseline_mean?.numerator === 'string' && typeof value.baseline_mean.denominator === 'string' && <p>均量 <code>{value.baseline_mean.numerator}/{value.baseline_mean.denominator}</code></p>}
+      {typeof value?.ratio?.numerator === 'string' && typeof value.ratio.denominator === 'string' && <p>比值 <code>{value.ratio.numerator}/{value.ratio.denominator}</code></p>}
       <p className="subtle">近似值独立舍入至4位小数，采用四舍六入五成双。</p>
     </details>
   </div>;
