@@ -125,6 +125,29 @@ def _refs(refs):
     return sorted(normalized, key=_json)
 
 
+def _events(events, identities, a, b):
+    if type(events) is not list or len(events) > 64:
+        raise ValueError("invalid_descriptor")
+    normalized_events = []
+    for event in events:
+        _keys(event, ("symbol", "snapshot_id", "start_date", "end_date", "kind", "evidence_refs"))
+        if not _text(event["symbol"]) or event["symbol"] not in identities:
+            raise ValueError("descriptor_source_mismatch")
+        if event["snapshot_id"] != identities[event["symbol"]]["snapshot_id"]:
+            raise ValueError("descriptor_source_mismatch")
+        first = strict_date(event["start_date"], "invalid_descriptor")
+        last = strict_date(event["end_date"], "invalid_descriptor")
+        if first > last or last < a or first > b or not _enum(
+                event["kind"], {"halt", "corporate_action_unresolved", "scope_conflict"}):
+            raise ValueError("invalid_descriptor")
+        if event["kind"] == "scope_conflict":
+            raise ValueError("scope_conflict")
+        normalized_events.append({**event, "evidence_refs": _refs(event["evidence_refs"])})
+    if len({_json(event) for event in normalized_events}) != len(normalized_events):
+        raise ValueError("invalid_descriptor")
+    return sorted(normalized_events, key=_json)
+
+
 def _descriptor(value, identities, target, a, b):
     _keys(value, ("schema_version", "group_name", "group_axis", "selection_date", "membership",
                   "selection_basis", "scope", "evidence_refs", "members", "events"))
@@ -159,26 +182,7 @@ def _descriptor(value, identities, target, a, b):
         found[symbol] = dict(member)
     if target not in found:
         raise ValueError("invalid_target")
-    events = value["events"]
-    if type(events) is not list or len(events) > 64:
-        raise ValueError("invalid_descriptor")
-    normalized_events = []
-    for event in events:
-        _keys(event, ("symbol", "snapshot_id", "start_date", "end_date", "kind", "evidence_refs"))
-        if not _text(event["symbol"]) or event["symbol"] not in found:
-            raise ValueError("descriptor_source_mismatch")
-        if event["snapshot_id"] != found[event["symbol"]]["snapshot_id"]:
-            raise ValueError("descriptor_source_mismatch")
-        first = strict_date(event["start_date"], "invalid_descriptor")
-        last = strict_date(event["end_date"], "invalid_descriptor")
-        if first > last or last < a or first > b or not _enum(
-                event["kind"], {"halt", "corporate_action_unresolved", "scope_conflict"}):
-            raise ValueError("invalid_descriptor")
-        if event["kind"] == "scope_conflict":
-            raise ValueError("scope_conflict")
-        normalized_events.append({**event, "evidence_refs": _refs(event["evidence_refs"])})
-    if len({_json(event) for event in normalized_events}) != len(normalized_events):
-        raise ValueError("invalid_descriptor")
+    normalized_events = _events(value["events"], found, a, b)
     return {**value, "scope": {key: dict(scope[key]) for key in scope},
             "evidence_refs": _refs(value["evidence_refs"]),
             "members": [found[symbol] for symbol in sorted(found)], "events": sorted(normalized_events, key=_json)}
@@ -197,8 +201,7 @@ def _checks(checks):
     return failed
 
 
-def _source(query):
-    """Validate only necessary Store structure and source qualification."""
+def _source_header(query):
     required = {"snapshot_id", "batch_id", "query_id", "selection", "manifest", "metadata", "rows",
                 "unlocated", "counts", "batch_checks"}
     extras = ({"read_projection"} if "read_projection" in query else {"quality", "unlocated_quality", "totals"})
@@ -223,14 +226,57 @@ def _source(query):
             or metadata.get("raw_sha256") != manifest["raw_sha256"]
             or selection["fields"] != list(VALUE_FIELDS)):
         raise ValueError("source_identity_mismatch")
-    if manifest.get("qualification") != "source_evidence_retrospective_only":
-        raise ValueError("unsupported_source")
+    return selection, manifest, metadata
+
+
+def _source_counts(query):
     counts = query["counts"]
     _keys(counts, ("selected_rows", "unlocated_rows", "batch_rows", "batch_unlocated_rows"), "invalid_counts")
     expected = (len(query["rows"]), len(query["unlocated"]), len(query["rows"]) + len(query["unlocated"]), len(query["unlocated"]))
     if any(type(counts[key]) is not int or counts[key] != count for key, count in zip(
             ("selected_rows", "unlocated_rows", "batch_rows", "batch_unlocated_rows"), expected)):
         raise ValueError("invalid_counts")
+
+
+def _source_rows(query):
+    ordinals = set()
+    for rows, unlocated in ((query["rows"], False), (query["unlocated"], True)):
+        for row in rows:
+            if type(row) is not dict or not {"ordinal", "label", "tokens", "values", "checks"} <= row.keys():
+                raise ValueError("invalid_query")
+            ordinal = row["ordinal"]
+            if type(ordinal) is not int or ordinal <= 0 or ordinal in ordinals:
+                raise ValueError("invalid_source_ordinal")
+            ordinals.add(ordinal)
+            if ((row["label"] is None) != unlocated or row["label"] is not None and type(row["label"]) is not str
+                    or type(row["tokens"]) is not dict or type(row["values"]) is not dict
+                    or not set(_PRICE) <= row["values"].keys()):
+                raise ValueError("invalid_query")
+            if any(row["values"][key] is not None and type(row["values"][key]) not in (str, Decimal, int) for key in _PRICE):
+                raise ValueError("invalid_query")
+            _checks(row["checks"])
+
+
+def _source_semantics(contract):
+    semantics = contract.get("source_semantics", {}).get("fields", {}) if type(contract.get("source_semantics")) is dict else {}
+    if type(semantics) is not dict:
+        raise ValueError("invalid_query")
+    return semantics
+
+
+def _source_semantic_field(semantics, name):
+    field = semantics.get(name, {})
+    if type(field) is not dict:
+        raise ValueError("invalid_query")
+    return field
+
+
+def _source(query):
+    """Validate only necessary Store structure and source qualification."""
+    selection, manifest, metadata = _source_header(query)
+    if manifest.get("qualification") != "source_evidence_retrospective_only":
+        raise ValueError("unsupported_source")
+    _source_counts(query)
     failed = _checks(query["batch_checks"])
     if source_rejection(query):
         raise ValueError("known_negative_source")
@@ -261,13 +307,9 @@ def _source(query):
             if obj.get(key) not in (None, "unknown", required_value):
                 raise ValueError("scope_conflict")
     contract = manifest["contract"]
-    semantics = contract.get("source_semantics", {}).get("fields", {}) if type(contract.get("source_semantics")) is dict else {}
-    if type(semantics) is not dict:
-        raise ValueError("invalid_query")
+    semantics = _source_semantics(contract)
     for name, expected_value in (("price_unit", "CNY"), ("adjustment", "none")):
-        field = semantics.get(name, {})
-        if type(field) is not dict:
-            raise ValueError("invalid_query")
+        field = _source_semantic_field(semantics, name)
         if field.get("value") not in (None, "unknown", expected_value, "unadjusted" if name == "adjustment" else "CNY"):
             raise ValueError("source_adjustment_conflict" if name == "adjustment" else "scope_conflict")
     if metadata.get("requested_adjustment") != "none" or _enum(metadata.get("source_adjustment"), _ADJUSTED):
@@ -280,22 +322,7 @@ def _source(query):
         raise ValueError("unsupported_source")
     if metadata.get("period") != "1d" or metadata.get("requested_period") != "1d":
         raise ValueError("unsupported_period")
-    ordinals = set()
-    for rows, unlocated in ((query["rows"], False), (query["unlocated"], True)):
-        for row in rows:
-            if type(row) is not dict or not {"ordinal", "label", "tokens", "values", "checks"} <= row.keys():
-                raise ValueError("invalid_query")
-            ordinal = row["ordinal"]
-            if type(ordinal) is not int or ordinal <= 0 or ordinal in ordinals:
-                raise ValueError("invalid_source_ordinal")
-            ordinals.add(ordinal)
-            if ((row["label"] is None) != unlocated or row["label"] is not None and type(row["label"]) is not str
-                    or type(row["tokens"]) is not dict or type(row["values"]) is not dict
-                    or not set(_PRICE) <= row["values"].keys()):
-                raise ValueError("invalid_query")
-            if any(row["values"][key] is not None and type(row["values"][key]) not in (str, Decimal, int) for key in _PRICE):
-                raise ValueError("invalid_query")
-            _checks(row["checks"])
+    _source_rows(query)
     return identity
 
 
@@ -392,7 +419,7 @@ def _exact(value, unit="ratio"):
     return dict(numerator=str(value.numerator), denominator=str(value.denominator), unit=unit)
 
 
-def _member(query, identity, target, a, b, events):
+def _endpoint_member(query, identity, a, b, events):
     candidates, reasons, anomalies = {a: [], b: []}, set(), []
     for rows in (query["rows"], query["unlocated"]):
         for row in rows:
@@ -431,10 +458,15 @@ def _member(query, identity, target, a, b, events):
             reasons.add("halted_endpoint_source_value")
     valid = left is not None and right is not None and not (reasons - _DIAGNOSTIC)
     change = Fraction(right) / Fraction(left) - 1 if valid else None
-    return dict(symbol=identity["symbol"], role="target" if identity["symbol"] == target else "peer",
+    return dict(symbol=identity["symbol"],
                 snapshot_id=query["snapshot_id"], batch_id=query["batch_id"], query_id=query["query_id"],
                 endpoints=dict(start=start, end=end), source_change=_exact(change) if change is not None else None,
                 reasons=_ordered(reasons), anomalies=sorted(anomalies, key=lambda item: item["ordinal"])), change
+
+
+def _member(query, identity, target, a, b, events):
+    member, change = _endpoint_member(query, identity, a, b, events)
+    return {**member, "role": "target" if identity["symbol"] == target else "peer"}, change
 
 
 def peer_relative_report(queries, group_descriptor, target, start_date, end_date):
@@ -509,3 +541,162 @@ endpoints never roll back dates or silently shrink the selected peer group.
                     corporate_action_coverage="unknown", adjustment="request_declared_semantics_unverified",
                     source_integrity="trusted_store_boundary", membership="current_members_retrospective",
                     source_semantics="unverified", statistical_or_trading_advantage="not_evaluated"))
+
+
+GROUP_METHOD_ID = 'explicit-group-source-endpoints-v1'
+GROUP_RULE_VERSION = 'peer-eligibility-complete-group-type7-v1'
+GROUP_MAX_RESULT_BYTES = 2 * 1024 * 1024
+_GROUP_SOURCE_REASONS = frozenset({
+    'known_negative_source', 'source_identity_conflict', 'source_adjustment_conflict',
+    'source_structure_failed', 'unsupported_source_check', 'scope_conflict',
+    'unsupported_source', 'unsupported_period',
+})
+GROUP_ERRORS = _GROUP_SOURCE_REASONS | frozenset({
+    'invalid_queries', 'invalid_query', 'invalid_selection', 'full_query_required',
+    'invalid_source_id', 'source_identity_mismatch', 'invalid_counts',
+    'invalid_source_ordinal', 'invalid_source_checks', 'invalid_dates',
+    'member_limit', 'duplicate_member', 'research_row_limit', 'universe_row_limit',
+    'auxiliary_input_limit', 'invalid_descriptor', 'descriptor_source_mismatch',
+    'group_result_limit', 'group_fraction_limit',
+})
+_GROUP_SCOPE = {key: dict(value=value, evidence_status='assumed') for key, value in
+                dict(asset_type='stock', share_class='A_share', price_currency='CNY',
+                     daily_label_basis='CN_exchange_date').items()}
+_GROUP_LIMITATIONS = dict(economic_return_qualified=False, total_return_qualified=False,
+    historical_availability='unverified', closure='unknown', trading_calendar='unknown',
+    corporate_action_coverage='unknown', adjustment='request_declared_semantics_unverified',
+    source_integrity='trusted_store_boundary', membership='current_members_retrospective',
+    source_semantics='unverified', statistical_or_trading_advantage='not_evaluated')
+
+
+def _group_exact(value):
+    # Admission establishes <2000 decimal digits for any 50-member mean.
+    # Guard arbitrary helper inputs before Python's integer-to-text safety limit.
+    if abs(value.numerator).bit_length() > 13_600 or value.denominator.bit_length() > 13_600:
+        raise ValueError('group_fraction_limit')
+    result = _exact(value)
+    if any(len(result[key]) > 4096 for key in ('numerator', 'denominator')):
+        raise ValueError('group_fraction_limit')
+    return result
+
+
+def _group_quantile(ordered, probability):
+    position = (len(ordered) - 1) * probability
+    index = position.numerator // position.denominator
+    weight = position - index
+    return ordered[index] if weight == 0 else ordered[index] * (1-weight) + ordered[index+1] * weight
+
+
+def _group_structure(query):
+    """Finish necessary structure checks before retaining any source rejection."""
+    _, manifest, metadata = _source_header(query)
+    _source_counts(query)
+    _checks(query['batch_checks'])
+    _source_rows(query)
+    if 'interpretation' in metadata and type(metadata['interpretation']) is not dict:
+        raise ValueError('invalid_query')
+    semantics = _source_semantics(manifest['contract'])
+    for name in ('price_unit', 'adjustment'):
+        _source_semantic_field(semantics, name)
+
+
+def group_endpoint_report(queries, start_date, end_date, *, events=None):
+    """Exact source descriptions for one explicit group; no target or training.
+
+    Complete trusted Store inputs only. Source qualification refusals retain
+    unevaluated members after structural admission. Store corruption and malformed
+    input never become ordinary missing members. The HTTP route supplies no events.
+    """
+    from collections import Counter
+
+    if type(queries) not in (list, tuple):
+        raise ValueError('invalid_queries')
+    if not 4 <= len(queries) <= MAX_MEMBERS:
+        raise ValueError('member_limit')
+    if any(type(q) is not dict or type(q.get('rows')) not in (list, tuple) or
+           type(q.get('unlocated')) not in (list, tuple) for q in queries):
+        raise ValueError('invalid_query')
+    sizes = [len(q['rows']) + len(q['unlocated']) for q in queries]
+    if max(sizes) > MAX_SOURCE_ROWS:
+        raise ValueError('research_row_limit')
+    if sum(sizes) > MAX_TOTAL_ROWS:
+        raise ValueError('universe_row_limit')
+    a, b = strict_date(start_date, 'invalid_dates'), strict_date(end_date, 'invalid_dates')
+    if a >= b:
+        raise ValueError('invalid_dates')
+    events = [] if events is None else events
+    _auxiliary(events)
+    for query in queries:
+        _group_structure(query)
+    sources, identities, snapshots = [], {}, set()
+    for query in sorted(queries, key=lambda q: q['snapshot_id']):
+        if query['snapshot_id'] in snapshots:
+            raise ValueError('duplicate_member')
+        snapshots.add(query['snapshot_id'])
+        source_error, identity = None, None
+        try:
+            identity = _source(query)
+        except ValueError as exc:
+            if str(exc) not in _GROUP_SOURCE_REASONS:
+                raise
+            source_error = str(exc)
+            if source_error != 'source_identity_conflict':
+                try:
+                    identity = symbol_identity(query)
+                except ValueError:
+                    pass
+        symbol = identity['symbol'] if identity is not None else None
+        if symbol is not None:
+            if symbol in identities:
+                raise ValueError('duplicate_member')
+            identities[symbol] = dict(symbol=symbol, snapshot_id=query['snapshot_id'], query_id=query['query_id'])
+        sources.append((query, identity, source_error))
+    events = _events(events, identities, a, b)
+    members, changes = [], []
+    for query, identity, source_error in sources:
+        if source_error is not None:
+            members.append(dict(symbol=identity['symbol'] if identity is not None else None,
+                snapshot_id=query['snapshot_id'], batch_id=query['batch_id'], query_id=query['query_id'],
+                evaluation='not_evaluated', endpoints=None, source_change=None,
+                reasons=[source_error], anomalies=None))
+            continue
+        member, change = _endpoint_member(query, identity, a, b, events)
+        issues = member['anomalies']
+        counts = Counter(code for item in issues for code in item['codes'])
+        member['anomalies'] = dict(total=len(issues), counts=dict(sorted(counts.items())),
+                                  examples=issues[:20], truncated=len(issues) > 20)
+        member['evaluation'] = 'evaluated'
+        # The shared core already emits reduced exact fractions, without floats.
+        if change is not None:
+            member['source_change'] = _group_exact(change)
+            changes.append(change)
+        members.append(member)
+    n, k = len(members), len(changes)
+    signs = dict(positive=sum(v > 0 for v in changes), zero=sum(v == 0 for v in changes),
+                 negative=sum(v < 0 for v in changes))
+    summary = dict(mean=None, median=None, q1=None, q3=None)
+    if k == n:
+        ordered = sorted(changes)
+        summary = dict(mean=_group_exact(sum(ordered, Fraction()) / n),
+            median=_group_exact(_group_quantile(ordered, Fraction(1,2))),
+            q1=_group_exact(_group_quantile(ordered, Fraction(1,4))),
+            q3=_group_exact(_group_quantile(ordered, Fraction(3,4))))
+    parameters = dict(start_date=a, end_date=b)
+    source_refs = [{key: member[key] for key in ('symbol','snapshot_id','batch_id','query_id')} for member in members]
+    scope = {key: dict(value) for key, value in _GROUP_SCOPE.items()}
+    identity_input = dict(method_id=GROUP_METHOD_ID, rule_version=GROUP_RULE_VERSION,
+                         source_rule_version=RULE_VERSION, parameters=parameters,
+                         sources=source_refs, scope=scope, events=events)
+    report = dict(method_id=GROUP_METHOD_ID, rule_version=GROUP_RULE_VERSION, source_rule_version=RULE_VERSION,
+        analysis_id=hashlib.sha256(_json(identity_input).encode('utf-8')).hexdigest(),
+        parameters=parameters, scope=scope, events=events, members=members,
+        counts=dict(selected=n, valid=k, missing=n-k), coverage=_group_exact(Fraction(k,n)),
+        sign_counts=signs,
+        sign_proportions={key: _group_exact(Fraction(count,k)) if k else None for key,count in signs.items()},
+        summary=summary, summary_reason=None if n == k else 'incomplete_group',
+        status='complete' if n == k else 'partial' if k else 'unavailable',
+        diagnostic_only=any(set(member['reasons']) & _DIAGNOSTIC for member in members),
+        limitations=dict(_GROUP_LIMITATIONS))
+    if len(_json(report).encode('utf-8')) > GROUP_MAX_RESULT_BYTES:
+        raise ValueError('group_result_limit')
+    return report

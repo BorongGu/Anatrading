@@ -1,0 +1,1068 @@
+{
+  "complete": {
+    "expected": {
+      "ids": [
+        "51a7c230f703fc13da07f13ec0a528cb86d553d3ef1b7970b1140c055d13b849",
+        "2f4955e6eac443acb61b9492e950035b0782b3524dc212aa97f3f48a0c097b84",
+        "1eb686562ddbbebc4a5a5a31bca4071c0a1df84b343e721ad5edf45f8bca6539",
+        "680291e07dc096dd4f715d24cc7d4688ee2ba443c5ea68f31130033f7879bb44",
+        "3786cd75dc017c46c0a8672da309d3c828a9a447d647808d4a63d67180d61642"
+      ],
+      "start": "2026-09-28",
+      "end": "2026-09-30"
+    },
+    "reply": {
+      "method_id": "explicit-group-source-endpoints-v1",
+      "rule_version": "peer-eligibility-complete-group-type7-v1",
+      "source_rule_version": "peer-relative-eligibility-v1",
+      "analysis_id": "46ad4b8f8c5ada3460a20fd90ec58a2643fe976cc7220b8ac7828613e4ff1387",
+      "parameters": {
+        "start_date": "2026-09-28",
+        "end_date": "2026-09-30"
+      },
+      "scope": {
+        "asset_type": {
+          "value": "stock",
+          "evidence_status": "assumed"
+        },
+        "share_class": {
+          "value": "A_share",
+          "evidence_status": "assumed"
+        },
+        "price_currency": {
+          "value": "CNY",
+          "evidence_status": "assumed"
+        },
+        "daily_label_basis": {
+          "value": "CN_exchange_date",
+          "evidence_status": "assumed"
+        }
+      },
+      "events": [],
+      "members": [
+        {
+          "symbol": "600002.SH",
+          "snapshot_id": "1eb686562ddbbebc4a5a5a31bca4071c0a1df84b343e721ad5edf45f8bca6539",
+          "batch_id": "70800a0148dbf277e71fafd03ff3f6d1c28478a5c051ce762686d2bc6bd469de",
+          "query_id": "987b5df58a549e29016a0a534e523cc2c5f30d81ba196a9bc11056b4f096b00a",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600001.SH",
+          "snapshot_id": "2f4955e6eac443acb61b9492e950035b0782b3524dc212aa97f3f48a0c097b84",
+          "batch_id": "ff220978669adc8c425537938836f0ee868adc57ab857f87e5ea3232e5a4f623",
+          "query_id": "a21309422c209359b08f4d47fd5e94a59fb51d887e9a71b003c33bd963987958",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600004.SH",
+          "snapshot_id": "3786cd75dc017c46c0a8672da309d3c828a9a447d647808d4a63d67180d61642",
+          "batch_id": "a160d52e3a50ed9c46b5cfa233b18a2b059c28e4dee540979c8f6fbeca7f935d",
+          "query_id": "8ac6fdcffc93c8d5c0c439381c30a773dcb7f09d6ad8b400fd42b8810764e281",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "106",
+              "close_exact": "106",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "3",
+            "denominator": "50",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600000.SH",
+          "snapshot_id": "51a7c230f703fc13da07f13ec0a528cb86d553d3ef1b7970b1140c055d13b849",
+          "batch_id": "a3154fcee5aa318129e200fd496552c37d96fcda5715ae73bdcab536ff89e011",
+          "query_id": "1150a59fc255ac3667b3ba8282d1c03793e6acca9dc94d24d31f41cbc46be789",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600003.SH",
+          "snapshot_id": "680291e07dc096dd4f715d24cc7d4688ee2ba443c5ea68f31130033f7879bb44",
+          "batch_id": "43bb11999c5125363f72e6065cec40293181843266b0423adb5ef968e3771fcf",
+          "query_id": "eda4940fb9c6d1619eaedb5bddd9f46b9a92d3851c1e7870c9e2e0b8aa7e0ec8",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        }
+      ],
+      "counts": {
+        "selected": 5,
+        "valid": 5,
+        "missing": 0
+      },
+      "coverage": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "ratio"
+      },
+      "sign_counts": {
+        "positive": 5,
+        "zero": 0,
+        "negative": 0
+      },
+      "sign_proportions": {
+        "positive": {
+          "numerator": "1",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "zero": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "negative": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        }
+      },
+      "summary": {
+        "mean": {
+          "numerator": "1",
+          "denominator": "50",
+          "unit": "ratio"
+        },
+        "median": {
+          "numerator": "1",
+          "denominator": "100",
+          "unit": "ratio"
+        },
+        "q1": {
+          "numerator": "1",
+          "denominator": "100",
+          "unit": "ratio"
+        },
+        "q3": {
+          "numerator": "1",
+          "denominator": "100",
+          "unit": "ratio"
+        }
+      },
+      "summary_reason": null,
+      "status": "complete",
+      "diagnostic_only": false,
+      "limitations": {
+        "economic_return_qualified": false,
+        "total_return_qualified": false,
+        "historical_availability": "unverified",
+        "closure": "unknown",
+        "trading_calendar": "unknown",
+        "corporate_action_coverage": "unknown",
+        "adjustment": "request_declared_semantics_unverified",
+        "source_integrity": "trusted_store_boundary",
+        "membership": "current_members_retrospective",
+        "source_semantics": "unverified",
+        "statistical_or_trading_advantage": "not_evaluated"
+      }
+    }
+  },
+  "partial": {
+    "expected": {
+      "ids": [
+        "51a7c230f703fc13da07f13ec0a528cb86d553d3ef1b7970b1140c055d13b849",
+        "2f4955e6eac443acb61b9492e950035b0782b3524dc212aa97f3f48a0c097b84",
+        "1eb686562ddbbebc4a5a5a31bca4071c0a1df84b343e721ad5edf45f8bca6539",
+        "680291e07dc096dd4f715d24cc7d4688ee2ba443c5ea68f31130033f7879bb44",
+        "3786cd75dc017c46c0a8672da309d3c828a9a447d647808d4a63d67180d61642"
+      ],
+      "start": "2026-09-28",
+      "end": "2026-09-30"
+    },
+    "reply": {
+      "method_id": "explicit-group-source-endpoints-v1",
+      "rule_version": "peer-eligibility-complete-group-type7-v1",
+      "source_rule_version": "peer-relative-eligibility-v1",
+      "analysis_id": "46ad4b8f8c5ada3460a20fd90ec58a2643fe976cc7220b8ac7828613e4ff1387",
+      "parameters": {
+        "start_date": "2026-09-28",
+        "end_date": "2026-09-30"
+      },
+      "scope": {
+        "asset_type": {
+          "value": "stock",
+          "evidence_status": "assumed"
+        },
+        "share_class": {
+          "value": "A_share",
+          "evidence_status": "assumed"
+        },
+        "price_currency": {
+          "value": "CNY",
+          "evidence_status": "assumed"
+        },
+        "daily_label_basis": {
+          "value": "CN_exchange_date",
+          "evidence_status": "assumed"
+        }
+      },
+      "events": [],
+      "members": [
+        {
+          "symbol": "600002.SH",
+          "snapshot_id": "1eb686562ddbbebc4a5a5a31bca4071c0a1df84b343e721ad5edf45f8bca6539",
+          "batch_id": "70800a0148dbf277e71fafd03ff3f6d1c28478a5c051ce762686d2bc6bd469de",
+          "query_id": "987b5df58a549e29016a0a534e523cc2c5f30d81ba196a9bc11056b4f096b00a",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600001.SH",
+          "snapshot_id": "2f4955e6eac443acb61b9492e950035b0782b3524dc212aa97f3f48a0c097b84",
+          "batch_id": "ff220978669adc8c425537938836f0ee868adc57ab857f87e5ea3232e5a4f623",
+          "query_id": "a21309422c209359b08f4d47fd5e94a59fb51d887e9a71b003c33bd963987958",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600004.SH",
+          "snapshot_id": "3786cd75dc017c46c0a8672da309d3c828a9a447d647808d4a63d67180d61642",
+          "batch_id": "a160d52e3a50ed9c46b5cfa233b18a2b059c28e4dee540979c8f6fbeca7f935d",
+          "query_id": "8ac6fdcffc93c8d5c0c439381c30a773dcb7f09d6ad8b400fd42b8810764e281",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "106",
+              "close_exact": "106",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "3",
+            "denominator": "50",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600000.SH",
+          "snapshot_id": "51a7c230f703fc13da07f13ec0a528cb86d553d3ef1b7970b1140c055d13b849",
+          "batch_id": "a3154fcee5aa318129e200fd496552c37d96fcda5715ae73bdcab536ff89e011",
+          "query_id": "1150a59fc255ac3667b3ba8282d1c03793e6acca9dc94d24d31f41cbc46be789",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": null,
+              "close_token": null,
+              "close_exact": null,
+              "reasons": [
+                "missing_endpoint"
+              ]
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": null,
+          "reasons": [
+            "missing_endpoint"
+          ],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600003.SH",
+          "snapshot_id": "680291e07dc096dd4f715d24cc7d4688ee2ba443c5ea68f31130033f7879bb44",
+          "batch_id": "43bb11999c5125363f72e6065cec40293181843266b0423adb5ef968e3771fcf",
+          "query_id": "eda4940fb9c6d1619eaedb5bddd9f46b9a92d3851c1e7870c9e2e0b8aa7e0ec8",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        }
+      ],
+      "counts": {
+        "selected": 5,
+        "valid": 4,
+        "missing": 1
+      },
+      "coverage": {
+        "numerator": "4",
+        "denominator": "5",
+        "unit": "ratio"
+      },
+      "sign_counts": {
+        "positive": 4,
+        "zero": 0,
+        "negative": 0
+      },
+      "sign_proportions": {
+        "positive": {
+          "numerator": "1",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "zero": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "negative": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        }
+      },
+      "summary": {
+        "mean": null,
+        "median": null,
+        "q1": null,
+        "q3": null
+      },
+      "summary_reason": "incomplete_group",
+      "status": "partial",
+      "diagnostic_only": false,
+      "limitations": {
+        "economic_return_qualified": false,
+        "total_return_qualified": false,
+        "historical_availability": "unverified",
+        "closure": "unknown",
+        "trading_calendar": "unknown",
+        "corporate_action_coverage": "unknown",
+        "adjustment": "request_declared_semantics_unverified",
+        "source_integrity": "trusted_store_boundary",
+        "membership": "current_members_retrospective",
+        "source_semantics": "unverified",
+        "statistical_or_trading_advantage": "not_evaluated"
+      }
+    }
+  },
+  "rejected": {
+    "expected": {
+      "ids": [
+        "51a7c230f703fc13da07f13ec0a528cb86d553d3ef1b7970b1140c055d13b849",
+        "2f4955e6eac443acb61b9492e950035b0782b3524dc212aa97f3f48a0c097b84",
+        "1eb686562ddbbebc4a5a5a31bca4071c0a1df84b343e721ad5edf45f8bca6539",
+        "680291e07dc096dd4f715d24cc7d4688ee2ba443c5ea68f31130033f7879bb44",
+        "3786cd75dc017c46c0a8672da309d3c828a9a447d647808d4a63d67180d61642"
+      ],
+      "start": "2026-09-28",
+      "end": "2026-09-30"
+    },
+    "reply": {
+      "method_id": "explicit-group-source-endpoints-v1",
+      "rule_version": "peer-eligibility-complete-group-type7-v1",
+      "source_rule_version": "peer-relative-eligibility-v1",
+      "analysis_id": "6f155a52264cb9c02b05e2a56968eebddda85b6663463dcbd4217547ccf93b0a",
+      "parameters": {
+        "start_date": "2026-09-28",
+        "end_date": "2026-09-30"
+      },
+      "scope": {
+        "asset_type": {
+          "value": "stock",
+          "evidence_status": "assumed"
+        },
+        "share_class": {
+          "value": "A_share",
+          "evidence_status": "assumed"
+        },
+        "price_currency": {
+          "value": "CNY",
+          "evidence_status": "assumed"
+        },
+        "daily_label_basis": {
+          "value": "CN_exchange_date",
+          "evidence_status": "assumed"
+        }
+      },
+      "events": [],
+      "members": [
+        {
+          "symbol": "600002.SH",
+          "snapshot_id": "1eb686562ddbbebc4a5a5a31bca4071c0a1df84b343e721ad5edf45f8bca6539",
+          "batch_id": "70800a0148dbf277e71fafd03ff3f6d1c28478a5c051ce762686d2bc6bd469de",
+          "query_id": "987b5df58a549e29016a0a534e523cc2c5f30d81ba196a9bc11056b4f096b00a",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600001.SH",
+          "snapshot_id": "2f4955e6eac443acb61b9492e950035b0782b3524dc212aa97f3f48a0c097b84",
+          "batch_id": "ff220978669adc8c425537938836f0ee868adc57ab857f87e5ea3232e5a4f623",
+          "query_id": "a21309422c209359b08f4d47fd5e94a59fb51d887e9a71b003c33bd963987958",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600004.SH",
+          "snapshot_id": "3786cd75dc017c46c0a8672da309d3c828a9a447d647808d4a63d67180d61642",
+          "batch_id": "a160d52e3a50ed9c46b5cfa233b18a2b059c28e4dee540979c8f6fbeca7f935d",
+          "query_id": "8ac6fdcffc93c8d5c0c439381c30a773dcb7f09d6ad8b400fd42b8810764e281",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "106",
+              "close_exact": "106",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "3",
+            "denominator": "50",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": null,
+          "snapshot_id": "51a7c230f703fc13da07f13ec0a528cb86d553d3ef1b7970b1140c055d13b849",
+          "batch_id": "a3154fcee5aa318129e200fd496552c37d96fcda5715ae73bdcab536ff89e011",
+          "query_id": "1150a59fc255ac3667b3ba8282d1c03793e6acca9dc94d24d31f41cbc46be789",
+          "evaluation": "not_evaluated",
+          "endpoints": null,
+          "source_change": null,
+          "reasons": [
+            "source_identity_conflict"
+          ],
+          "anomalies": null
+        },
+        {
+          "symbol": "600003.SH",
+          "snapshot_id": "680291e07dc096dd4f715d24cc7d4688ee2ba443c5ea68f31130033f7879bb44",
+          "batch_id": "43bb11999c5125363f72e6065cec40293181843266b0423adb5ef968e3771fcf",
+          "query_id": "eda4940fb9c6d1619eaedb5bddd9f46b9a92d3851c1e7870c9e2e0b8aa7e0ec8",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "100",
+              "close_exact": "100",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "101",
+              "close_exact": "101",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "100",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        }
+      ],
+      "counts": {
+        "selected": 5,
+        "valid": 4,
+        "missing": 1
+      },
+      "coverage": {
+        "numerator": "4",
+        "denominator": "5",
+        "unit": "ratio"
+      },
+      "sign_counts": {
+        "positive": 4,
+        "zero": 0,
+        "negative": 0
+      },
+      "sign_proportions": {
+        "positive": {
+          "numerator": "1",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "zero": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "negative": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        }
+      },
+      "summary": {
+        "mean": null,
+        "median": null,
+        "q1": null,
+        "q3": null
+      },
+      "summary_reason": "incomplete_group",
+      "status": "partial",
+      "diagnostic_only": false,
+      "limitations": {
+        "economic_return_qualified": false,
+        "total_return_qualified": false,
+        "historical_availability": "unverified",
+        "closure": "unknown",
+        "trading_calendar": "unknown",
+        "corporate_action_coverage": "unknown",
+        "adjustment": "request_declared_semantics_unverified",
+        "source_integrity": "trusted_store_boundary",
+        "membership": "current_members_retrospective",
+        "source_semantics": "unverified",
+        "statistical_or_trading_advantage": "not_evaluated"
+      }
+    }
+  },
+  "near_zero": {
+    "expected": {
+      "ids": [
+        "954c388e15702b5098f4072f62e2487cdde5105d59bc7a2ea1fd8a4d765f355f",
+        "a2b0c52d34481f0a393a6cddc58b5fcf9459715761e50c8053b168c8bffea5aa",
+        "a0b64e5c55cb17272c1ef885e47df8de45dffb346030b853754a2568884f8517",
+        "c328e7a3a455da5bef2c1f19a41ca0f477744dce3a932d1e351a5a9a5c7bf292"
+      ],
+      "start": "2026-09-28",
+      "end": "2026-09-30"
+    },
+    "reply": {
+      "method_id": "explicit-group-source-endpoints-v1",
+      "rule_version": "peer-eligibility-complete-group-type7-v1",
+      "source_rule_version": "peer-relative-eligibility-v1",
+      "analysis_id": "31ce330fb1b46607ab112c96ae120fd8791d517082960679b60ce1054143a8ca",
+      "parameters": {
+        "start_date": "2026-09-28",
+        "end_date": "2026-09-30"
+      },
+      "scope": {
+        "asset_type": {
+          "value": "stock",
+          "evidence_status": "assumed"
+        },
+        "share_class": {
+          "value": "A_share",
+          "evidence_status": "assumed"
+        },
+        "price_currency": {
+          "value": "CNY",
+          "evidence_status": "assumed"
+        },
+        "daily_label_basis": {
+          "value": "CN_exchange_date",
+          "evidence_status": "assumed"
+        }
+      },
+      "events": [],
+      "members": [
+        {
+          "symbol": "600000.SH",
+          "snapshot_id": "954c388e15702b5098f4072f62e2487cdde5105d59bc7a2ea1fd8a4d765f355f",
+          "batch_id": "68f63a2418de68a2e6b2f6200f7d07e3cda25e37dbfbbfe80b665eb829dc17fc",
+          "query_id": "15850d355f1f6609901868b338725ca194a9ff808db1d29c9146a97161ad6f43",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "1e0",
+              "close_exact": "1",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "1.000000000000000001",
+              "close_exact": "1.000000000000000001",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "1",
+            "denominator": "1000000000000000000",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600002.SH",
+          "snapshot_id": "a0b64e5c55cb17272c1ef885e47df8de45dffb346030b853754a2568884f8517",
+          "batch_id": "924a1fecdc584ffe12ac4f3d939abf46af87b92a2566d641e717965f883b45d5",
+          "query_id": "8239dce275f2d383da192dc9ec3d395057d8527e6be708c657026770dfe2b6db",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "1",
+              "close_exact": "1",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "1",
+              "close_exact": "1",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "0",
+            "denominator": "1",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600001.SH",
+          "snapshot_id": "a2b0c52d34481f0a393a6cddc58b5fcf9459715761e50c8053b168c8bffea5aa",
+          "batch_id": "e916a9e2c8df3933d2f1c69f93e57b193549e1dd9278f4e50ae74358e005dca6",
+          "query_id": "7d68f9b9990d62ff2047015e2753fe1e3e21772a63883142e5fb76b809280e41",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "1",
+              "close_exact": "1",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "0.999999999999999999",
+              "close_exact": "0.999999999999999999",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "-1",
+            "denominator": "1000000000000000000",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        },
+        {
+          "symbol": "600003.SH",
+          "snapshot_id": "c328e7a3a455da5bef2c1f19a41ca0f477744dce3a932d1e351a5a9a5c7bf292",
+          "batch_id": "4e529f032ff78ebe6324cb7c1c381f241351394d268118c9c0768dab10416de1",
+          "query_id": "03775de8035afeb1de65568fdc394acadce4a813594d04ccccfdcea12b32d672",
+          "endpoints": {
+            "start": {
+              "date": "2026-09-28",
+              "ordinal": 1,
+              "close_token": "1",
+              "close_exact": "1",
+              "reasons": []
+            },
+            "end": {
+              "date": "2026-09-30",
+              "ordinal": 2,
+              "close_token": "1",
+              "close_exact": "1",
+              "reasons": []
+            }
+          },
+          "source_change": {
+            "numerator": "0",
+            "denominator": "1",
+            "unit": "ratio"
+          },
+          "reasons": [],
+          "anomalies": {
+            "total": 0,
+            "counts": {},
+            "examples": [],
+            "truncated": false
+          },
+          "evaluation": "evaluated"
+        }
+      ],
+      "counts": {
+        "selected": 4,
+        "valid": 4,
+        "missing": 0
+      },
+      "coverage": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "ratio"
+      },
+      "sign_counts": {
+        "positive": 1,
+        "zero": 2,
+        "negative": 1
+      },
+      "sign_proportions": {
+        "positive": {
+          "numerator": "1",
+          "denominator": "4",
+          "unit": "ratio"
+        },
+        "zero": {
+          "numerator": "1",
+          "denominator": "2",
+          "unit": "ratio"
+        },
+        "negative": {
+          "numerator": "1",
+          "denominator": "4",
+          "unit": "ratio"
+        }
+      },
+      "summary": {
+        "mean": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "median": {
+          "numerator": "0",
+          "denominator": "1",
+          "unit": "ratio"
+        },
+        "q1": {
+          "numerator": "-1",
+          "denominator": "4000000000000000000",
+          "unit": "ratio"
+        },
+        "q3": {
+          "numerator": "1",
+          "denominator": "4000000000000000000",
+          "unit": "ratio"
+        }
+      },
+      "summary_reason": null,
+      "status": "complete",
+      "diagnostic_only": false,
+      "limitations": {
+        "economic_return_qualified": false,
+        "total_return_qualified": false,
+        "historical_availability": "unverified",
+        "closure": "unknown",
+        "trading_calendar": "unknown",
+        "corporate_action_coverage": "unknown",
+        "adjustment": "request_declared_semantics_unverified",
+        "source_integrity": "trusted_store_boundary",
+        "membership": "current_members_retrospective",
+        "source_semantics": "unverified",
+        "statistical_or_trading_advantage": "not_evaluated"
+      }
+    }
+  }
+}

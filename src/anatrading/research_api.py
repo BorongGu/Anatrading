@@ -221,6 +221,32 @@ def _calculate_path(store, sid, cutoff, error):
 
 def register_research_routes(app, owner, parse_parameters, error, safe_store_call):
     """Reuse the established local HTTP boundary and error mapping."""
+    @app.get("/api/research/group-endpoints")
+    async def group_endpoints(request: Request):
+        from .peer_relative_research import group_endpoint_report, GROUP_ERRORS
+        p = parse_parameters(request, {"snapshot_ids", "start_date", "end_date"},
+                             ("snapshot_ids", "start_date", "end_date"))
+        if len(p["snapshot_ids"]) > MAX_MEMBERS * 65:
+            raise error("research_member_limit")
+        ids = [_identifier(sid, error) for sid in p["snapshot_ids"].split(",")]
+        if not 4 <= len(ids) <= MAX_MEMBERS:
+            raise error("research_member_limit")
+        if len(set(ids)) != len(ids):
+            raise error("duplicate_snapshot")
+        ids.sort()
+        start, end = _day(p["start_date"], error), _day(p["end_date"], error)
+        if start >= end:
+            raise error("invalid_dates")
+        def calculate(store):
+            _research_budget(store, ids, None, error)
+            queries = [store._research_query(sid, cutoff=None) for sid in ids]
+            try:
+                return group_endpoint_report(queries, start, end)
+            except ValueError as exc:
+                code = str(exc)
+                raise error(code if code in GROUP_ERRORS else "invalid_research_input") from None
+        return JSONResponse(await owner.call(lambda store: safe_store_call(lambda: calculate(store))))
+
     @app.get("/api/research/two-group-explanation")
     async def two_group_explanation(request: Request):
         from .two_group_explanation import two_group_report, ERRORS

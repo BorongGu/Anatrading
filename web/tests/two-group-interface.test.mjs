@@ -9,7 +9,7 @@ const {UniverseResearch,createUniverseDraft}=await server.ssrLoadModule('/src/Un
 const {TwoGroupResults}=await server.ssrLoadModule('/src/TwoGroupResults.tsx');
 const render=(c,p)=>renderToStaticMarkup(createElement(c,p));
 test('SSR explicit roles are expanded and no target selector or legacy required window exists',()=>{
- const f=fixture(),draft={...createUniverseDraft(),ids:f.expected.ids,cutoff:f.expected.end,explanation:{enabled:true,start:f.expected.start,roles:{}}};
+ const f=fixture(),draft={...createUniverseDraft(),ids:f.expected.ids,cutoff:f.expected.end,mode:'explanation',explanation:{start:f.expected.start,roles:{}}};
  const html=render(UniverseResearch,{draft,snapshots:f.expected.ids.map(id=>({snapshot_id:id,row_count:62,metadata:{period:'1d',source_code:id.slice(0,6)}})),onImport(){},onOpen(){}});
  assert.equal((html.match(/aria-label="参考组 /g)||[]).length,4);assert.match(html,/解释全部所选成员/);assert.match(html,/每组至少两只/);assert.doesNotMatch(html,/id="universe-lookback"|目标选择|添加条件/);assert.match(html,/当前区间起点/);
 });
