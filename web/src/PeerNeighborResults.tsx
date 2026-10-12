@@ -1,5 +1,6 @@
 import { peerReason, peerSign } from './peer-neighbor-model.ts';
 import type { PeerNeighborReport, PeerCell, PeerMember } from './peer-neighbor-model.ts';
+import { peerDeclineDetails } from './peer-decline-details.ts';
 
 interface PeerNeighborResultsProps {
   report: PeerNeighborReport;
@@ -114,6 +115,84 @@ export function PeerNeighborResults({ report, name, onOpen }: PeerNeighborResult
     </>;
   }
 
+  function declineDetails(member: PeerMember) {
+    const details = peerDeclineDetails(report, member.snapshot_id);
+    const unavailableReasons = {
+      source_panel_unavailable: '完整组来源未齐，无法核对同跌明细。',
+      invalid_member_identity: '目标或同伴身份未通过核对，明细不可用。',
+      invalid_source_endpoints: '121个同日精确端点未通过核对，明细不可用。',
+    };
+
+    return <details className="peer-decline-details">
+      <summary>同跌明细</summary>
+      {!details.available ? <p>{unavailableReasons[details.reason]}</p> : <>
+        <p>按相邻源收盘比较：跌为本价小于前价，未跌包含持平。</p>
+        <p>仅记源价方向，不表示含分红经济收益或未来概率。</p>
+        {(['previous', 'current'] as const).map(window => {
+          const values = details[window];
+          return <section key={window}>
+            <h4>{window === 'previous' ? '前60区间' : '当前60区间'}</h4>
+            <p>{report.windows[window].start} → {report.windows[window].end}</p>
+            <div className="table-scroll">
+              <table className="distribution-table">
+                <thead><tr>
+                  <th scope="col">目标 / 同伴</th>
+                  <th scope="col">同伴跌</th>
+                  <th scope="col">同伴未跌</th>
+                  <th scope="col">合计</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">目标跌</th>
+                    <td>{values.counts.downDown}</td>
+                    <td>{values.counts.downNonDown}</td>
+                    <td>{values.targetDown}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">目标未跌</th>
+                    <td>{values.counts.nonDownDown}</td>
+                    <td>{values.counts.nonDownNonDown}</td>
+                    <td>{values.targetNonDown}</td>
+                  </tr>
+                </tbody>
+                <tfoot><tr>
+                  <th scope="row">合计</th>
+                  <td>{values.peerDown}</td>
+                  <td>{values.peerNonDown}</td>
+                  <td>{values.total}</td>
+                </tr></tfoot>
+              </table>
+            </div>
+            <p>持平：目标 {values.targetFlat}，同伴 {values.peerFlat}（已计入未跌）。</p>
+            <details>
+              <summary>同跌日期 {values.jointDownDates.length} 条</summary>
+              {values.jointDownDates.length === 0 ? <p>本窗无同跌日期。</p> : <>
+                <p>前日期 → 结束日期；分别打开双方至结束日期。</p>
+                <ul>
+                  {values.jointDownDates.map(event => <li key={event.date}>
+                    <span>{event.previousDate} → {event.date}</span>
+                    <div className="button-group">
+                      <button
+                        type="button"
+                        aria-label={`打开目标至${event.date}`}
+                        onClick={() => onOpen(target.snapshot_id, event.date)}
+                      >打开目标</button>
+                      <button
+                        type="button"
+                        aria-label={`打开同伴至${event.date}`}
+                        onClick={() => onOpen(member.snapshot_id, event.date)}
+                      >打开同伴</button>
+                    </div>
+                  </li>)}
+                </ul>
+              </>}
+            </details>
+          </section>;
+        })}
+      </>}
+    </details>;
+  }
+
   return <section className="panel research-panel">
     <div className="section-heading">
       <h2>双窗有符号相关{name ? ` · ${name}` : ''}</h2>
@@ -179,6 +258,7 @@ export function PeerNeighborResults({ report, name, onOpen }: PeerNeighborResult
                 <p>{member.reasons.map(peerReason).join('；') ||
                   (report.source_panel_complete ? '来源面板完整' : '本成员已核，整组面板未齐')}</p>
                 {source(member)}
+                {declineDetails(member)}
               </td>
             </tr>;
           })}
