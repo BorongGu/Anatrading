@@ -26,7 +26,7 @@ README 将安装和当前能力前置，原有命令、章节入口及以下历�
 
 ## 功能与研究进展
 
-2026-10-12新增[048共同端点单组](research/048-common-endpoint-group.md)：在既有多股选择中直接指定一组和共同a/b，沿030来源资格，保留N/K、原端点、全部失效行及完整组摘要。它补明确单组入口，不替代020固定池或030目标同伴比较。见[设计审查](reviews/2026-10-12-group-endpoints-design.md)、[实现独审](reviews/2026-10-12-group-endpoints-code-review.md)和[合成工程验收](qualification/group-endpoints.md)。本轮过滤Python3262通过/1 skip/34 deselected，另14真实用例未收集；Node275通过及构建通过，真实/浏览器/效果未验。
+2026-10-12新增[048共同端点单组](research/048-common-endpoint-group.md)：在既有多股选择中直接指定一组和共同a/b，沿030来源资格，保留N/K、原端点、全部失效行及完整组摘要。它补明确单组入口，不替代020固定池或030目标同伴比较。见[设计审查](reviews/2026-10-12-group-endpoints-design.md)、[实现独审](reviews/2026-10-12-group-endpoints-code-review.md)和[分阶段验收](qualification/group-endpoints.md)。初次合成范围过滤Python3262通过/1 skip/34 deselected，另14真实用例未收集；Node275通过及构建通过。随后8份既有腾讯日线、两个4成员组、3种固定窗口的6例真实来源核对通过独立终审，覆盖原token精确参考→新Store→ASGI→前端DTO/静态SSR及48项日期前缀与callback；两项验收脚本首轮失败经最小修正后通过，重复不加计。仅覆盖4例K=4与2例K=0，2份strict/6份legacy的原来源限定不变；更多真实类别、浏览器、性能与效果仍未验，合成整套未重跑。
 
 本轮已接通三个首版日线研究流程，**Linux 产品回归通过，完整验收仍有开放项**：
 
