@@ -39,3 +39,16 @@ test('actual backend failure codes have actionable Chinese reasons', () => {
     ['query_row_limit', '20,000'], ['service_busy', '请求队列'],
   ]) assert.ok(explain(new Error(code)).includes(expected), code);
 });
+
+test('shared explanations use only own mappings and keep safe unknown-code guidance', () => {
+  for (const code of ['constructor', 'unrecognized_safe_code']) {
+    assert.equal(explain(new Error(code)), `操作未完成，请根据安全代码核对输入或本地服务。（${code}）`);
+  }
+  for (const error of [new Error('__proto__'), new Error('toString'), new Error('<private raw payload>'),
+    new Error('/private/path'), new Error('constructor\nPRIVATE_BODY'), new Error('x'.repeat(81)),
+    'constructor', { message: 'constructor' }, null, undefined, 12]) {
+    assert.equal(explain(error), '连接中断，请确认本地服务仍在运行。（connection_error）');
+  }
+  assert.equal(explain(new Error('raw_object_corrupt')), '原件哈希或长度不一致，结果已清空；请恢复正确原件再查询。（raw_object_corrupt）');
+  assert.equal(explain(new Error('connection_error')), '连接中断，请确认本地服务仍在运行。（connection_error）');
+});

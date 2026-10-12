@@ -87,7 +87,7 @@ export function safeCode(error: unknown): string {
 }
 export function explain(error: unknown): string {
   const code = safeCode(error);
-  return `${explanations[code] ?? '操作未完成，请根据安全代码核对输入或本地服务。'}（${code}）`;
+  return `${Object.hasOwn(explanations, code) ? explanations[code] : '操作未完成，请根据安全代码核对输入或本地服务。'}（${code}）`;
 }
 
 export async function checkedFetch(url: string, options: RequestInit = {}): Promise<Response> {

@@ -1,6 +1,6 @@
 /** One explicit group, exact source ratios. No source qualification is added here. */
-import { jsonRequest } from './api.ts';
-import { canonicalJson } from './filter-model.ts';
+import { jsonRequest, safeCode } from './api.ts';
+import { canonicalJson, explainFilter } from './filter-model.ts';
 import type { SourceEndpoint } from './two-group-model.ts';
 export const GROUP_METHOD = 'explicit-group-source-endpoints-v1';
 export const GROUP_RULE = 'peer-eligibility-complete-group-type7-v1';
@@ -181,3 +181,7 @@ const groupReasons: Record<string,string> = {
   research_row_limit:'完整来源超过每股20,000条或合计200,000条预算；修改日期不会缩减读取',universe_row_limit:'完整来源合计超过200,000条预算',
 };
 export const groupReason = (code: string) => Object.hasOwn(groupReasons,code) ? groupReasons[code] : `来源限制：${code}`;
+export function explainGroupEndpointError(error: unknown): string {
+  const code = safeCode(error);
+  return Object.hasOwn(groupReasons, code) ? groupReasons[code] : explainFilter(error);
+}
