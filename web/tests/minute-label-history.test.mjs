@@ -154,7 +154,26 @@ test('fetch rejects valid-looking but wrong context and result hashes and malfor
   await assert.rejects(load(fixture(),'{'),/invalid_query_response/);
 });
 test('2 MiB streamed response ceiling rejects overflow without accepting a partial response', async () => {
-  await assert.rejects(load(fixture(),' '.repeat(2*1024*1024+1)),/response_limit/);
+  await assert.rejects(load(fixture(),' '.repeat(2*1024*1024+1)), error => {
+    assert.equal(error.message, 'response_limit');
+    assert.match(explainMinuteHistoryError(error), /2 MiB.*缩小显示源序号窗口无效.*仍须满足大小限制/);
+    assert.notEqual(explainMinuteHistoryError(error), explain(error));
+    return true;
+  });
+});
+test('minute history server response-limit uses the same bounded recovery guidance', async () => {
+  const f = fixture(), previous = globalThis.fetch;
+  globalThis.fetch = async path => {
+    assert.equal(path, f.request.path);
+    return Response.json({ error: 'response_limit' }, { status: 400 });
+  };
+  try {
+    await assert.rejects(loadMinuteHistory(f.request, new AbortController().signal), error => {
+      assert.equal(error.message, 'response_limit');
+      assert.equal(explainMinuteHistoryError(error), '历史同标签记录的响应超过 2 MiB 大小上限，缩小显示源序号窗口无效。可尝试较小来源数据版本；响应仍须满足大小限制。（response_limit）');
+      return true;
+    });
+  } finally { globalThis.fetch = previous; }
 });
 test('minute history row-limit response explains the full-version budget without changing ordinary query guidance', async () => {
   const f = fixture(), previous = globalThis.fetch;
@@ -172,7 +191,7 @@ test('minute history row-limit response explains the full-version budget without
   } finally { globalThis.fetch = previous; }
 });
 test('minute history keeps ordinary explanations and safe-code handling for every other error', () => {
-  for (const error of [new Error('response_limit'), new Error('invalid_query_response'), new Error('raw_object_corrupt'),
+  for (const error of [new Error('response_limit\n'), 'response_limit', { message: 'response_limit' }, new Error('invalid_query_response'), new Error('raw_object_corrupt'),
     new Error('unknown_safe_code'), new Error('/private/error.txt'), new Error('query_row_limit\n'),
     'query_row_limit', { message: 'query_row_limit' }, null]) {
     assert.equal(explainMinuteHistoryError(error), explain(error));

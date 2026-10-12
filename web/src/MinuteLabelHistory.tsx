@@ -14,6 +14,7 @@ const reasons: Record<string, string> = {
 };
 
 export function explainMinuteHistoryError(error: unknown): string {
+  if (safeCode(error) === 'response_limit') return '历史同标签记录的响应超过 2 MiB 大小上限，缩小显示源序号窗口无效。可尝试较小来源数据版本；响应仍须满足大小限制。（response_limit）';
   return safeCode(error) === 'query_row_limit'
     ? '历史同标签记录需要整个数据版本的上下文，完整版本上限为 20,000 条。缩小显示源序号窗口无效，请改选不超过上限的较小来源数据版本。（query_row_limit）'
     : explain(error);
