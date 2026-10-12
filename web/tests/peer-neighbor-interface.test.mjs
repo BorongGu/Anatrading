@@ -28,7 +28,14 @@ for(const name of Object.keys(fixtures))test(`SSR ${name} preserves target, all 
 });
 test('all boundary and selected date handlers preserve exact snapshot and date',()=>{
  const r=fixtures.complete.reply,calls=[],tree=PeerNeighborResults({report:r,name:'',onOpen:(...args)=>calls.push(args)});
- function visit(node){if(!node||typeof node!=='object')return;if(Array.isArray(node)){node.forEach(visit);return;}if(node.type==='button')node.props.onClick();visit(node.props?.children);}
+ function visit(node) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) { node.forEach(visit); return; }
+  // Keep the original source-button contract independent of the added detail buttons.
+  if (node.props?.className === 'peer-decline-details') return;
+  if (node.type === 'button') node.props.onClick();
+  visit(node.props?.children);
+ }
  visit(tree);assert.equal(calls.length,r.members.length*124);
  const expected=new Set(r.members.flatMap(m=>r.used_dates.map(day=>`${m.snapshot_id}/${day}`)));assert.ok(calls.every(([id,day])=>expected.has(`${id}/${day}`)));
 });
