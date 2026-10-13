@@ -25,6 +25,8 @@ const explanations: Record<string, string> = {
   cache_unstable: '客户端正在更新缓存，请稍后重新读取。',
   invalid_day_capture: '日线缓存为空、过大或记录未完整写入。',
   http_result_unknown: '行情接口连接失败或超时，请确认通达信处于运行状态。',
+  dispersion_result_limit: '单日期结果超过64 KiB预算，已整份拒绝；请核对来源资格资料。',
+  invalid_research_date: '日期须为有效完整日期，且不能晚于当前查询截止。',
   response_limit: '行情返回数据过大，请减少读取条数。',
   invalid_query_response: '响应与当前选择或显示映射不一致，已清空结果。',
   invalid_ordinal_range: '源序号须为正整数，起点不大于终点，闭区间最多 20,000 条。',

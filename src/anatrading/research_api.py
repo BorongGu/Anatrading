@@ -5,9 +5,10 @@ reports are pure functions; this module alone binds them to source identities.
 """
 from datetime import date
 import re
+import json
 
 from fastapi import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from .store import _identity
 
@@ -219,8 +220,65 @@ def _calculate_path(store, sid, cutoff, error):
     return envelope
 
 
+def _dispersion_bytes(report, error):
+    """Encode the entire response within 64 KiB, on the existing owner.
+
+    A single JSON string token is otherwise emitted as one unbounded chunk.
+    Guard its input length first; escaped/UTF-8 chunks then have a fixed bound.
+    Accumulation stops before adding any chunk that would exceed the budget.
+    """
+    limit = 65_536
+    remaining = limit
+    def guard(value):
+        nonlocal remaining
+        remaining -= 1 + (len(value) if isinstance(value, str) else 0)
+        if remaining < 0:
+            raise error("dispersion_result_limit")
+        if isinstance(value, str):
+            if len(value) > limit:
+                raise error("dispersion_result_limit")
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                guard(key)
+                guard(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                guard(item)
+    guard(report)
+    output = bytearray()
+    for chunk in json.JSONEncoder(ensure_ascii=False, allow_nan=False, separators=(",", ":")).iterencode(report):
+        encoded = chunk.encode("utf-8")
+        if len(output) + len(encoded) > limit:
+            raise error("dispersion_result_limit")
+        output.extend(encoded)
+    return bytes(output)
+
+
+def _calculate_dispersion(store, sid, cutoff, selected_date, error):
+    from .close_dispersion import selected_dispersion_report
+
+    query = _load(store, [sid], cutoff, error)[0]
+    result = _research_call(lambda: selected_dispersion_report(query, selected_date), error)
+    identity = {key: result[key] for key in ("view_method_id", "method_id", "adapter_id", "numeric_policy_id")}
+    identity.update(snapshot_id=query["snapshot_id"], query_id=query["query_id"], date=selected_date)
+    result["analysis_id"] = _identity(identity)
+    return _dispersion_bytes(result, error)
+
+
 def register_research_routes(app, owner, parse_parameters, error, safe_store_call):
     """Reuse the established local HTTP boundary and error mapping."""
+    @app.get("/api/research/close-dispersion/{snapshot_id}")
+    async def close_dispersion(snapshot_id: str, request: Request):
+        sid = _identifier(snapshot_id, error)
+        p = parse_parameters(request, {"cutoff", "date"})
+        cutoff = _day(p["cutoff"], error) if "cutoff" in p else None
+        selected_date = _day(p["date"], error) if "date" in p else None
+        if cutoff is not None and selected_date is not None and selected_date > cutoff:
+            raise error("invalid_research_date")
+        body = await owner.call(lambda store: safe_store_call(
+            lambda: _calculate_dispersion(store, sid, cutoff, selected_date, error)))
+        return Response(body, media_type="application/json")
+
     @app.get("/api/research/drawdown-episodes")
     async def drawdown_episodes(request: Request):
         from .drawdown_episode_research import drawdown_episode_report, ERRORS
