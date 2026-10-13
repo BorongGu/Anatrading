@@ -178,4 +178,4 @@ README 将安装和当前能力前置，原有命令、章节入口及以下历�
 
 ## 2026-10-13 运输诊断增量
 
-[055冻结设计](research/055-bounded-transport-phase-diagnostics.md)已接受并按先失败测试、后三模块最小实现推进。新增本次命令内存phase摘要，持久约定、分类、配额和来源权限不变；[验收记录](qualification/public-acquisition.md)暂待最终回归及独立实现审查。腾讯／新浪真实请求保持0次，未读取旧私有数据，实源链路门槛仍未解除。
+[055冻结设计](research/055-bounded-transport-phase-diagnostics.md)已接受并按先失败测试、后三模块最小实现推进。新增本次命令内存phase摘要，持久约定、分类、配额和来源权限不变；[验收记录](qualification/public-acquisition.md)：独立实现复审无阻断，114份持久JSON与基线逐字一致；最终受影响587通过，产品同字节版本全仓允许子集3470通过、49跳过、2个socket用例明确未跑。腾讯／新浪真实请求保持0次，未读取旧私有数据，实源链路门槛仍未解除。

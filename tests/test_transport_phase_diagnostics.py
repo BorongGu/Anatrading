@@ -306,3 +306,55 @@ def test_i3_spawn_pipe_and_cancel_unknown(monkeypatch):
     messages = queue.Queue()
     transport._read_pipe(Stream(), 'stdout', 100, messages, threading.Event())
     assert messages.get() == ('error', 'transport_protocol_invalid')
+
+
+@pytest.mark.parametrize('framing', ['fixed', 'chunked', 'eof'])
+@pytest.mark.parametrize('error,code', [(OSError('PRIVATE'), 'transport_network_error'),
+    (TimeoutError('PRIVATE'), 'transport_timeout'), (ssl.SSLError('PRIVATE'), 'transport_network_error')])
+def test_p5_partial_entity_fault_roundtrip_preserves_all_metadata(framing, error, code):
+    wire = response(b'ab', framing=framing == 'fixed')
+    if framing == 'chunked':
+        wire = response(b'2\r\nab\r\n0\r\n\r\n', b'Transfer-Encoding: chunked\r\n', framing=False)
+    class Stream(io.BytesIO):
+        reads = 0
+        def read(self, size=-1):
+            self.reads += 1
+            if self.reads > 1: raise error
+            return super().read(min(size, 1))
+    with pytest.raises(worker._TransportFailure) as caught:
+        worker._read_response(Stream(wire), URL)
+    expected = dict(code=code, phase='read', status=200, byte_count=1,
+                    body_sha256=hashlib.sha256(b'a').hexdigest(), complete=False)
+    assert caught.value.record() == expected
+    with pytest.raises(transport.PublicTransportError) as received:
+        transport._decode_output(json.dumps({'error': caught.value.record()}), REQUEST)
+    assert received.value.__dict__ == expected
+    assert str(received.value) == code
+
+
+@pytest.mark.parametrize('site', ['connection_enter', 'secured_enter', 'stream_enter',
+                                  'stream_exit', 'secured_exit', 'connection_exit'])
+def test_p3_distinct_resource_entry_and_cleanup_remain_unknown(monkeypatch, site):
+    class Resource:
+        def __init__(self, name): self.name = name
+        def __enter__(self):
+            if site == self.name + '_enter': raise OSError('PRIVATE')
+            return self
+        def __exit__(self, *args):
+            if site == self.name + '_exit': raise OSError('PRIVATE')
+        def sendall(self, wire): pass
+        def makefile(self, *args, **kwargs): return stream
+    class Stream(Resource, io.BytesIO):
+        def __init__(self):
+            Resource.__init__(self, 'stream')
+            io.BytesIO.__init__(self, response())
+    connection, secured, stream = Resource('connection'), Resource('secured'), Stream()
+    class Context:
+        def wrap_socket(self, sock, **kwargs):
+            assert sock is connection
+            return secured
+    monkeypatch.setattr(worker.socket, 'create_connection', lambda *a, **kw: connection)
+    monkeypatch.setattr(worker.ssl, 'create_default_context', Context)
+    with pytest.raises(worker._TransportFailure) as caught: worker._request(REQUEST)
+    assert caught.value.record() == {'code': 'transport_network_error'}
+    assert getattr(caught.value, 'phase', 'unknown') == 'unknown'
