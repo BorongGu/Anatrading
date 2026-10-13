@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { jsonRequest } from './api.ts';
 import { Generation } from './model.ts';
+import { PairHistory } from './PairHistory.tsx';
 import { assertResearchReply, buildResearchRequest, explainResearch, formatEstimate, formatPercent, isDailySnapshot, researchReason, snapshotName } from './research-model.ts';
 import { EstimatePlot, Metric, ResearchProvenance } from './ResearchResults.tsx';
 import type { Snapshot } from './types.ts';
@@ -25,18 +26,22 @@ function PairResearch({ snapshots, onImport }: { snapshots: Snapshot[]; onImport
   const [report, setReport] = useState<ResearchEnvelope<PairResult> | null>(null);
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [issue, setIssue] = useState('');
+  const available = daily.some(item => item.snapshot_id === left) && daily.some(item => item.snapshot_id === right);
+  const latestAvailable = useRef(available); latestAvailable.current = available;
   const gate = useRef(new Generation()); const abort = useRef<AbortController | null>(null);
   function invalidate() { gate.current.invalidate(); abort.current?.abort(); setReport(null); setIssue(''); setPhase('idle'); }
   useEffect(() => () => { gate.current.invalidate(); abort.current?.abort(); }, []);
+  useEffect(() => { if (!available) invalidate(); }, [available]);
   async function load() {
+    if (!latestAvailable.current) return;
     invalidate(); const generation = gate.current.current();
     try {
       const request = buildResearchRequest('pair', [left, right], cutoff, Number(lookback));
       const controller = new AbortController(); abort.current = controller; setPhase('loading');
       const result = await jsonRequest<ResearchEnvelope<PairResult>>(request.path, { signal: controller.signal });
-      if (!gate.current.isCurrent(generation)) return;
+      if (!latestAvailable.current || !gate.current.isCurrent(generation)) return;
       assertResearchReply(result, request.expected); setReport(result); setPhase('ready');
-    } catch (error) { if (gate.current.isCurrent(generation)) { setIssue(explainResearch(error)); setPhase('error'); } }
+    } catch (error) { if (latestAvailable.current && gate.current.isCurrent(generation)) { setIssue(explainResearch(error)); setPhase('error'); } }
   }
   return <>
     <div className="workspace-intro"><span className="eyebrow">关系研究</span><h1>双股对比</h1><p>对齐两只股票的共同日期，观察相对强弱、收益相关与价格偏离。</p></div>
@@ -45,13 +50,14 @@ function PairResearch({ snapshots, onImport }: { snapshots: Snapshot[]; onImport
         <form onSubmit={event => { event.preventDefault(); void load(); }}>
           <div className="pair-selectors"><label>左侧股票 A（被解释侧）<select value={left} onChange={event => { setLeft(event.target.value); invalidate(); }} required><option value="">请选择</option>{daily.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 6)}</option>)}</select></label>
             <span className="comparison-sign" aria-hidden="true">↔</span><label>右侧股票 B（解释侧）<select value={right} onChange={event => { setRight(event.target.value); invalidate(); }} required><option value="">请选择</option>{daily.map(item => <option key={item.snapshot_id} value={item.snapshot_id}>{snapshotName(item)} · {item.snapshot_id.slice(0, 6)}</option>)}</select></label></div>
-          <div className="research-controls cross-controls"><label>统一截止日期<input type="date" required value={cutoff} onChange={event => { setCutoff(event.target.value); invalidate(); }} /></label><label>观察窗口<input type="number" min="5" max="252" required value={lookback} onChange={event => { setLookback(event.target.value); invalidate(); }} /><small>来源记录数</small></label><button className="primary" disabled={phase === 'loading'}>{phase === 'loading' ? '核验并计算中…' : '比较两只股票'}</button></div>
+          <div className="research-controls cross-controls"><label>统一截止日期<input type="date" required value={cutoff} onChange={event => { setCutoff(event.target.value); invalidate(); }} /></label><label>观察窗口<input type="number" min="5" max="252" required value={lookback} onChange={event => { setLookback(event.target.value); invalidate(); }} /><small>来源记录数</small></label><button className="primary" disabled={!available || phase === 'loading'}>{phase === 'loading' ? '核验并计算中…' : '比较两只股票'}</button></div>
         </form><p className="inline-note">仅比较同一市场的不同证券。不填补缺日；坏行与重复日期会中断滚动窗口。</p>
       </section>
-      {issue && <p className="error-banner" role="alert">{issue}</p>}
-      {phase === 'loading' && <div className="panel research-loading" role="status">正在核验来源并计算，较早的结果已清除。</div>}
-      {!report && phase === 'idle' && <div className="workflow-hint"><span>接下来</span><p>选好两份日线数据与截止日期，即可查看共同样本和关系指标。</p></div>}
-      {report && <PairResults report={report} cutoff={cutoff} lookback={Number(lookback)} />}
+      {!available && <p className="inline-note amber">所选数据版本已不可用或不再是日线，请重新选择。</p>}
+      {available && issue && <p className="error-banner" role="alert">{issue}</p>}
+      {available && phase === 'loading' && <div className="panel research-loading" role="status">正在核验来源并计算，较早的结果已清除。</div>}
+      {available && !report && phase === 'idle' && <div className="workflow-hint"><span>接下来</span><p>选好两份日线数据与截止日期，即可查看共同样本和关系指标。</p></div>}
+      {available && report && <PairResults report={report} cutoff={cutoff} lookback={Number(lookback)} />}
     </>}
   </>;
 }
@@ -73,6 +79,7 @@ export function PairResults({ report, cutoff, lookback }: { report: ResearchEnve
       {row.reason && <p className="inline-note amber">{researchReason(row.reason)}</p>}{row.coverage_reason && <p className="inline-note amber">{researchReason(row.coverage_reason)}</p>}
     </> : <p className="research-loading">截止范围没有共同日期，不能计算关系。</p>}
     <details className="calculation-note"><summary>对齐与异常记录</summary><div className="table-scroll"><table><thead><tr><th>来源</th><th>源记录</th><th>重复日期</th><th>无效日期</th><th>无法定位</th></tr></thead><tbody>{([['A', a.left], ['B', a.right]] as const).map(([name, side]) => <tr key={name}><th>{name}</th><td>{side.source_rows}</td><td>{side.duplicate_groups}</td><td>{side.invalid_groups}</td><td>{side.unlocated_rows}</td></tr>)}</tbody></table></div></details>
+    <PairHistory report={report} lookback={lookback} />
     <ResearchProvenance report={report} />
   </section>;
 }
