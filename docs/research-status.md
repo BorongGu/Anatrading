@@ -175,3 +175,7 @@ README 将安装和当前能力前置，原有命令、章节入口及以下历�
 - [TradingView 高级能力与分期路线](research/031-tradingview-advanced-roadmap.md)：长期目标与后续候选，具体新增范围须单独研究复核
 - [国内能力矩阵](research/006-domestic-capabilities.md) / [国际能力矩阵](research/007-international-capabilities.md)：广覆盖调研；具体版本与同任务实测仍需补齐
 - 历史记录：[早期架构决策](REVIEW_DECISIONS.md)、[数据格式约定](contracts/INITIAL_DATA_CONTRACT.md)、[存储验收](qualification/evidence-core.md)、[图形验收](qualification/workbench.md)、[HTTP 约定](contracts/WORKBENCH_HTTP.md)。旧计数、性能和平台结论只适用于各报告注明的版本与日期
+
+## 2026-10-13 运输诊断增量
+
+[055冻结设计](research/055-bounded-transport-phase-diagnostics.md)已接受并按先失败测试、后三模块最小实现推进。新增本次命令内存phase摘要，持久约定、分类、配额和来源权限不变；[验收记录](qualification/public-acquisition.md)暂待最终回归及独立实现审查。腾讯／新浪真实请求保持0次，未读取旧私有数据，实源链路门槛仍未解除。

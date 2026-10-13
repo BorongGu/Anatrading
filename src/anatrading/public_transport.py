@@ -21,7 +21,7 @@ import threading
 import time
 
 from .public_http_worker import (
-    MAX_BODY_BYTES, MAX_HEADER_BYTES, MAX_REQUEST_BYTES, _SAFE_CODES,
+    MAX_BODY_BYTES, MAX_HEADER_BYTES, MAX_REQUEST_BYTES, _SAFE_CODES, _SAFE_PHASES,
     _TransportFailure, _validate_request,
 )
 
@@ -36,13 +36,15 @@ _HASH = re.compile(r"[0-9a-f]{64}")
 class PublicTransportError(Exception):
     """Only stable codes and explicitly sanitized metadata cross this boundary."""
     def __init__(self, code, *, status=None, retry_after=None, byte_count=None,
-                 body_sha256=None, complete=None):
+                 body_sha256=None, complete=None, phase=None):
         self.code = code if code in _SAFE_CODES else "transport_protocol_invalid"
         for name, value in (("status", status), ("retry_after", retry_after),
                             ("byte_count", byte_count), ("body_sha256", body_sha256),
                             ("complete", complete)):
             if value is not None:
                 setattr(self, name, value)
+        if phase is not None:
+            self.phase = phase if type(phase) is str and phase in _SAFE_PHASES else "unknown"
         super().__init__(self.code)
 
 
@@ -148,9 +150,11 @@ def _pairs(pairs):
 
 
 def _safe_error(value):
-    allowed = {"code", "status", "retry_after", "byte_count", "body_sha256", "complete"}
+    allowed = {"code", "status", "retry_after", "byte_count", "body_sha256", "complete", "phase"}
     if (type(value) is not dict or not set(value) <= allowed
             or type(value.get("code")) is not str or value["code"] not in _SAFE_CODES):
+        raise ValueError
+    if "phase" in value and (type(value["phase"]) is not str or value["phase"] not in _SAFE_PHASES):
         raise ValueError
     if "status" in value and (type(value["status"]) is not int or not 100 <= value["status"] <= 599):
         raise ValueError

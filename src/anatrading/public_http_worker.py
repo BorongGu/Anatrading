@@ -5,6 +5,7 @@ This is a program/environment boundary, not an operating-system file sandbox.
 Never import application modules, open a Store, or emit server failure content.
 """
 import base64
+from contextlib import contextmanager
 from datetime import timezone
 from email.utils import parsedate_to_datetime
 import hashlib
@@ -28,6 +29,7 @@ _ALLOWED_HEADERS = {"Accept": "*/*", "Accept-Encoding": "identity"}
 _CRITICAL_HEADERS = {"content-type", "content-encoding", "content-length", "transfer-encoding"}
 _TOKEN = re.compile(rb"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 _STATUS = re.compile(rb"HTTP/1\.[01] ([1-5][0-9]{2})(?: [\t\x20-\x7e\x80-\xff]*)?\r\n")
+_SAFE_PHASES = frozenset({"dns", "connect", "tls", "http", "read", "unknown"})
 _SAFE_CODES = frozenset({
     "transport_request_invalid", "transport_headers_invalid", "transport_headers_too_large",
     "transport_framing_invalid", "transport_encoding_unsupported", "transport_body_too_large",
@@ -48,7 +50,8 @@ class _TransportFailure(Exception):
 
     def record(self):
         return {name: value for name, value in self.__dict__.items()
-                if name in {"code", "status", "retry_after", "byte_count", "body_sha256", "complete"}}
+                if name in {"code", "status", "retry_after", "byte_count", "body_sha256", "complete"}
+                or name == "phase" and type(value) is str and value in _SAFE_PHASES}
 
 
 def _validate_request(request):
@@ -147,9 +150,10 @@ class _ResponseReader:
         self.body = bytearray()
         self.digest = hashlib.sha256()
         self.status = None
+        self.phase = "http"
 
     def fail(self, code, *, complete=False, retry_after=None):
-        safe = {"byte_count": len(self.body), "body_sha256": self.digest.hexdigest(), "complete": complete}
+        safe = {"phase": self.phase, "byte_count": len(self.body), "body_sha256": self.digest.hexdigest(), "complete": complete}
         if self.status is not None:
             safe["status"] = self.status
         if retry_after is not None:
@@ -286,6 +290,7 @@ def _read_response(stream, response_url):
             reader.fail("transport_http_status")
         if "content-type" not in headers:
             reader.fail("transport_headers_invalid")
+        reader.phase = "read"
         reader.body_bytes(headers)
         body = bytes(reader.body)
         if _is_restriction(body):
@@ -301,6 +306,23 @@ def _read_response(stream, response_url):
         reader.fail("transport_network_error")
 
 
+@contextmanager
+def _phase(phase):
+    """Annotate only the enclosed operation, never resource entry or cleanup.
+
+    Keep the outer request's existing exception-to-code mapping, including
+    SSL errors during writes. Response reading keeps its own older mapping.
+    """
+    try:
+        yield
+    except ssl.SSLError:
+        raise _TransportFailure("transport_tls_invalid", phase=phase) from None
+    except (socket.timeout, TimeoutError):
+        raise _TransportFailure("transport_timeout", phase=phase) from None
+    except OSError:
+        raise _TransportFailure("transport_network_error", phase=phase) from None
+
+
 def _request(request):
     host, target = _validate_request(request)
     context = ssl.create_default_context()
@@ -308,10 +330,21 @@ def _request(request):
     wire = (f"GET {target} HTTP/1.1\r\nHost: {host}\r\nAccept: */*\r\n"
             "Accept-Encoding: identity\r\nConnection: close\r\n\r\n").encode("ascii")
     try:
-        with socket.create_connection((host, 443), timeout=15) as connection:
-            with context.wrap_socket(connection, server_hostname=host) as secured:
-                secured.sendall(wire)
-                with secured.makefile("rb", buffering=16384) as stream:
+        with _phase("unknown"):
+            try:
+                connection = socket.create_connection((host, 443), timeout=15)
+            except socket.gaierror:
+                raise _TransportFailure("transport_network_error", phase="dns") from None
+            except ConnectionRefusedError:
+                raise _TransportFailure("transport_network_error", phase="connect") from None
+        with connection as connection:
+            with _phase("tls"):
+                secured = context.wrap_socket(connection, server_hostname=host)
+            with secured as secured:
+                with _phase("http"):
+                    secured.sendall(wire)
+                    stream = secured.makefile("rb", buffering=16384)
+                with stream as stream:
                     return _read_response(stream, request["url"])
     except _TransportFailure:
         raise

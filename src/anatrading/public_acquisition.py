@@ -707,7 +707,7 @@ def _source_blocked(source_dir, source):
     return True
 
 
-def _summary(store, plan, journal, elapsed):
+def _summary(store, plan, journal, elapsed, transport_diagnostics):
     states = [block['status'] for block in journal['blocks']]
     stopped = next((b for b in journal['blocks'] if b['status'] not in {'committed', 'empty_result', 'pending'}), None)
     if all(state == 'committed' for state in states):
@@ -744,12 +744,14 @@ def _summary(store, plan, journal, elapsed):
                 error_code=stopped['error_code'] if stopped else None, stop_reason=stopped['error_code'] if stopped else None,
                 resume_allowed=allowed, attempts_used=len(journal['attempts']),
                 attempts_remaining=_MAX_ATTEMPTS-len(journal['attempts']), blocks=blocks,
-                quantity_normalization='unstandardized', coverage='unverified', elapsed_seconds=round(elapsed, 3))
+                quantity_normalization='unstandardized', coverage='unverified', elapsed_seconds=round(elapsed, 3),
+                transport_diagnostics=transport_diagnostics)
 
 
 def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, cancelled=None):
-    from .public_transport import PublicTransportError, fetch
+    from .public_transport import PublicTransportError, fetch, _SAFE_PHASES
     transport, checkpoint, cancelled = transport or fetch, checkpoint or (lambda stage: None), cancelled or (lambda: False)
+    transport_diagnostics = []
     started = time.monotonic()
     deadline = started + _COMMAND_SECONDS
     resuming = plan is None
@@ -843,12 +845,19 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                     attempt['retry_after'] = getattr(error, 'retry_after', None)
                     _state(journal, index, status, code, attempt)
                     _save(directory, journal)
+                    # Ephemeral, non-authoritative metadata, only after durable state.
+                    phase = getattr(error, 'phase', 'unknown')
+                    if type(phase) is not str or phase not in _SAFE_PHASES:
+                        phase = 'unknown'
+                    if len(transport_diagnostics) < _MAX_ATTEMPTS:
+                        transport_diagnostics.append(dict(run_id=plan['run_id'], attempt_number=number,
+                                                          block_id=block['block_id'], code=code, phase=phase))
                 except DecodeError as error:
                     _state(journal, index, 'failed_terminal', error.code, attempt)
                     _save(directory, journal)
             if journal['blocks'][index]['status'] not in {'committed', 'empty_result'}:
                 break
-        return _summary(store, plan, journal, time.monotonic()-started)
+        return _summary(store, plan, journal, time.monotonic()-started, transport_diagnostics)
 
 
 def acquire_public(root, *, source, symbol, asset_type, period, start=None, end=None, count=None,

@@ -66,3 +66,13 @@
 - Windows原生自动采集：未跑。当前新采集路径要求no-follow目录描述符及目录fsync，能力不足的平台在联网前明确失败；既有跨平台Store行为未改。
 - 强断电、网络盘、跨OS共享互斥、浏览器、长期来源可用性及最终性能：本轮未验证。
 - 市场完整覆盖、标准数量单位、历史当时可得、预测／交易增量：本轮不授予资格。legacy历史重建依旧明确缺少运输和头重复性证据。
+
+## 2026-10-13：有界运输阶段诊断（独立实现复审待完成）
+
+编码前已接受[冻结设计与16组矩阵](../research/055-bounded-transport-phase-diagnostics.md)。新增 `transport_diagnostics` 是当前命令内存中的失败摘要：每条仅 `run_id/attempt_number/block_id/code/phase`，最多10条，现有首次运输失败即停意味着通常最多1条。没有本次运输错误时为 `[]`；resume 不回填旧失败，使用真实的新 attempt 编号。字段不写 journal、plan、reservation、capture 或 source-state，所有原版本及四键 transport 持久约定不变。
+
+phase 精确取 `dns/connect/tls/http/read/unknown`。仅窄 create_connection 调用中的 gaierror 和 ConnectionRefusedError 分别给 dns/connect；其余通用连接异常／超时保守 unknown。TLS 包装、HTTP发送／头读取、实体读取分别标明已知位置；关闭、父截止／取消、损坏IPC和未知异常不继承最后阶段。phase 不参与分类、配额、恢复或来源许可。可信401/403/429仍优先blocked；无效IPC整条拒绝且不捞取status。
+
+新parent接受旧worker缺phase的错误，显示unknown。旧parent拒绝新worker的phase字段，必须同版本交付，无混搭兼容承诺。旧summary读取者应把缺失字段视为 `[]`；仓内CLI原样JSON及按键消费者适用，外部精确字段消费者可能需更新。新增诊断不含URL/host/IP/异常原文；原summary本来已有request，不宣称整个summary无URL。
+
+验证仅本地合成及故障进程，无真实请求或DNS，不打开旧私有数据库、Store或行情原件。实现前新增测试83失败/14通过；首次最小实现97通过。最终增补矩阵、受影响套件和允许的全仓回归正在验证，正式结果另补。真实来源、Windows原生、浏览器、性能与金融效果均未验证。全仓两个localhost慢流测试 `test_http_slow_chunks_do_not_reset_absolute_deadline[header/body]` 因零网络边界明确未跑。
