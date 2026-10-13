@@ -1,3 +1,4 @@
+import { NoticeDateDiagnostic } from './NoticeDateDiagnostic.tsx';
 import { useState } from 'react';
 import { groupPairReason } from './group-pair-model.ts';
 import type { GroupPair, GroupPairMember, GroupPairReport } from './group-pair-model.ts';
@@ -109,6 +110,7 @@ export function GroupPairResults({ report, name, onOpen }: {
     </section>}
     <p className="inline-note">正相关只描述中心化线性关系，不表示每天同涨同跌；零相关不表示独立。常量变化的相关未定义，包含恒定非零变化。无排名、差值或自动分组。</p>
     <p className="inline-note amber">当前明确成员的来源回顾。交易日历、复权、公司行动、闭合与历史当时可得性未核实；A股/CNY为范围假设。不认证预测、协整、套利或经济收益。性能、实际人效和金融效果未验。</p>
+    <NoticeDateDiagnostic report={report} onOpen={onOpen} />
     <details><summary>计算身份与回查边界</summary><p>{report.method_id} · {report.rule_version} · {report.source_rule_version} · {report.analysis_id}</p>
       <p>打开原数据版本至指定日期，不自动聚焦源序号。前缀查询与完整来源查询的query_id不同。哈希只验证响应自洽，前端不独立认证原件或重算Pearson相关。</p>
     </details>
