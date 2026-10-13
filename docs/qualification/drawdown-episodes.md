@@ -40,7 +40,7 @@ npm run build
 
 最终修订后的结果：所列Python 145 passed，0 failed、0 skipped；全量Node 628 passed，0 failed、0 skipped、0 cancelled；TypeScript/Vite构建通过。独立实现审查通过，无剩余已知阻断。以上Python范围只包含预审过的纯函数和全新合成Store用例，没有运行完整pytest。Node全量包含两个原有新合成桥接；只释放已完成桥接自己的新数据库，保留锁文件、原件和目录，失败时保留新证据。不清理历史Store。
 
-旧数值/来源资格、Store/锁/导入/导出、原有结果组件及未计划修改的产品文件，按编码前SHA-256清单核对不变；有意接入仅限research_api、universe-request、UniverseResearch三个文件。冻结设计三文件也逐一核对未变。
+旧数值/来源资格、Store/锁/导入/导出、原有结果组件及未计划修改的产品文件，按编码前SHA-256清单核对不变；有意接入仅限research_api、universe-request、UniverseResearch三个文件。最终产品验收时，三份设计文件也逐一核对未变。
 
 ## 失败、警告和未验范围
 
@@ -51,3 +51,5 @@ npm run build
 未验：历史真实数据、Windows原生、真实浏览器交互与视觉布局、socket HTTP、性能/RSS、完整Python集合、真人效率、样本外预测或交易结果。未下载行情，未接触旧受限DB、凭据或账户权限，未公开部署。本地通过仅接受上述有界描述功能。
 
 下一验收：负责方检查最终diff和独审记录后决定发布流程；真实来源/浏览器/Windows及任何性能或预测扩展仍需各自明确范围和证据。
+
+验收后的文档同步：仅更新当前 `docs/research-status.md` 的050状态指针，并在本记录注明变更。050研究稿和编码前验收协议正文保持不变；设计提交 `19daf9440a5c77c4fe9abf5d8c974a430b08c764` 完整保留当时三份文件的编码前原文。此次不改产品代码或测试，不重跑产品验证，也不表示已发布或合并。
