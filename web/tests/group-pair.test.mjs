@@ -93,7 +93,7 @@ test('051 pagination retains all 1225 pairs, constants and failures, 50 per page
  for(let page=0;page<Math.ceil(r.pairs.length/50);page++){
  const result=groupPairPage(r,page);all.push(...result.pairs);
  const html=render(GroupPairPage,{report:r,window:'current',page,onPage(){},onSelect(){}});
- assert.equal((html.match(/回查双方/g)||[]).length,result.pairs.length);assert.ok(result.pairs.length<=50);
+ assert.equal((html.match(/>查看双方来源<\/button>/g)||[]).length,result.pairs.length);assert.ok(result.pairs.length<=50);
  }
  assert.deepEqual(all,r.pairs);assert.throws(()=>groupPairPage(r,-1));assert.throws(()=>groupPairPage(r,Math.ceil(r.pairs.length/50)));
  }
@@ -132,7 +132,7 @@ test('051 Unicode source failures render original tokens, all members and unavai
  const source=render(GroupPairSource,{member,commonDates:x.reply.used_dates,onOpen(){}});
  assert.match(source,/原文 停牌/);assert.match(source,/来源限制：未知核验/);assert.match(source,/来源限制：constructor/);assert.match(source,/来源限制：__proto__/);
  assert.ok(source.includes('🛑'.repeat(128)));assert.doesNotMatch(source,/native code|function Object/);
- for(const window of ['previous','current']){const table=render(GroupPairPage,{report:x.reply,window,page:0,onPage(){},onSelect(){}});assert.equal((table.match(/回查双方/g)||[]).length,3);assert.match(table,/不可算/);}
+ for(const window of ['previous','current']){const table=render(GroupPairPage,{report:x.reply,window,page:0,onPage(){},onSelect(){}});assert.equal((table.match(/>查看双方来源<\/button>/g)||[]).length,3);assert.match(table,/不可算/);}
 });
 
 test('051 Unicode byte budget rejects multi-byte overflow below the UTF-16 text count',()=>{
@@ -149,4 +149,66 @@ test('051 Unicode byte budget rejects multi-byte overflow below the UTF-16 text 
 test('051 SSR discloses complete-source post-cutoff qualification boundary',()=>{
  const html=render(GroupPairResults,{report:f().reply,name:'合成',onOpen(){}});
  assert.ok(html.includes('价格计算只使用截止日及以前的窗口；所选完整数据版本在截止日后出现身份、复权或结构反证，也会关闭本次相关计算。历史当时可得性未核实。'));
+});
+
+
+// Freeze the local reading/accessibility contract before changing presentation.
+const nodesOf=(tree,type)=>{const nodes=[];visit(tree,n=>{if(n.type===type)nodes.push(n);});return nodes;};
+test('051 readable exact boundaries follow exact metadata despite rounded display',()=>{
+ const cases=[
+ ['positive_one','1E+0','1.0000','positive','精确为+1'],
+ ['negative_one','-1E+0','-1.0000','negative','精确为−1'],
+ ['zero','0','0.0000','zero','精确为0'],
+ ...[['1E-4566','0.0000','positive'],['-1E-4566','0.0000','negative'],['1E+0','1.0000','positive'],['-1E+0','-1.0000','negative']].map(([e,d,s])=>['none',e,d,s,'非精确边界（精确计算结果不等于0或±1；有限精度估计与显示可能舍入为这些值）'])
+ ];
+ for(const [exact_boundary,estimate,display,sign,label] of cases){
+  const x=f();x.reply.pairs[0].current.correlation={exact_boundary,estimate,display,sign};assertGroupPairs(x.reply,x.expected);
+  const r={...x.reply,pairs:[x.reply.pairs[0]]},html=render(GroupPairPage,{report:r,window:'current',page:0,onPage(){},onSelect(){}});
+  assert.ok(html.includes(label));assert.doesNotMatch(html,/精确边界 (positive_one|negative_one|zero|none)/);
+ }
+});
+test('051 anomaly scopes and counts translate known codes and retain safe unknown raw diagnostics',()=>{
+ const member=f('unicode_failure').reply.members.find(m=>m.symbol==='600001.SH');
+ const codes=['history_insufficient','未知核验','constructor','__proto__','toString','<script>'];
+ member.anomalies={total:4,truncated:false,counts:Object.fromEntries(codes.map(c=>[c,4])),examples:['inside_interval','outside_interval','window_unavailable','unknown'].map((scope,i)=>({ordinal:i+1,date:null,scope,codes}))};
+ const html=render(GroupPairSource,{member,commonDates:[],onOpen(){}});
+ for(const label of ['候选窗口内','候选窗口外','候选窗口未建立','日期无法定位'])assert.ok(html.includes(label));
+ assert.ok(html.includes(`${groupPairReason('history_insufficient')} 4`));
+ for(const code of codes.slice(1,-1))assert.ok(html.includes(`来源限制：${code} 4`));
+ assert.ok(html.includes('来源限制：&lt;script&gt; 4'));assert.doesNotMatch(html,/native code|function Object|<script>|inside_interval|outside_interval|window_unavailable/);
+ assert.ok(html.includes('原文 停牌'));assert.ok(html.includes('🛑'.repeat(128)));
+ for(const scope of ['constructor','__proto__','toString','未知范围']){member.anomalies.examples[0].scope=scope;const fallback=render(GroupPairSource,{member,commonDates:[],onOpen(){}});assert.ok(fallback.includes(` · ${scope} · `));assert.doesNotMatch(fallback,/native code|function Object/);}
+});
+function collidingReport(){
+ const r=f().reply,mapping=new Map(r.members.map((m,i)=>[m.snapshot_id,'abcdef12'+String(i).padStart(56,'0')]));
+ for(const m of r.members)m.snapshot_id=mapping.get(m.snapshot_id);
+ for(const p of r.pairs){p.left_snapshot_id=mapping.get(p.left_snapshot_id);p.right_snapshot_id=mapping.get(p.right_snapshot_id);}
+ r.members[1].symbol=null;return r;
+}
+test('051 short visual IDs preserve full source, row keys and unambiguous pair/page names',()=>{
+ const r=collidingReport(),selected=[],names=[];
+ for(const window of ['previous','current']){
+  const tree=GroupPairPage({report:r,window,page:0,onPage(){},onSelect:p=>selected.push(p)}),buttons=nodesOf(tree,'button');
+  const title=window==='previous'?'前60区间':'当前60区间';
+  assert.equal(buttons[0].props['aria-label'],`上一页：${title}`);assert.equal(buttons[1].props['aria-label'],`下一页：${title}`);assert.equal(buttons[0].props.disabled,true);assert.equal(buttons[1].props.disabled,true);
+  buttons.slice(2).forEach((b,i)=>{const p=r.pairs[i];assert.equal(b.props.children,'查看双方来源');const label=b.props['aria-label'];assert.ok(label.includes(title));for(const id of [p.left_snapshot_id,p.right_snapshot_id]){assert.ok(label.includes(id));assert.ok(label.includes(r.members.find(m=>m.snapshot_id===id).symbol??'身份未核实'));}names.push(label);b.props.onClick();});
+  const html=render(GroupPairPage,{report:r,window,page:0,onPage(){},onSelect(){}}),visible=html.replace(/<[^>]*>/g,'');
+  for(const m of r.members){assert.ok(!visible.includes(m.snapshot_id));assert.ok(html.includes(`title="数据版本 ${m.snapshot_id}"`));}
+  assert.ok(visible.includes('版本 abcdef12…'));assert.ok(visible.includes('身份未核实'));
+  assert.deepEqual(nodesOf(tree,'tr').slice(1).map(n=>n.key),r.pairs.map(p=>`${p.left_snapshot_id}:${p.right_snapshot_id}`));
+ }
+ assert.equal(new Set(names).size,names.length);assert.deepEqual(selected,[...r.pairs,...r.pairs]);
+ const html=render(GroupPairResults,{report:r,name:'',onOpen(){}});for(const m of r.members)assert.ok(html.includes(m.snapshot_id));
+});
+test('051 every source action names member full version and exact date and calls once',()=>{
+ const r=collidingReport(),names=[];
+ for(const commonDates of [r.used_dates,[]])for(const m of r.members){
+  const calls=[],tree=GroupPairSource({member:m,commonDates,onOpen:(...a)=>calls.push(a)}),buttons=nodesOf(tree,'button');
+  const dates=[...(commonDates.length?[commonDates[0],commonDates[60],commonDates[120]]:[]),...m.endpoints.map(p=>p.date)];
+  assert.equal(buttons.length,dates.length);
+  buttons.forEach((b,i)=>{const label=b.props['aria-label'];assert.ok(label.startsWith(b.props.children));assert.ok(label.includes(m.symbol??'身份未核实'));assert.ok(label.includes(m.snapshot_id));assert.ok(label.includes(dates[i]));if(commonDates.length)names.push(label);b.props.onClick();assert.equal(calls.length,i+1);assert.deepEqual(calls[i],[m.snapshot_id,dates[i]]);});
+  assert.ok(render(GroupPairSource,{member:m,commonDates,onOpen(){}}).includes(m.snapshot_id));
+ }
+ assert.equal(new Set(names).size,names.length);
+ const source=readFileSync(new URL('../src/GroupPairResults.tsx',import.meta.url),'utf8');assert.ok(source.includes('日期按钮将打开对应股票的个股研究；每次打开一方'));
 });
