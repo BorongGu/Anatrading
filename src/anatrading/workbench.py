@@ -18,7 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException
 from starlette.requests import ClientDisconnect
 from starlette.responses import JSONResponse, Response
-from starlette.staticfiles import StaticFiles
+from .static_assets import EncodedStaticFiles
 
 from .research_api import register_research_routes
 from .formats import FORMAT_IDS
@@ -880,7 +880,7 @@ def create_app(root, *, port=8765, web_directory=None, on_shutdown=None):
 
     directory = Path(web_directory) if web_directory is not None else Path(__file__).resolve().parents[2] / "web/dist"
     if directory.is_dir():
-        app.mount("/", StaticFiles(directory=directory, html=True))
+        app.mount("/", EncodedStaticFiles(directory=directory, html=True))
     else:
         @app.get("/")
         async def missing_web():
