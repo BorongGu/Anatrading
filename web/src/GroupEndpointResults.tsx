@@ -3,7 +3,7 @@ import type { ExactRatio, GroupEndpointReport } from './group-endpoint-model.ts'
 const fraction = (v: ExactRatio | null) => v ? `${v.numerator}/${v.denominator}` : '不可算';
 export function GroupEndpointResults({report,name,onOpen}:{report:GroupEndpointReport;name:string;onOpen:(id:string,date:string)=>void}) {
   const c=report.counts, p=report.parameters;
-  return <section className="panel"><div className="section-heading"><h2>共同端点单组{name ? ` · ${name}` : ''}</h2><span>原组 {c.selected} · 有效 {c.valid} · 不可算 {c.missing}</span></div>
+  return <section className="panel"><div className="section-heading"><h2>区间收盘变化对比{name ? ` · ${name}` : ''}</h2><span>原组 {c.selected} · 有效 {c.valid} · 不可算 {c.missing}</span></div>
     <p>共同起点 {p.start_date} → 终点 {p.end_date}。源收盘变化 = 终点收盘 / 起点收盘 − 1。</p>
     <p>精确正／零／负：{report.sign_counts.positive}／{report.sign_counts.zero}／{report.sign_counts.negative}，合计为有效 {c.valid} 只。覆盖 {c.valid}/{c.selected}（{groupPercent(report.coverage)}）。</p>
     <p>有效成员中的正／零／负比例：{groupPercent(report.sign_proportions.positive)}／{groupPercent(report.sign_proportions.zero)}／{groupPercent(report.sign_proportions.negative)}。比例分母为有效 {c.valid} 只。</p>
