@@ -1,5 +1,7 @@
 # 研究与验证记录
 
+2026-10-13已实现：[051无目标全成对双窗相关](research/051-complete-pair-windows.md)在多股页显式选择2–50个版本与截止日，一次返回两个固定60区间的全部唯一成员对；各成员121日期数组必须一致，常量仅关闭涉及对，来源失败保留完整成员和全部不可算对，响应硬限2MiB。两窗默认折叠、固定50对分页、单一选中对端点回查，现有默认模式与049口径保持。仅本地合成/API、严格DTO/SHA、SSR/回调和控制器验收；原始失败、独审与未验范围见[实施记录](reviews/2026-10-13-complete-pair-implementation.md)。真实行情、实际浏览器、Windows、性能/人效与金融效果未验；发布状态以对应提交/PR为准。
+
 2026-10-13已实现：[多股已观察回撤摘要](qualification/drawdown-episodes.md)提供同日期数组下的最深段、已观察跨度最长段和截止未恢复段；本地验收与独立实现审查通过，公开发布状态以对应提交/PR为准。[050研究稿](research/050-observed-drawdown-episodes.md)与[编码前验收协议](plans/2026-10-13-drawdown-episode-acceptance.md)保留编码前冻结原文，当前实现范围、验证及未验边界见验收记录。
 
 050 后续[有限真实捕获兼容验收](qualification/drawdown-episodes-real-capture.md)接受六个预先冻结案例：30 份原捕获、19,200 行经新隔离 Store → ASGI → DTO/静态 SSR 与独立参考核对；三案可计算，三案按预期关闭比较并保留全部成员。原来源限定不变，040 仍为 0/15；浏览器、Windows、性能及金融效果未验。

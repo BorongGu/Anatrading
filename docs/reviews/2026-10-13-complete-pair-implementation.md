@@ -1,0 +1,89 @@
+# 051 全成对双窗实施审查与有限验收
+
+2026-10-13。编码前冻结提交46448fd；实现5fbd42c，原因码与测试生命周期修复8668c5b。以下为发布前验收记录，不含部署。最终代码保持049精确核、来源helpers及旧DTO不变。
+
+## 独立反方及修复
+
+独立只读审查核对新后端、API、DTO、UI、控制器接线及测试，未自行运行测试。首次发现一个P2阻断：全部日期未知时，空候选日期分支遗漏未知行的local_source_conflict/unclassified_source_failure，但DTO要求其诊断存在，导致合法失败报告被拒绝。
+
+先新增回归并实际失败（缺这两项原因）；再合并未知行scoped reasons。新增all_unknown跨Python→DTO样本通过。二次静态审查确认原阻断已修复，未发现新阻断，准许最终回归与本地提交。另依建议补全部50成员均非常量的2450可算相关、四成员0/60/120共同端点断言。
+
+051初版“T摘要与全部端点相同”已明确纠正为“T的相关摘要与各成员共同起止端点相同”；两世界C完整121价格序列不同。验收公式和反例未调整。一手阅读归属及公开链接已补全。
+
+## 首实现5fbd42c的实际通过
+
+- 受影响Python 194 passed，0 failed/skip：test_group_pair_research、test_group_pair_api、test_peer_neighbor_research、test_peer_neighbor_api、test_peer_relative_research、test_drawdown_episode_research、test_drawdown_episode_api、test_research_api。
+- 完整Node 684 passed，0 failed/skip；其中051的新DTO/请求/SSR/回调56项。全部Node以test-concurrency=1运行，合成Store仅指定的新临时根；未读取旧研究Store。
+- TypeScript + Vite production build通过；git diff --check通过。保留npm http-proxy环境警告与bundle超过500kB警告，没有调大阈值掩盖。
+
+覆盖：先异常输入；四成员两世界手算/有理数oracle；六成员结构；50成员2450cell及全非常量2450相关；恒价、恒定非零、近常量、符号翻转；各对逐目标049的相关对象（含非边界/常量）完全对照；缺/额外/重复/未知/截止日期与全源身份反证；新合成Store完整/投影/API一致、原件损坏/丢失后恢复、预算先于读取、双方指定日期原记录回查；置换与新来源身份的未来合法追加保持固定截止数值；受控整数/显示/2MiB失败；DTO keys/ID/完整组合/日期/常量交叉乘积/计数/估计边界/SHA篡改；一次GET、迟到fetch/hash失效、两表默认折叠、完整50对分页和双方回调身份。
+
+预算：canonical UTF-8 JSON包括analysis_id，后端与DTO同为2MiB。边界等于实际字节数成功、少一字节失败，API受控过限整次拒绝。50成员测试仅正确性与序列化，不是性能benchmark；输入上限不保证全部合法输入均能装下。
+
+## 原始失败与未验范围
+
+保留首次异常测试因模块尚不存在的收集失败，以及上述独立审查P2真实回归失败；最终所列检查无遗留失败。初版测试未出现其他失败。原始日志保留在实施环境的专用临时证据目录，不提交个人或运行产物。后续复核另发现下述原因码和测试生命周期问题，首轮无阻断结论不覆盖它们。
+
+未跑fullpytest；未启动监听服务/端口/浏览器、未接真实行情、旧Store、账户/依赖/部署。SSR使用Vite middleware-only转换，无listen；API为ASGI内存transport。SSR/回调与控制器测试不等于浏览器实际挂载/布局/焦点验收。Windows原生、真实样本兼容、实际浏览器、性能/峰值内存、真人效率、预测/交易效果均未验。未重新启动任何已停止的性能基准。
+
+
+## 后续原因码与测试生命周期修复
+
+负责人复核发现新增错误字典未限定自身属性：constructor/__proto__/toString等继承键可被当成说明，导致诊断返回函数或请求提示泄漏native code文本。上轮静态审查漏检。新增独立错误测试先实际取得2项失败，再将两处查找改为Object.hasOwn，并将peer_neighbor_泛前缀匹配收窄到三个明确的核错误；陌生、安全或不安全错误保持既有安全回退。实际banner表达式测试覆盖原型键、陌生前缀、非Error、不安全内容、已知预算和原件/服务恢复提示。独立只读复核认可修复，无新代码阻断。
+
+本轮完整Node首跑682通过、1测试文件失败：先注册的DTO测试结束时after关闭Vite runner，而同文件顶层await仍在加载SSR，5项SSR测试尚未注册。修为SSR模块全部加载完成后再注册测试和清理hook；所有原断言保留。修脚本曾因工作目录前缀错误失败，意外启动的未修重跑已取消，其日志保留，不计通过。
+
+最终相关Node 59项通过，完整Node **687通过、0失败/跳过/取消**；TypeScript/Vite再次通过，原npm环境及大chunk警告保持。Python没有修改，沿用同一Python代码的194项通过记录，本轮未重复Python。git diff --check通过。README和research-status补入当前功能入口，直接链接本实施记录；没有新增资格副本。本轮回归未覆盖实际DOM/浏览器；后续独立模拟DOM验收见下节，实际浏览器、真实行情、Windows、性能和金融效果仍未验。
+
+
+## 独立 React/JSDOM 有界交互验收
+
+独立验证者在最终产品提交8668c5b上实际挂载React组件，13组通过、0失败，React/JSDOM/window错误与警告记录均为空；这项执行与上文独立静态代码审查分开。冻结协议及合成样本，复用既有隔离依赖，没有安装、服务监听或仓库修改。前后5756个仓库及既有隔离依赖文件SHA-256一致、无增删，HEAD及干净工作树不变。私有验证脚本、原始日志及运行产物不提交。
+
+覆盖11成员55对完整与不可算报告的两窗默认折叠、50→5→50分页、边界按钮、全55对保留、双方实际日期回调和关闭选中端点；真实UniverseResearch的group_pairs接线中，一次提交仅一个GET意图，取消/切换模式/改截止/卸载各自晚到成功与拒绝共8条路径不污染新结果；不同合法analysis_id后折叠、页码及选择重置。重置使用实际父级，加载时控制器也清空结果，不能独立证明key的因果作用。
+
+本验收使用真实React与JSDOM模拟DOM、合成fetch，不是实际浏览器或HTTP验收；未跑50成员25页DOM遍历、pagehide/pageshow、视觉布局、键盘/焦点、真实Store、Windows、性能或金融效果。隔离测试未纳入仓库持续回归。
+
+## PR41精确9909d98复审：Unicode原文失败报告
+
+[Codex P2评论](https://github.com/BorongGu/Anatrading/pull/41#discussion_r4255415051)指出完整响应预算误用ASCII专用canonicalJson，合法“停牌”原始价格token会令整份失败报告被拒绝。此前静态无阻断和有界DOM结论均没有覆盖这条路径，本轮不重放那些结论。
+
+先增加实际Python解码合成capture生成的失败报告，包含中文价格原文、引号/反斜杠、换行/tab/NUL、U+2028/U+2029、128个astral字符，以及中文与constructor/__proto__/toString原始失败码。取得3项跨语言红失败。只改完整响应预算后，继续复现128个码点被JavaScript UTF-16 length误判；修复码点长度后，又复现诊断计数same调用仍以ASCII序列化中文键。三阶段原始失败均保留。
+
+最终新model以JSON.stringify后UTF-8字节数执行原2MiB硬限，原文长度按码点与Python len一致，诊断计数按自身键逐项比较；保留ASCII计算身份canonicalJson/SHA和全部共享helpers/旧协议。独立只读复审重新核查所有same调用，剩余用途只有固定格式、身份ID、日期和计数，无允许的原始Unicode字段；此次复核未执行测试。
+
+实际跨语言测试确认完整Python ensure_ascii=False序列化字节数与前端一致（含特殊字符），反转对象键顺序不改字节数；多字节输入即使UTF-16文本长度低于2MiB，真实UTF-8过限仍整份拒绝。新SSR验证GroupPairResults全部成员、两窗全部不可算对，以及选中来源的中文/astral原文和未知码安全回退；未将SSR称为实际浏览器或重跑的JSDOM验收。
+
+最终受影响Python测试27通过（包含新增fixture验证及新功能API）；产品Python无修改，原194项记录仍适用于原代码，本轮未重跑全套194。完整Node **691通过、0失败/跳过/取消**；TypeScript/Vite及diff检查通过，原npm环境/大chunk警告保留。真实行情、实际浏览器、Windows、性能/人效和金融效果仍未验。该修复推送到PR41同分支，禁止用旧head的review状态代表新head；合并仍待精确新head复审。
+
+### Unicode修复后的独立模拟DOM复验
+
+在75ed3e0产品提交上，原冻结harness逐字不改复跑13组全通过，另事前冻结Unicode增量1组通过；14组React/JSDOM/window错误与警告均为空。真实Python合成失败报告经新DTO及SHA验证后，实际GroupPairResults保留全部3个不可算对，点击选中双方，textContent精确保留4个原始Unicode token（含“停牌”、引号/控制/分隔字符及128个补充平面字符），双方日期回调身份正确。该样本42829字节，不是近预算UI测试；字节预算证据仍来自独立单元测试。前后5756代码/既有依赖文件哈希不变，无增删，HEAD及干净工作树不变。
+
+该执行属于React/JSDOM模拟DOM复验，未改变前述实际浏览器、HTTP/Store、Windows、性能等未验边界；textContent不能证明屏幕字形与控制字符实际呈现。分析key因果仍未独立隔离，pagehide/pageshow及N50的25页DOM遍历仍未跑。仅追加公开结论，不提交隔离脚本、样本或运行日志。
+
+## PR41来源资格异议的独立裁决与可见说明
+
+[第二轮Codex意见](https://github.com/BorongGu/Anatrading/pull/41#discussion_r4255536428)描述的事实成立：截止后全局来源反证能在旧端点不变时关闭相关可用性。本次独立裁决核对049编码前方案/验收与051冻结规则，保留全数据版本的身份、复权和结构资格检查，不采用先按cutoff过滤反证的建议；这不是数学未来价格泄漏的修复，也不否认可用性变化。AGENTS因果目标不变；完整报告不满足任意未来资格变化下可用性不变，不认证PIT历史信号。051及结果页新增直白说明。
+
+独立事前冻结9例探针：基线、两种未来合法价格追加、未来坏价、未来身份/复权/结构反证、畸形checks、未知日期。合法追加与可定位坏价经合成原始字节真实decoder，旧日期、端点和相关数值不变；身份/复权/结构/畸形/未知日期为合成DTO注入，只验证纯函数防御规则，不证明正常capture导入能触发所有分支。现行腾讯decoder不产生行级身份/复权字段。全局反证关闭、未知日期关闭，畸形checks以invalid_source_checks整次拒绝；所有结果与约定一致。
+
+## 固定真实capture的有限兼容验收
+
+在796cca5产品上，沿用原冻结成员与截止的六例，不换样本/日期：三例各45对两窗全部可算，另三例因日期网格不同或截止缺失保留全部270个不可算window cells。30份原始capture共19200行经新隔离Store一次导入；未触碰旧Store。独立Fraction参考先从原件计算，再核六个内存ASGI响应、前端DTO/SHA及12张SSR表；270个可算相关对象一致。另一独立复核未导入产品或参考脚本，直接核原始19200行与7260端点，以未中心化Fraction恒等式及整数半偶舍入复核270个可算相关和270个失败cells均一致。无真实常量列，不能据此认证常量边界。
+
+保留原始harness失败：ASGI主机名不合法、oracle序号字符串/整数比较、SSR把次级不可算标签重复计数；只修验证脚本后通过，未改产品或验收样本。短暂执行传输中断发生在最终证据写完后，未重跑实验。原件及386项来源/受保护代码哈希不变。这里只公开汇总结论，原件、API响应、私有日志与独审原文不提交。
+
+来源仍为captured_not_qualified/legacy_reconstruction：传输证据、header计数、单位、复权、采集时钟及历史当时可得性未认证，640条饱和/截断与请求范围不符限制保留。source_qualified只表示声明假设下算法可接纳，不能据此提升来源真实性或金融资格。没有实际浏览器/监听HTTP、Windows、性能、人效或预测/交易效果验收。
+
+### 可见说明后的最终回归
+
+上述真实capture/API/DTO/SSR及独立oracle证据对应796cca5；后续仅新增结果页说明与SSR文字断言，后端/API/DTO未变，未重复导入或重跑真实capture，不把旧SSR记录冒充新UI验收。新增文字断言先实际失败，再加说明后完整Node **692通过、0失败/跳过/取消**；TypeScript/Vite及diff检查通过，既有npm环境和大chunk警告保留。Python产品未改，本轮不重复Python。早先新增测试脚本因工作目录前缀写错未执行成功，随后未命中新测试的运行不计验收；修正路径后才取得真实红断言。原始日志留在隔离证据目录。
+
+## 第三轮精确0f79f86复审：解释器路径与全源预算提示
+
+Codex新增两项P2均接受并先取得红测试：051 fixture固定POSIX解释器路径会阻断Windows测试注册；全源行预算错误沿共享提示建议提前截止，但全源读取量不会因此减少。解释器沿仓内既有process.platform分支惯例选择Windows Scripts/python.exe或POSIX bin/python，不新增依赖/helper体系。纯表达式单测核win32/linux/darwin路径，不修改运行系统身份，不代表Windows原生执行通过。
+
+只在全成对错误字典覆盖research_row_limit及universe_row_limit，说明完整来源预算、减少成员或改用较小数据版本；其他研究模式共享提示保持不变。实际banner表达式回归核对两个代码均不建议改变截止。最终相关Node **66通过**，完整Node **694通过、0失败/跳过/取消**；TypeScript/Vite及diff检查通过，既有npm环境与大chunk警告保留。一次相关命令工作目录不符导致文件未找到，保留原始失败后在正确目录执行，不计为测试通过。
+
+产品Python、API、DTO验证/身份/预算算法未改，本轮不重复Python、真实capture或JSDOM；此前分版本证据边界保持，Windows原生及实际浏览器等仍未验。
