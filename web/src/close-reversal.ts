@@ -80,7 +80,7 @@ export function captureReversalSource(report:ResearchEnvelope<SingleResult>,cont
  ensure(Array.isArray(r.series)&&r.series.length<=MAX_POINTS&&Array.isArray(report.limitations)&&['retrospective_source_version','calendar_and_bar_closure_unverified','historical_availability_unverified','adjustment_basis_unverified'].every(x=>report.limitations.includes(x)));
  const countKeys=['source_rows','date_groups','valid_groups','invalid_groups','duplicate_groups','unlocated_rows','unreadable_date_rows','batch_unlocated_rows'] as const;
  ensure(c&&countKeys.every(k=>integer(c[k]))&&typeof c.coverage_known==='boolean'&&c.date_groups===r.series.length&&Number(c.valid_groups)+Number(c.invalid_groups)===c.date_groups);
- ensure(Number(c.source_rows)<=MAX_POINTS&&Number(c.source_rows)>=r.series.length,'resource_limit');
+ ensure(Number(c.source_rows)<=MAX_POINTS,'resource_limit');
  const reasonCounts=new Map<string,number>();const add=(key:string,n=1)=>{reasonCounts.set(key,(reasonCounts.get(key)??0)+n);};
  for(const k of ['invalid_groups','duplicate_groups','unlocated_rows','unreadable_date_rows','batch_unlocated_rows'])if(Number(c[k])>0)add(k,Number(c[k]));
  if(Number(c.source_rows)!==r.series.length)add('source_row_count_mismatch');

@@ -32,6 +32,10 @@ UI复用既有research-subsection、table-scroll和字体，放在既有SingleRe
 
 实现细化（独审后）：所有源行date/ordinal/close/reason/status均进入一次捕获的有界来源签名，事件与异步边界检查新鲜度，render不重做签名。完整结果端点保留规范close；模型status/reason仍留在原研究报告，不属于反转结果的源价资格。不可计算结果另附全部rejected_observations保留坏行与其状态。reason计数用Map后转own-properties，避免原型名绕过。完整来源coverage要求source_rows=series.length；不一致整条不可计算。UI发布绑定来源token，事件动作绑定当前模式与页。
 
-## 实施与最终限定验收（2026-10-13）
+## 首轮实施与限定验收（2026-10-13，P2修复前）
 
 本地实现完成，独立实现复审及精确hash合成验收GO。最终前端893、受影响Python79、构建通过；独立纯核298、适配器44、实际React＋jsdom27通过。完整分页覆盖247事件；20,000点为39,997事件并验证完整2MiB超限拒绝。代码身份、历史首轮失败、两项独审产品缺陷及修正、真实来源/浏览器/Windows等未跑边界见[限定验收](../qualification/060-close-reversal-records.md)。当前未据此声称发布或预测有效；058及其他STOP保持。
+
+远端审查补充：PR #54在初始31243bb指出source_rows较小不一致被提前抛资源错误。新增红绿回归并作一行修复，保持纯核/阈值不变，所有计数不一致统一保留整条unavailable证据。旧本地GO属于修复前hash；修复后15项持久测试、894项全前端及build通过，独立补丁审查通过，详见限定验收补充。
+
+P2修复最终独立execution-final-04：新hash上重新运行纯核298、适配器45、实际React＋jsdom27全部通过；最终全前端894与build通过。原首轮结果作为历史保留，不外推。

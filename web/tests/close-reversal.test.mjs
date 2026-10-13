@@ -56,3 +56,10 @@ test('omitted source rows and inherited reason keys cannot qualify',async()=>{
 test('accepted immutable evidence cannot be exported from mutated parent',async()=>{
  const {f,context:c}=source(),s=captureReversalSource(f.reply,c,f.expected);f.reply.result.series[0].close='123';await assert.rejects(buildReversalReport(s,600,options),/cancelled/);
 });
+test('smaller source count keeps unavailable report and complete rejected evidence',async()=>{
+ const {f,context:c}=source();f.reply.result.coverage.source_rows--;
+ const r=await buildReversalReport(captureReversalSource(f.reply,c,f.expected),600,options);
+ assert.equal(r.status,'unavailable');assert.equal(r.source.reasons.source_row_count_mismatch,1);
+ assert.equal(r.source.rejected_observations.length,f.reply.result.series.length);
+ for(const mode of ['up','down']){assert.equal(r.modes[mode].events,null);assert.equal(r.modes[mode].count,null);assert.equal(r.modes[mode].terminal,null);}
+});
