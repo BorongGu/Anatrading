@@ -121,6 +121,15 @@ def _reserved(path):
     return any(part in {MANIFEST, ".encoded"} or part.endswith(".gz") for part in parts)
 
 
+def _ambiguous(path):
+    # StaticFiles uses the single dot as its normalized root-directory sentinel.
+    if path == ".":
+        return False
+    # Conservative portable URL boundary, including Win32 streams/normalization.
+    return ("\\" in path or ":" in path
+            or any(part.endswith((".", " ")) for part in path.split("/")))
+
+
 class EncodedStaticFiles(StaticFiles):
     def __init__(self, *, directory, **kwargs):
         super().__init__(directory=directory, **kwargs)
@@ -129,18 +138,24 @@ class EncodedStaticFiles(StaticFiles):
         self.folded_paths = frozenset(path.casefold() for path in self.assets)
 
     async def __call__(self, scope, receive, send):
-        if _reserved(scope["path"]):
+        if _reserved(scope["path"]) or _ambiguous(scope["path"]):
             return await Response(status_code=404)(scope, receive, send)
         return await super().__call__(scope, receive, send)
 
     def lookup_path(self, path):
+        # StaticFiles constructs internal ./index.html and ./404.html paths.
+        path = os.path.normpath(path).replace(os.sep, "/")
+        if _ambiguous(path):
+            return "", None
         full_path, info = super().lookup_path(path)
         if info is not None:
             try:
                 relative = Path(full_path).resolve().relative_to(self.root).as_posix()
             except ValueError:
                 return "", None
-            if _reserved(relative):
+            if (_reserved(relative) or _ambiguous(relative)
+                    or relative.casefold() in self.folded_paths
+                    or (stat.S_ISREG(info.st_mode) and info.st_nlink > 1)):
                 return "", None
         return full_path, info
 
@@ -176,10 +191,10 @@ class EncodedStaticFiles(StaticFiles):
         return identity, identity_tag, "identity"
 
     async def get_response(self, path, scope):
-        if _reserved(path):
+        normalized = path.replace(os.sep, "/")
+        if _reserved(normalized) or _ambiguous(normalized):
             return Response(status_code=404)
         # StaticFiles normalizes using platform paths; manifest paths use '/'.
-        normalized = path.replace(os.sep, "/")
         asset = self.assets.get(normalized)
         if asset is None and normalized.casefold() in self.folded_paths:
             return Response(status_code=404)

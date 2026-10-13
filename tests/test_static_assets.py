@@ -317,3 +317,69 @@ def test_manifest_rejects_casefold_target_collision(built):
     (root / module.MANIFEST).write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="invalid_static_encoding_manifest"):
         module.EncodedStaticFiles(directory=root)
+
+
+@pytest.mark.parametrize("alias", ["assets/index-12345678.js.", "assets/index-12345678.js ",
+    "assets./index-12345678.js", "assets /index-12345678.js", "assets/index-12345678.js::$DATA",
+    "assets\\index-12345678.js", "assets/INDEX-~1.JS", "public-alias.js"])
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+def test_noncanonical_managed_destinations_never_use_legacy(built, monkeypatch, alias, method):
+    # Only filesystem lookup is simulated; real dispatch/fallback/response runs.
+    root, _, _ = built
+    original = module.StaticFiles.lookup_path
+    def resolved_lookup(self, path):
+        if path == alias:
+            target = root / NAME
+            return str(target), target.stat()
+        return original(self, path)
+    monkeypatch.setattr(module.StaticFiles, "lookup_path", resolved_lookup)
+    result = run(root, path="/"+alias, method=method, headers=[
+        (b"accept-encoding",b"gzip,identity;q=0"), (b"range",b"bytes=0-4"),
+        (b"if-modified-since",b"Wed, 31 Dec 2099 00:00:00 GMT")])
+    assert result[0] == 404
+    assert b"content-range" not in result[1]
+    assert BODY not in result[2]
+
+
+@pytest.mark.parametrize("target", [NAME, module.MANIFEST, f".encoded/{NAME}.gz", "public.json"])
+def test_fallback_hardlinks_are_denied(built, target):
+    import os
+    root, _, _ = built
+    os.link(root / target, root / "hardlink-alias.txt")
+    assert run(root, path="/hardlink-alias.txt")[0] == 404
+    # Canonical managed assets are still served through their own snapshots.
+    assert run(root)[0] == 200
+
+
+def test_public_symlink_and_ambiguous_destination_controls(built):
+    root, _, _ = built
+    (root / "normal-alias.json").symlink_to(root / "public.json")
+    assert run(root, path="/normal-alias.json")[2] == b'{"synthetic":true}'
+    (root / "managed-alias.js").symlink_to(root / NAME)
+    assert run(root, path="/managed-alias.js")[0] == 404
+    for index, name in enumerate(["odd.txt.", "odd.txt ", "odd:stream"]):
+        (root / name).write_bytes(b"AMBIGUOUS_SYNTHETIC")
+        (root / f"innocent{index}.txt").symlink_to(root / name)
+        assert run(root, path=f"/innocent{index}.txt")[0] == 404
+
+
+def test_native_internal_separators_are_not_raw_url_backslashes(built, monkeypatch):
+    import ntpath
+    import os
+    from types import SimpleNamespace
+    root, _, encoded = built
+    (root / "licenses").mkdir()
+    (root / "licenses/notice.txt").write_bytes(b"PUBLIC_SYNTHETIC_NOTICE")
+    app = module.EncodedStaticFiles(directory=root, html=True)
+    # Isolated internal path normalization only; no OS identity override.
+    monkeypatch.setattr(module, "os", SimpleNamespace(sep="\\", path=ntpath, fstat=os.fstat))
+    async def scenario():
+        request = scope(headers=[(b"accept-encoding",b"gzip")])
+        response = await app.get_response(ntpath.normpath(NAME), request)
+        verify(await call(response, request), encoded, b"gzip")
+        public = await app.get_response(ntpath.normpath("licenses/notice.txt"), scope(path="/licenses/notice.txt"))
+        result = await call(public, scope(path="/licenses/notice.txt"))
+        assert result[0] == 200 and result[2] == b"PUBLIC_SYNTHETIC_NOTICE"
+        raw = await call(app, scope(path="/assets\\index-12345678.js"))
+        assert raw[0] == 404
+    asyncio.run(scenario())
