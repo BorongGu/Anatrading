@@ -1,3 +1,4 @@
+import { PeerChangeDetails } from './PeerChangeDetails.tsx';
 import { peerReason, peerSign } from './peer-neighbor-model.ts';
 import type { PeerNeighborReport, PeerCell, PeerMember } from './peer-neighbor-model.ts';
 import { peerDeclineDetails } from './peer-decline-details.ts';
@@ -259,6 +260,7 @@ export function PeerNeighborResults({ report, name, onOpen }: PeerNeighborResult
                   (report.source_panel_complete ? '来源面板完整' : '本成员已核，整组面板未齐')}</p>
                 {source(member)}
                 {declineDetails(member)}
+                <PeerChangeDetails key={`${report.analysis_id}:${id}`} report={report} peerId={id} onOpen={onOpen} />
               </td>
             </tr>;
           })}

@@ -1,3 +1,4 @@
+import { exactPercent } from './exact-percent.ts';
 /** One explicit group, exact source ratios. No source qualification is added here. */
 import { jsonRequest, safeCode } from './api.ts';
 import { canonicalJson, explainFilter } from './filter-model.ts';
@@ -165,11 +166,7 @@ export async function fetchGroupEndpoints(request: ReturnType<typeof groupEndpoi
 export function groupPercent(value: ExactRatio | null): string {
   if(value===null)return '不可算';
   // Values reach rendering only after the bounded exact response validator.
-  const n=BigInt(value.numerator),d=BigInt(value.denominator),absolute=n<0n?-n:n;
-  const scaled=absolute*1_000_000n;let rounded=scaled/d;const remainder=scaled%d;
-  if(remainder*2n>d||remainder*2n===d&&rounded%2n===1n)rounded++;
-  const text=`${rounded/10000n}.${(rounded%10000n).toString().padStart(4,'0')}%`;
-  return `${n<0n&&rounded!==0n?'-':''}${text}${n!==0n&&rounded===0n?`（${n>0n?'正':'负'}，显示舍入）`:''}`;
+  return exactPercent(BigInt(value.numerator), BigInt(value.denominator), '%');
 }
 export const groupSign = (value: ExactRatio | null) => value===null?'不可算':value.numerator==='0'?'零':value.numerator.startsWith('-')?'负':'正';
 const groupReasons: Record<string,string> = {
