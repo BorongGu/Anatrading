@@ -1,0 +1,519 @@
+{
+  "query": {
+    "snapshot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "query_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "metadata": {
+      "period": "1d",
+      "source_code": "600000",
+      "source_venue": "SH"
+    },
+    "rows": [
+      {
+        "ordinal": 1,
+        "label": "2026-01-01",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 2,
+        "label": "2026-01-02",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 3,
+        "label": "2026-01-03",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 4,
+        "label": "2026-01-04",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 5,
+        "label": "2026-01-05",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 6,
+        "label": "2026-01-06",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 7,
+        "label": "2026-01-07",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 8,
+        "label": "2026-01-08",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 9,
+        "label": "2026-01-09",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 10,
+        "label": "2026-01-10",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 11,
+        "label": "2026-01-11",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 12,
+        "label": "2026-01-12",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 13,
+        "label": "2026-01-13",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 14,
+        "label": "2026-01-14",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 15,
+        "label": "2026-01-15",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 16,
+        "label": "2026-01-16",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 17,
+        "label": "2026-01-17",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 18,
+        "label": "2026-01-18",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      },
+      {
+        "ordinal": 19,
+        "label": "2026-01-19",
+        "tokens": {},
+        "values": {
+          "open": "1",
+          "high": "1",
+          "low": "1",
+          "close": "1"
+        }
+      },
+      {
+        "ordinal": 20,
+        "label": "2026-01-20",
+        "tokens": {},
+        "values": {
+          "open": "2",
+          "high": "2",
+          "low": "2",
+          "close": "2"
+        }
+      }
+    ],
+    "unlocated": [],
+    "batch_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "selection": {
+      "mode": "retrospective",
+      "cutoff": null,
+      "snapshot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ordinal_start": null,
+      "ordinal_end": null,
+      "fields": [
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+        "amount"
+      ],
+      "versions": {}
+    },
+    "manifest": {
+      "raw_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "source_contract_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "qualification": "synthetic"
+    }
+  },
+  "report": {
+    "identity": {
+      "snapshot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "batch_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "query_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "raw_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "source_contract_id": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "selection": {
+        "mode": "retrospective",
+        "cutoff": null,
+        "snapshot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "ordinal_start": null,
+        "ordinal_end": null,
+        "fields": [
+          "open",
+          "high",
+          "low",
+          "close",
+          "volume",
+          "amount"
+        ],
+        "versions": {}
+      },
+      "symbol_identity": {
+        "symbol": "600000.SH",
+        "code": "600000",
+        "venue": "SH",
+        "market": "CN_A",
+        "qualification": "source_claim"
+      },
+      "source_qualification": "synthetic"
+    },
+    "method_id": "source-close-dispersion20-population-v1",
+    "adapter_id": "daily-bars-strict-positive-v1",
+    "numeric_policy_id": "integer-moments-isqrt36-v1",
+    "parameters": {
+      "window": 20,
+      "current_inclusive": true,
+      "variance_divisor": 20,
+      "sigma_multiplier": 2
+    },
+    "coverage": {
+      "source_rows": 20,
+      "date_groups": 20,
+      "valid_groups": 20,
+      "invalid_groups": 0,
+      "duplicate_groups": 0,
+      "unlocated_rows": 0,
+      "unreadable_date_rows": 0,
+      "batch_unlocated_rows": 0,
+      "coverage_known": true
+    },
+    "numeric_kind": "exact_integer_moments_with_certified_decimal_enclosures",
+    "source_numeric_kind": "exact_decimal_text",
+    "qualification": "conditional_source_observations",
+    "units": {
+      "mean": "source_price",
+      "variance": "source_price_squared",
+      "sigma": "source_price",
+      "envelope": "source_price"
+    },
+    "limitations": [
+      "retrospective_source_version",
+      "calendar_and_coverage_unverified",
+      "adjustment_and_corporate_actions_unverified",
+      "historical_availability_unverified",
+      "close_finality_unverified",
+      "strict_positive_full_ohlc_adapter",
+      "fixed_engineering_parameters_not_calibrated",
+      "numeric_enclosures_not_probability_intervals",
+      "no_prediction_or_trading_return_claim"
+    ],
+    "view_method_id": "selected-source-close-dispersion20-v1",
+    "selection": {
+      "date_requested": null,
+      "resolved_date": "2026-01-20",
+      "policy": "latest_source_date"
+    },
+    "selected": {
+      "position": 19,
+      "date": "2026-01-20",
+      "ordinal": 20,
+      "close": "2",
+      "source_reason": null,
+      "window_start_position": 0,
+      "window_end_position": 19,
+      "window_count": 20,
+      "invalid_members": [],
+      "status": "computed",
+      "reason": null,
+      "sum_u": "30000000000000000000",
+      "sum_squares_u": "50000000000000000000000000000000000000",
+      "dispersion_numerator": "100000000000000000000000000000000000000",
+      "mean_exact": "1.5",
+      "variance_exact": "0.25",
+      "sigma": {
+        "lower": "0.5",
+        "upper": "0.5",
+        "exact": true,
+        "display": "0.5000",
+        "display_reason": null
+      },
+      "envelope_lower": {
+        "lower": "0.5",
+        "upper": "0.5",
+        "exact": true,
+        "display": "0.5000",
+        "display_reason": null
+      },
+      "envelope_upper": {
+        "lower": "2.5",
+        "upper": "2.5",
+        "exact": true,
+        "display": "2.5000",
+        "display_reason": null
+      }
+    },
+    "members": [
+      {
+        "position": 0,
+        "date": "2026-01-01",
+        "ordinal": 1,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 1,
+        "date": "2026-01-02",
+        "ordinal": 2,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 2,
+        "date": "2026-01-03",
+        "ordinal": 3,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 3,
+        "date": "2026-01-04",
+        "ordinal": 4,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 4,
+        "date": "2026-01-05",
+        "ordinal": 5,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 5,
+        "date": "2026-01-06",
+        "ordinal": 6,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 6,
+        "date": "2026-01-07",
+        "ordinal": 7,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 7,
+        "date": "2026-01-08",
+        "ordinal": 8,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 8,
+        "date": "2026-01-09",
+        "ordinal": 9,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 9,
+        "date": "2026-01-10",
+        "ordinal": 10,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 10,
+        "date": "2026-01-11",
+        "ordinal": 11,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 11,
+        "date": "2026-01-12",
+        "ordinal": 12,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 12,
+        "date": "2026-01-13",
+        "ordinal": 13,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 13,
+        "date": "2026-01-14",
+        "ordinal": 14,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 14,
+        "date": "2026-01-15",
+        "ordinal": 15,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 15,
+        "date": "2026-01-16",
+        "ordinal": 16,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 16,
+        "date": "2026-01-17",
+        "ordinal": 17,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 17,
+        "date": "2026-01-18",
+        "ordinal": 18,
+        "close": "2",
+        "source_reason": null
+      },
+      {
+        "position": 18,
+        "date": "2026-01-19",
+        "ordinal": 19,
+        "close": "1",
+        "source_reason": null
+      },
+      {
+        "position": 19,
+        "date": "2026-01-20",
+        "ordinal": 20,
+        "close": "2",
+        "source_reason": null
+      }
+    ],
+    "status": "computed",
+    "reason": null,
+    "analysis_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  }
+}

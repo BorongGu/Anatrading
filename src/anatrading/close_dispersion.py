@@ -9,7 +9,7 @@ from math import isqrt
 
 from .numeric import NumericError, decimal_text, decimal_value
 from .pair_research import symbol_identity
-from .research_series import MAX_RESEARCH_ROWS, daily_bars, daily_coverage, source_rejection
+from .research_series import MAX_RESEARCH_ROWS, daily_bars, daily_coverage, source_rejection, strict_date
 
 
 _METHOD = 'source-close-dispersion20-population-v1'
@@ -88,35 +88,30 @@ def _request(query):
     return symbol_identity(query)
 
 
-def dispersion_report(query):
-    """Fixed current-inclusive windows of distinct readable source dates.
+def _window_row(bars, position):
+    """The single shared position projection for both public report shapes."""
+    bar = bars[position]
+    start = max(0, position - 19)
+    window = bars[start:position + 1]
+    invalid = [dict(position=start + offset, date=member['date'], ordinal=member['ordinal'], reason=member['reason'])
+           for offset, member in enumerate(window) if member['reason'] is not None]
+    reason = 'history_insufficient' if len(window) < 20 else 'invalid_window' if invalid else None
+    result = dict.fromkeys(_RESULTS) if reason else exact_window([member['close'] for member in window])
+    return dict(position=position, date=bar['date'], ordinal=bar['ordinal'],
+               close=decimal_text(bar['close']) if bar['close'] is not None else None,
+               source_reason=bar['reason'], window_start_position=start,
+               window_end_position=position, window_count=len(window), invalid_members=invalid,
+               status='unavailable' if reason else 'computed', reason=reason, **result)
 
-    Bad dated groups retain positions. Undatable rows remain in coverage,
-    without invented calendar slots. No Store access, source repair or fetching.
-    """
-    symbol = _request(query)
-    bars = daily_bars(query)
-    coverage = daily_coverage(query, bars)
-    series = []
-    for position, bar in enumerate(bars):
-        start = max(0, position - 19)
-        window = bars[start:position + 1]
-        invalid = [dict(position=start + offset, date=member['date'], ordinal=member['ordinal'], reason=member['reason'])
-                   for offset, member in enumerate(window) if member['reason'] is not None]
-        reason = 'history_insufficient' if len(window) < 20 else 'invalid_window' if invalid else None
-        result = dict.fromkeys(_RESULTS) if reason else exact_window([member['close'] for member in window])
-        series.append(dict(position=position, date=bar['date'], ordinal=bar['ordinal'],
-                           close=decimal_text(bar['close']) if bar['close'] is not None else None,
-                           source_reason=bar['reason'], window_start_position=start,
-                           window_end_position=position, window_count=len(window), invalid_members=invalid,
-                           status='unavailable' if reason else 'computed', reason=reason, **result))
+
+def _header(query, symbol, coverage):
     identity = {key: query[key] for key in ('snapshot_id', 'batch_id', 'query_id')}
     identity.update({key: query['manifest'][key] for key in ('raw_sha256', 'source_contract_id')})
     identity.update(selection=deepcopy(query['selection']), symbol_identity=symbol,
                     source_qualification=deepcopy(query['manifest'].get('qualification')))
     return dict(identity=identity, method_id=_METHOD, adapter_id=_ADAPTER, numeric_policy_id=_NUMERIC,
                 parameters=dict(window=20, current_inclusive=True, variance_divisor=20, sigma_multiplier=2),
-                series=series, coverage=coverage,
+                coverage=coverage,
                 numeric_kind='exact_integer_moments_with_certified_decimal_enclosures',
                 source_numeric_kind='exact_decimal_text',
                 qualification=('source_rejected' if source_rejection(query) else
@@ -127,3 +122,41 @@ def dispersion_report(query):
                              'close_finality_unverified', 'strict_positive_full_ohlc_adapter',
                              'fixed_engineering_parameters_not_calibrated', 'numeric_enclosures_not_probability_intervals',
                              'no_prediction_or_trading_return_claim'])
+
+
+def dispersion_report(query):
+    """Offline full report, retaining every original field and window."""
+    symbol = _request(query)
+    bars = daily_bars(query)
+    return dict(**_header(query, symbol, daily_coverage(query, bars)),
+                series=[_window_row(bars, position) for position in range(len(bars))])
+
+
+def selected_dispersion_report(query, date=None):
+    """One exact source date, or the latest group including invalid groups.
+
+    Source normalization and coverage inspect the whole trusted prefix. Only
+    the selected position is projected; no full historical report is built.
+    """
+    if date is not None:
+        strict_date(date, 'invalid_research_date')
+    symbol = _request(query)
+    cutoff = query['selection'].get('cutoff')
+    if date is not None and cutoff is not None and date > cutoff:
+        raise ValueError('invalid_research_date')
+    bars = daily_bars(query)
+    position = (len(bars) - 1 if bars else None) if date is None else next(
+        (i for i, bar in enumerate(bars) if bar['date'] == date), None)
+    selected = _window_row(bars, position) if position is not None else None
+    members = [] if selected is None else [
+        dict(position=i, date=bars[i]['date'], ordinal=bars[i]['ordinal'],
+             close=decimal_text(bars[i]['close']) if bars[i]['close'] is not None else None,
+             source_reason=bars[i]['reason'])
+        for i in range(selected['window_start_position'], position + 1)]
+    return dict(**_header(query, symbol, daily_coverage(query, bars)),
+                view_method_id='selected-source-close-dispersion20-v1',
+                selection=dict(date_requested=date, resolved_date=selected['date'] if selected else None,
+                               policy='latest_source_date' if date is None else 'exact_source_date'),
+                selected=selected, members=members,
+                status=selected['status'] if selected else 'unavailable',
+                reason=selected['reason'] if selected else 'no_date_groups' if not bars else 'date_not_present')
