@@ -1,0 +1,728 @@
+{
+  "artifact_kind": "frozen_synthetic_concept_cards_not_full_dto",
+  "revision": "2026-10-13-r2",
+  "warning": "All values below are synthetic. These projections are not executable tests or complete DTOs and have not passed any validator. A reviewer must construct and validate full synthetic envelopes before implementation testing.",
+  "common": {
+    "snapshot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "owner_graph_query_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "research_query_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "analysis_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "method_id": "daily-causal-research-v1",
+    "lookback": 20,
+    "horizon": 5,
+    "requested_cutoff": "2026-01-20",
+    "evaluation_as_of": "2026-01-20",
+    "test_start": null,
+    "event": {
+      "index": 20,
+      "date": "2026-01-02",
+      "ordinal": 101,
+      "partition": "descriptive",
+      "selected": true,
+      "label_status": "valid",
+      "label_reason": null,
+      "evaluation_status": "valid",
+      "signal_as_of": "2026-01-02",
+      "evaluation_as_of": "2026-01-20",
+      "label_end": "2026-01-13",
+      "start_close": "100",
+      "end_close": "105",
+      "price_change": 0.05
+    },
+    "slot_dates": [
+      "2026-01-02",
+      "2026-01-05",
+      "2026-01-07",
+      "2026-01-08",
+      "2026-01-12",
+      "2026-01-13"
+    ],
+    "slot_ordinals": [
+      101,
+      105,
+      108,
+      109,
+      115,
+      120
+    ],
+    "slot_default_status": "computed",
+    "slot_default_reason": null,
+    "projection_note": "Slots normally represent series[20..25], except overlap cards explicitly use[21..26]. Preceding groups, estimates, coverage, qualifications, other events, counts and full envelope are omitted. Normal cards are intended coherent synthetic projections, not validated DTOs. Default computed assumes an uninterrupted valid prefix; reset cards explicitly override subsequent statuses."
+  },
+  "cards": [
+    {
+      "id": "P1A",
+      "close": [
+        "100",
+        "90",
+        "95",
+        "100",
+        "103",
+        "105"
+      ],
+      "answer": "t1=90 at 2026-01-05 ordinal105; final105. No newly computed percent in detail.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P1B",
+      "close": [
+        "100",
+        "110",
+        "108",
+        "107",
+        "106",
+        "105"
+      ],
+      "answer": "t1=110 at 2026-01-05 ordinal105; sequence differs from P1A although final105.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P2A",
+      "close": [
+        "100",
+        "90",
+        "110",
+        "100",
+        "103",
+        "105"
+      ],
+      "answer": "90 at t1, 110 at t2; preserve this order.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P2B",
+      "close": [
+        "100",
+        "110",
+        "90",
+        "100",
+        "103",
+        "105"
+      ],
+      "answer": "110 at t1, 90 at t2; do not replace sequence with min/max.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P3",
+      "close": [
+        "100",
+        "90",
+        "95",
+        "102"
+      ],
+      "series_ends_at_offset": 3,
+      "override": {
+        "requested_cutoff": "2026-01-08",
+        "evaluation_as_of": "2026-01-08",
+        "event": {
+          "label_status": "immature",
+          "label_reason": "insufficient_future_records",
+          "evaluation_status": "immature",
+          "label_end": null,
+          "end_close": null,
+          "price_change": null
+        }
+      },
+      "answer": "t4/t5 unknown date, ordinal and close; 4/6 existing slots; no horizon shortening.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P3_BAD",
+      "extends": "P3",
+      "slot_override": {
+        "2": {
+          "ordinal": null,
+          "close": null,
+          "status": "invalid",
+          "reason": "duplicate_date"
+        },
+        "3": {
+          "status": "warming_up",
+          "reason": null
+        }
+      },
+      "answer": "Immature remains immature, despite existing bad slot.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P4_DUP",
+      "close": [
+        "100",
+        "90",
+        null,
+        "102",
+        "103",
+        "105"
+      ],
+      "slot_override": {
+        "2": {
+          "ordinal": null,
+          "status": "invalid",
+          "reason": "duplicate_date"
+        },
+        "3": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "4": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "5": {
+          "status": "warming_up",
+          "reason": null
+        }
+      },
+      "override": {
+        "event": {
+          "label_status": "invalid",
+          "label_reason": "invalid_label_window",
+          "evaluation_status": "invalid",
+          "price_change": null
+        }
+      },
+      "answer": "Third position t2 remains duplicate group dated2026-01-07; no ordinal or close; t5 stays original120.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P4_ZERO",
+      "extends": "P4_DUP",
+      "slot_override": {
+        "2": {
+          "ordinal": 108,
+          "close": "0",
+          "status": "invalid",
+          "reason": "invalid_price"
+        },
+        "3": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "4": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "5": {
+          "status": "warming_up",
+          "reason": null
+        }
+      },
+      "answer": "Show exact 0 at t2, retain invalid; structurally valid zero does not block invalid evidence.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P4_NEGATIVE",
+      "extends": "P4_DUP",
+      "slot_override": {
+        "2": {
+          "ordinal": 108,
+          "close": "-0.000000000000000001",
+          "status": "invalid",
+          "reason": "invalid_price"
+        },
+        "3": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "4": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "5": {
+          "status": "warming_up",
+          "reason": null
+        }
+      },
+      "answer": "Show full negative string, retain invalid; do not drop slot.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P4_OHLC",
+      "close": [
+        "100",
+        "90",
+        "95",
+        "102",
+        "103",
+        "105"
+      ],
+      "slot_override": {
+        "2": {
+          "status": "invalid",
+          "reason": "invalid_ohlc"
+        },
+        "3": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "4": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "5": {
+          "status": "warming_up",
+          "reason": null
+        }
+      },
+      "override": {
+        "event": {
+          "label_status": "invalid",
+          "label_reason": "invalid_label_window",
+          "evaluation_status": "invalid",
+          "price_change": null
+        }
+      },
+      "answer": "Positive closes do not repair invalid OHLC label; detailed OHLC is not reconstructed.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P5_OVERLAP",
+      "extends": "P1A",
+      "override": {
+        "event": {
+          "selected": false,
+          "evaluation_status": "overlap_excluded",
+          "index": 21
+        }
+      },
+      "answer": "Not in effective event statistics; baseline membership not asserted. Explicit previous selected index20; targetindex21 is within its5-step window.",
+      "classification": "normal_synthetic_projection",
+      "series_window_indices": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26
+      ],
+      "coherent_prefix": {
+        "preceding_group_count": 21,
+        "first_twenty_groups": "indices0..19: valid ascending dates before2026-01-01, no duplicates, close80/open80/low79/high85; no breakouts once rule becomes computable until index20.",
+        "previous_selected_event": {
+          "index": 20,
+          "date": "2026-01-01",
+          "ordinal": 100,
+          "close": "90",
+          "open": "90",
+          "low": "89",
+          "high": "90",
+          "selected": true
+        },
+        "target_ohlc": "At index21 on2026-01-02: open100/high100/low99/close100, so it exceeds prior high90. Later valid slots may use open=high=low=close as given; synthetic only.",
+        "selection_relation": "21 <=20+5 so target is overlap_excluded. Complete report must include all events actually produced later and exact partition/counts. Previous event label window ends at targett4 on2026-01-12; target ends at t5 on2026-01-13."
+      }
+    },
+    {
+      "id": "P5_PURGE",
+      "extends": "P1A",
+      "override": {
+        "test_start": "2026-01-12",
+        "event": {
+          "partition": "train",
+          "evaluation_status": "purged"
+        }
+      },
+      "answer": "Selected train event ends at2026-01-13 >=split; purged. Price path remains visible.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P5_OVERLAP_PURGE",
+      "extends": "P5_PURGE",
+      "override": {
+        "event": {
+          "selected": false,
+          "evaluation_status": "overlap_excluded",
+          "index": 21
+        }
+      },
+      "answer": "Overlap priority wins, do not relabel purged or count both.",
+      "classification": "normal_synthetic_projection",
+      "series_window_indices": [
+        21,
+        22,
+        23,
+        24,
+        25,
+        26
+      ],
+      "coherent_prefix": {
+        "preceding_group_count": 21,
+        "first_twenty_groups": "indices0..19: valid ascending dates before2026-01-01, no duplicates, close80/open80/low79/high85; no breakouts once rule becomes computable until index20.",
+        "previous_selected_event": {
+          "index": 20,
+          "date": "2026-01-01",
+          "ordinal": 100,
+          "close": "90",
+          "open": "90",
+          "low": "89",
+          "high": "90",
+          "selected": true
+        },
+        "target_ohlc": "At index21 on2026-01-02: open100/high100/low99/close100, so it exceeds prior high90. Later valid slots may use open=high=low=close as given; synthetic only.",
+        "selection_relation": "21 <=20+5 so target is overlap_excluded. Complete report must include all events actually produced later and exact partition/counts. Previous event label window ends at targett4 on2026-01-12; target ends at t5 on2026-01-13."
+      }
+    },
+    {
+      "id": "P5_INVALID_PURGE",
+      "extends": "P4_OHLC",
+      "override": {
+        "test_start": "2026-01-12",
+        "event": {
+          "partition": "train",
+          "evaluation_status": "purged"
+        }
+      },
+      "answer": "Selected mature invalid train label can be purged; original invalid label remains visible.",
+      "classification": "normal_synthetic_projection",
+      "slot_override": {
+        "3": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "4": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "5": {
+          "status": "warming_up",
+          "reason": null
+        }
+      }
+    },
+    {
+      "id": "P5_OTHER_PART",
+      "extends": "P1A",
+      "override": {
+        "test_start": "2026-01-14",
+        "event": {
+          "partition": "train"
+        }
+      },
+      "current_display_partition": "test",
+      "answer": "Valid train event is not in currently displayed test event statistics. Switching to train changes only membership explanation.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P6",
+      "extends": "P1A",
+      "alternative_worlds": "Same six closes, differing intrabar paths, corporate actions and execution restrictions, none supplied as data.",
+      "answer": "No MFE/MAE, stop sequence, wealth, tradable return or prediction conclusion.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P7_SAME_ID_REPLACEMENT",
+      "extends": "P1A",
+      "second_response_change": {
+        "offset": 2,
+        "close": "96"
+      },
+      "answer": "New acceptance token and selection cleared even if analysis_id, dates, ordinals are identical. New explicit selection can show96.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P7_OWNED_PROJECTION_MUTATION",
+      "extends": "P1A",
+      "attempted_change": "After capture attempt replacing projection slot.close, splicing projection slots, or changing captured event/identity fields. This artifact executes no operation.",
+      "answer": "All owned projection containers are frozen, hold no raw mutable aliases and keep their values; rawreport is not frozen. Each full reaccept including sameobject still clears selection.",
+      "classification": "isolated_lexical_or_structural_boundary"
+    },
+    {
+      "id": "P8_PAGED",
+      "extends": "P1A",
+      "raw_query_membership": "Event trueRow is in q.rows but outside current page/chart view.",
+      "answer": "No false missing-row message or focus claim; only true research identifiers and passive scope note.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P8_ABSENT",
+      "extends": "P1A",
+      "raw_query_membership": "Event absent from q.rows due ordinal range, present in same-response research prefix.",
+      "answer": "Six slots still available; no fake Row, source callback or new fetch.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "PRICE_PRECISION",
+      "close": [
+        "1",
+        "1.000000000000000001",
+        "1.000000000000000002",
+        "1",
+        "1",
+        "1"
+      ],
+      "override": {
+        "event": {
+          "start_close": "1",
+          "end_close": "1",
+          "price_change": 0
+        }
+      },
+      "answer": "Display both last-place changes exactly; no Number conversion or percent computation.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "KALMAN_ONLY_FAILURE",
+      "extends": "P1A",
+      "slot_override": {
+        "2": {
+          "status": "invalid",
+          "reason": "numerical_failure"
+        },
+        "3": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "4": {
+          "status": "warming_up",
+          "reason": null
+        },
+        "5": {
+          "status": "warming_up",
+          "reason": null
+        }
+      },
+      "answer": "Original valid label and valid event membership remain unchanged; series estimate failure is shown separately.",
+      "classification": "injected_estimator_failure"
+    },
+    {
+      "id": "NULL_CUTOFF",
+      "extends": "P1A",
+      "override": {
+        "requested_cutoff": null,
+        "evaluation_as_of": "2026-01-13"
+      },
+      "series_ends_at_offset": 5,
+      "answer": "Requested cutoff displays unrestricted; actual D is lastseries.date,2026-01-13; graphQ need not equal researchQ.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "EXPLICIT_GAP_CUTOFF",
+      "extends": "P1A",
+      "series_ends_at_offset": 5,
+      "answer": "D stays requested2026-01-20 although lastseries.date is2026-01-13.",
+      "classification": "normal_synthetic_projection"
+    },
+    {
+      "id": "P4_END_NULL",
+      "classification": "normal_synthetic_projection",
+      "extends": "P1A",
+      "slot_override": {
+        "5": {
+          "close": null,
+          "status": "invalid",
+          "reason": "missing_ohlc"
+        }
+      },
+      "override": {
+        "event": {
+          "label_status": "invalid",
+          "label_reason": "invalid_label_window",
+          "evaluation_status": "invalid",
+          "end_close": null,
+          "price_change": null
+        }
+      },
+      "answer": "Mature bad endpoint stays at t5 with originaldate/ordinal and retained close; end_close matches. Invalid record remains visible; no drop, repair or shortening."
+    },
+    {
+      "id": "P4_END_ZERO",
+      "classification": "normal_synthetic_projection",
+      "extends": "P1A",
+      "slot_override": {
+        "5": {
+          "close": "0",
+          "status": "invalid",
+          "reason": "invalid_price"
+        }
+      },
+      "override": {
+        "event": {
+          "label_status": "invalid",
+          "label_reason": "invalid_label_window",
+          "evaluation_status": "invalid",
+          "end_close": "0",
+          "price_change": null
+        }
+      },
+      "answer": "Mature bad endpoint stays at t5 with originaldate/ordinal and retained close; end_close matches. Invalid record remains visible; no drop, repair or shortening."
+    },
+    {
+      "id": "P4_END_NEGATIVE",
+      "classification": "normal_synthetic_projection",
+      "extends": "P1A",
+      "slot_override": {
+        "5": {
+          "close": "-1",
+          "status": "invalid",
+          "reason": "invalid_price"
+        }
+      },
+      "override": {
+        "event": {
+          "label_status": "invalid",
+          "label_reason": "invalid_label_window",
+          "evaluation_status": "invalid",
+          "end_close": "-1",
+          "price_change": null
+        }
+      },
+      "answer": "Mature bad endpoint stays at t5 with originaldate/ordinal and retained close; end_close matches. Invalid record remains visible; no drop, repair or shortening."
+    },
+    {
+      "id": "P5_IMMATURE_OVERLAP",
+      "classification": "normal_synthetic_projection",
+      "extends": "P5_OVERLAP",
+      "close": [
+        "100",
+        "90",
+        "95",
+        "102"
+      ],
+      "series_ends_at_offset": 3,
+      "override": {
+        "requested_cutoff": "2026-01-08",
+        "evaluation_as_of": "2026-01-08",
+        "event": {
+          "label_status": "immature",
+          "label_reason": "insufficient_future_records",
+          "label_end": null,
+          "end_close": null,
+          "price_change": null
+        }
+      },
+      "answer": "Targetindex21 remains selected=false/evaluation=overlap_excluded, label=immature; previousindex20 also selected but immature. Onlyt0..t3 exist; t4/t5 unknown. No purging without endpoint.",
+      "coherent_prefix": {
+        "preceding_group_count": 21,
+        "first_twenty_groups": "indices0..19: valid ascending dates before2026-01-01, no duplicates, close80/open80/low79/high85; no breakouts once rule becomes computable until index20.",
+        "previous_selected_event": {
+          "index": 20,
+          "date": "2026-01-01",
+          "ordinal": 100,
+          "close": "90",
+          "open": "90",
+          "low": "89",
+          "high": "90",
+          "selected": true
+        },
+        "target_ohlc": "At index21 on2026-01-02: open100/high100/low99/close100, so it exceeds prior high90. Later valid slots may use open=high=low=close as given; synthetic only.",
+        "selection_relation": "21 <=20+5 so target is overlap_excluded. Series ends atindex24 (targett3); priorselected index20 would need index25 and target21 would need index26, neither exists. Both labels are immature; complete report includes every actually generated event and counts."
+      }
+    }
+  ],
+  "price_text_cases": {
+    "accepted": [
+      "0",
+      "1",
+      "-1",
+      "0.000000000000000001",
+      "-0.000000000000000001",
+      "99999999999999999999.999999999999999999",
+      "-99999999999999999999.999999999999999999"
+    ],
+    "rejected": [
+      "-0",
+      "+1",
+      "01",
+      "1.0",
+      "1.",
+      ".1",
+      " 1",
+      "1 ",
+      "1e2",
+      "NaN",
+      "Infinity",
+      "１",
+      "100000000000000000000",
+      "0.0000000000000000001"
+    ],
+    "null": "Allowed absent retained value for existing invalid/immature slot; differs from missing future slot. Valid label cannot contain null.",
+    "classification": "isolated_lexical_or_structural_boundary"
+  },
+  "mutation_cards": [
+    {
+      "id": "M01",
+      "change": "event.start_close differs from series[i].close",
+      "answer": "Block association, retain original event/statistics.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M02",
+      "change": "event.end_close or label_end differs from series[i+5]",
+      "answer": "Block association.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M03",
+      "change": "event index/date/ordinal mismatch or breakout is not true",
+      "answer": "Old validator already rejects; new feature cannot bypass it.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M04",
+      "change": "valid label contains a zero or null close",
+      "answer": "Block selected evidence; never silently recategorize original label.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M05",
+      "change": "unknown label_status/evaluation_status/partition",
+      "answer": "Block new association despite possible old text acceptance.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M06",
+      "change": "nonselected event claims evaluation valid or purged",
+      "answer": "Block association; priority contradiction.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M07",
+      "change": "partition counts disagree with original event ledger",
+      "answer": "Block association; no replacement counts displayed.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M08",
+      "change": "missing start_close field or close malformed/over40chars",
+      "answer": "Block new association; no coercion/null replacement.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M09",
+      "change": "explicit cutoff differs from D, or unrestricted D differs from lastseries date",
+      "answer": "Block association.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M10",
+      "change": "duplicate_date with nonnull ordinal/close",
+      "answer": "Block malformed slot association.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M11",
+      "change": "valid label with known source invalidity reason",
+      "answer": "Block contradiction; Kalman numerical_failure remains allowed.",
+      "classification": "deliberately_inconsistent_negative"
+    },
+    {
+      "id": "M12",
+      "change": "unknown new series reason under otherwise valid label",
+      "answer": "Local unavailable without changing original label; explicit future contract review needed.",
+      "classification": "deliberately_inconsistent_negative"
+    }
+  ],
+  "classification_contract": {
+    "normal_synthetic_projection": "Intended coherent normal synthetic OHLC/prefix projection, incomplete and not executed or DTO-validated; full realization must include all actual events and counts.",
+    "injected_estimator_failure": "Contract injection; natural numerical reachability not claimed.",
+    "deliberately_inconsistent_negative": "Purposefully contradicted fields; reject at specified gate.",
+    "isolated_lexical_or_structural_boundary": "Not a normal backend report.",
+    "unsupported_operation": "Outside published-report read-only ownership contract."
+  },
+  "unsupported_operations": [
+    {
+      "operation": "Force raw report mutation after publication, bypassing read-only ownership.",
+      "contract": "Unsupported. Owned six-slot capture remains unchanged, but original table/statistics consistency after this violation is not guaranteed. Change must use full acceptance; no runtime whole-tree freeze claim."
+    }
+  ]
+}
