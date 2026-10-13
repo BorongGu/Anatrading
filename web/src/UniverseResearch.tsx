@@ -129,6 +129,7 @@ export function UniverseResearch({ snapshots, onImport, onOpen, draft: controlle
         <DrawdownEpisodeResults
           key={report.report.analysis_id}
           report={report.report}
+          expected={requestState.spec?.kind === 'drawdown_episodes' ? requestState.spec.request.expected : undefined}
           name={draft.groupName}
           onOpen={onOpen}
         />
