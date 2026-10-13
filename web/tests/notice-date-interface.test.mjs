@@ -55,3 +55,20 @@ test('v2 and legacy readouts display the actual reference coverage and separatel
  const old=await buildNoticeDiagnostic(structuredClone(fixtures.mixed.reply),legacy),oldHtml=render(NoticeDateReadout,{diagnostic:old,onOpen(){}});
  assert.match(oldHtml,/本参考含深交所有限公告日期/);assert.match(oldHtml,/该所日期计划本包未覆盖/);assert.doesNotMatch(oldHtml,/本参考含上交所/);
 });
+test('malformed bundled reference cannot break collapsed 051 and stays a strict local calculation failure',async()=>{
+ const {default:bundle}=await server.ssrLoadModule('/src/notice-reference-v2.json');
+ const {buildNoticeDiagnostic:build}=await server.ssrLoadModule('/src/notice-date-model.ts');
+ const schema=bundle.schema;
+ try {
+  bundle.schema='invalid-reference';
+  const html=render(NoticeDateDiagnostic,{report:fixtures.complete.reply,onOpen(){}});
+  assert.match(html,/公告参考覆盖信息暂不可用/);assert.doesNotMatch(html,/零个交易所|正在核对|有限公告日期核对结果/);
+  await assert.rejects(()=>build(structuredClone(fixtures.complete.reply)),/invalid_notice_reference/);
+ } finally {bundle.schema=schema;}
+});
+test('valid empty reference coverage stays distinct from invalid reference coverage',async()=>{
+ const {default:bundle}=await server.ssrLoadModule('/src/notice-reference-v2.json');
+ const notices=bundle.notices;
+ try {bundle.notices=[];const html=render(NoticeDateDiagnostic,{report:fixtures.complete.reply,onOpen(){}});assert.match(html,/本包未列出交易所公告日期/);assert.doesNotMatch(html,/覆盖信息暂不可用/);}
+ finally {bundle.notices=notices;}
+});
