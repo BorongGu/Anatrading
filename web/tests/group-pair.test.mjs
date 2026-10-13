@@ -145,3 +145,8 @@ test('051 Unicode byte budget rejects multi-byte overflow below the UTF-16 text 
  assert.ok(text.length<2*1024*1024);assert.ok(new TextEncoder().encode(text).byteLength>2*1024*1024);
  assert.throws(()=>assertGroupPairs(x.reply,x.expected),/invalid_group_pair_response/);
 });
+
+test('051 SSR discloses complete-source post-cutoff qualification boundary',()=>{
+ const html=render(GroupPairResults,{report:f().reply,name:'合成',onOpen(){}});
+ assert.ok(html.includes('价格计算只使用截止日及以前的窗口；所选完整数据版本在截止日后出现身份、复权或结构反证，也会关闭本次相关计算。历史当时可得性未核实。'));
+});

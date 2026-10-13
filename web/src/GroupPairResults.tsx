@@ -83,6 +83,7 @@ export function GroupPairResults({ report, name, onOpen }: {
     <h2>全成对双窗相关{name ? ` · ${name}` : ''}</h2>
     <p>原组 {report.counts.selected} 只 · 每窗全部 {report.counts.pairs} 对。简单源收盘变化 =（本价 − 前价）/ 前价；两窗各60变化，共享边界价格。</p>
     <p>各成员独立选取精确截止日及以前最后121个来源日期组，完整数组必须一致。全部成员与不可算对保留。</p>
+    <p className="inline-note amber">价格计算只使用截止日及以前的窗口；所选完整数据版本在截止日后出现身份、复权或结构反证，也会关闭本次相关计算。历史当时可得性未核实。</p>
     {!report.source_panel_complete && <p className="inline-note amber" role="status">完整来源面板未齐，全部相关关闭。{report.grid_reasons.map(groupPairReason).join('；')}。不交集、不补齐、不回退。</p>}
     <details><summary>全部成员来源核验</summary><ul>{report.members.map(m => <li key={m.snapshot_id}>
       {m.symbol ?? '身份未核实'} · {m.snapshot_id} · 候选日期 {m.date_array.length} 个 · {m.reasons.map(groupPairReason).join('；') || '本成员核验完整'}
