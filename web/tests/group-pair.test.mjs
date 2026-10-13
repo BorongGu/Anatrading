@@ -110,7 +110,7 @@ test('051 both sides arbitrary dates and boundary handlers preserve IDs and date
 test('051 page selection buttons select a single exact pair without requests',()=>{
  const r=f('maximum').reply,selected=[],pages=[],tree=GroupPairPage({report:r,window:'previous',page:1,onPage:p=>pages.push(p),onSelect:p=>selected.push(p)});
  visit(tree,n=>{if(n.type==='button')n.props.onClick();});assert.deepEqual(pages,[0,2]);assert.deepEqual(selected,r.pairs.slice(50,100));
- const source=readFileSync(new URL('../src/GroupPairResults.tsx',import.meta.url),'utf8');assert.match(source,/useState<GroupPair \| null>\(null\)/);assert.match(source,/setSelected\(null\)/);assert.doesNotMatch(source,/fetch\(/);
+ const source=readFileSync(new URL('../src/GroupPairResults.tsx',import.meta.url),'utf8');assert.match(source,/useState<\{report:GroupPairReport;pair:GroupPair\}\|null>\(null\)/);assert.match(source,/setSelected\(null\)/);assert.doesNotMatch(source,/fetch\(/);
 });
 
 

@@ -1,7 +1,9 @@
+import { pairSignContextBinding } from './pair-sign-crossproducts.ts';
+import { PairSignDetails } from './PairSignDetails.tsx';
 import { NoticeDateDiagnostic } from './NoticeDateDiagnostic.tsx';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { groupPairReason } from './group-pair-model.ts';
-import type { GroupPair, GroupPairMember, GroupPairReport } from './group-pair-model.ts';
+import type { GroupPair, GroupPairMember, GroupPairReport, GroupPairExpected } from './group-pair-model.ts';
 import { peerSign } from './peer-neighbor-model.ts';
 
 const PAGE_SIZE = 50;
@@ -86,10 +88,16 @@ export function GroupPairSource({ member, commonDates, onOpen }: {
     </>}
   </section>;
 }
-export function GroupPairResults({ report, name, onOpen }: {
-  report: GroupPairReport; name: string; onOpen: (id: string,date: string) => void;
+export function GroupPairResults({ report, expected, name, onOpen }: {
+  report: GroupPairReport; expected?: GroupPairExpected; name: string; onOpen: (id: string,date: string) => void;
 }) {
-  const [selected,setSelected] = useState<GroupPair | null>(null);
+  const [selection,setSelection] = useState<{report:GroupPairReport;pair:GroupPair}|null>(null);
+  const active=useRef({report,selection});active.current={report,selection};
+  useEffect(()=>()=>{active.current.selection=null;},[]);
+  const sourceBinding=pairSignContextBinding(report);
+  const selected=selection?.report===report?selection.pair:null;
+  const setSelected=(pair:GroupPair|null)=>{if(active.current.report===report){const next=pair?{report,pair}:null;active.current={report,selection:next};setSelection(next);}};
+  const openCurrent=(id:string,date:string)=>{if(active.current.report===report&&active.current.selection===selection&&selection&&sourceBinding!==null&&pairSignContextBinding(report)===sourceBinding)onOpen(id,date);};
   const members = new Map(report.members.map(m => [m.snapshot_id,m]));
   return <section className="panel research-panel">
     <h2>全成对双窗相关{name ? ` · ${name}` : ''}</h2>
@@ -106,7 +114,8 @@ export function GroupPairResults({ report, name, onOpen }: {
     {selected && <section aria-label="选中对来源回查">
       <h3>选中对来源回查</h3>
       <p>日期按钮将打开对应股票的个股研究；每次打开一方。</p><button type="button" onClick={() => setSelected(null)}>关闭回查</button>
-      {[selected.left_snapshot_id,selected.right_snapshot_id].map(id => <GroupPairSource key={id} member={members.get(id)!} commonDates={report.used_dates} onOpen={onOpen} />)}
+      {[selected.left_snapshot_id,selected.right_snapshot_id].map(id => <GroupPairSource key={id} member={members.get(id)!} commonDates={report.used_dates} onOpen={openCurrent} />)}
+      {expected && <PairSignDetails report={report} expected={expected} pair={selected} onOpen={openCurrent} />}
     </section>}
     <p className="inline-note">正相关只描述中心化线性关系，不表示每天同涨同跌；零相关不表示独立。常量变化的相关未定义，包含恒定非零变化。无排名、差值或自动分组。</p>
     <p className="inline-note amber">当前明确成员的来源回顾。交易日历、复权、公司行动、闭合与历史当时可得性未核实；A股/CNY为范围假设。不认证预测、协整、套利或经济收益。性能、实际人效和金融效果未验。</p>

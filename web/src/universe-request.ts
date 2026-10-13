@@ -1,5 +1,5 @@
 import { groupPairRequest, fetchGroupPairs } from './group-pair-model.ts';
-import type { GroupPairReport } from './group-pair-model.ts';
+import type { GroupPairReport, GroupPairExpected } from './group-pair-model.ts';
 import { drawdownEpisodeRequest, fetchDrawdownEpisodes } from './drawdown-episode-model.ts';
 import type { DrawdownReport } from './drawdown-episode-model.ts';
 import { peerNeighborRequest, fetchPeerNeighbors } from './peer-neighbor-model.ts';
@@ -16,7 +16,7 @@ import type { ResearchEnvelope, UniverseResult } from './research-types.ts';
 
 export interface UniverseDraft { ids: string[]; cutoff: string; lookback: string; groupName: string; filter: FilterDraft; mode: 'group_pairs' | 'drawdown_episodes' | 'existing' | 'explanation' | 'group_endpoints' | 'peer_neighbors'; peerTarget: string; groupStart: string; explanation: { start: string; roles: Record<string, 'A' | 'B' | ''> } }
 export type UniverseRequestSpec = { kind: 'group_pairs'; request: ReturnType<typeof groupPairRequest> } | { kind: 'drawdown_episodes'; request: ReturnType<typeof drawdownEpisodeRequest> } | { kind: 'peer_neighbors'; request: ReturnType<typeof peerNeighborRequest> } | { kind: 'group_endpoints'; request: ReturnType<typeof groupEndpointRequest> } | { kind: 'explanation'; request: ReturnType<typeof explanationRequest> } | { kind: 'filter'; request: FilterRequest } | { kind: 'universe'; request: ReturnType<typeof buildResearchRequest> };
-export type UniverseRequestResult = { kind: 'group_pairs'; report: GroupPairReport } | { kind: 'drawdown_episodes'; report: DrawdownReport } | { kind: 'peer_neighbors'; report: PeerNeighborReport } | { kind: 'group_endpoints'; report: GroupEndpointReport } | { kind: 'explanation'; report: ExplanationReport } | { kind: 'filter'; report: FilterEnvelope } | { kind: 'universe'; report: ResearchEnvelope<UniverseResult> };
+export type UniverseRequestResult = { kind: 'group_pairs'; report: GroupPairReport; expected: GroupPairExpected } | { kind: 'drawdown_episodes'; report: DrawdownReport } | { kind: 'peer_neighbors'; report: PeerNeighborReport } | { kind: 'group_endpoints'; report: GroupEndpointReport } | { kind: 'explanation'; report: ExplanationReport } | { kind: 'filter'; report: FilterEnvelope } | { kind: 'universe'; report: ResearchEnvelope<UniverseResult> };
 export class UniverseInputError extends Error {
   input: 'cutoff' | 'lookback' | 'group-start';
   constructor(input: 'cutoff' | 'lookback' | 'group-start') { super(input === 'cutoff' ? 'invalid_cutoff' : input === 'group-start' ? 'invalid_dates' : 'invalid_lookback'); this.name = 'UniverseInputError'; this.input = input; }
@@ -60,7 +60,10 @@ export async function prepareUniverseRequest(draft: UniverseDraft, availableIds:
 }
 /** The actual component path: exactly one endpoint supplies each report. */
 export async function loadUniverseRequest(spec: UniverseRequestSpec, signal: AbortSignal): Promise<UniverseRequestResult> {
-  if (spec.kind === 'group_pairs') return { kind: 'group_pairs', report: await fetchGroupPairs(spec.request, signal) };
+  if (spec.kind === 'group_pairs') {
+    const request = structuredClone(spec.request);
+    return { kind: 'group_pairs', report: await fetchGroupPairs(request, signal), expected: request.expected };
+  }
   if (spec.kind === 'drawdown_episodes') return { kind: 'drawdown_episodes', report: await fetchDrawdownEpisodes(spec.request, signal) };
   if (spec.kind === 'peer_neighbors') return { kind: 'peer_neighbors', report: await fetchPeerNeighbors(spec.request, signal) };
   if (spec.kind === 'group_endpoints') return { kind: 'group_endpoints', report: await fetchGroupEndpoints(spec.request, signal) };
