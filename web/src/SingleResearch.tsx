@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useRef, useState } from 'react';
+import { SingleEventPath } from './SingleEventPath.tsx';
+import { acceptEventPath, captureEventPath, eventPathBelongs, EventPathError } from './single-event-path.ts';
+import type { AcceptedEventPath, EventPathContext, EventPathProjection } from './single-event-path.ts';
 import { HistoricalPathResearch } from './HistoricalPathResearch.tsx';
 import { jsonRequest } from './api.ts';
 import { Generation } from './model.ts';
@@ -13,10 +16,20 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const [testStart, setTestStart] = useState('');
   const [partition, setPartition] = useState('test');
   const [report, setReport] = useState<ResearchEnvelope<SingleResult> | null>(null);
+  const [accepted, setAccepted] = useState<AcceptedEventPath | null>(null);
+  const [pathIssue, setPathIssue] = useState('');
+  const [selection, setSelection] = useState<{ token: object; position: number; projection: EventPathProjection | null; issue: string } | null>(null);
+  const active = useRef<AcceptedEventPath | null>(null);
+  const acceptedGeneration = useRef<number | null>(null);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const pathId = useId();
+  const context: EventPathContext = { ownerQueryId: query.query_id, snapshotId: query.snapshot_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
+  const currentContext = useRef(context); currentContext.current = context;
+  function closePath() { setSelection(null); if (trigger.current?.isConnected) trigger.current.focus(); }
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading');
   const [issue, setIssue] = useState('');
   const gate = useRef(new Generation()); const abort = useRef<AbortController | null>(null);
-  function invalidate() { gate.current.invalidate(); abort.current?.abort(); setReport(null); onReport?.(query.query_id, null); setIssue(''); setPhase('idle'); }
+  function invalidate() { active.current = null; acceptedGeneration.current = null; setAccepted(null); setSelection(null); setPathIssue(''); gate.current.invalidate(); abort.current?.abort(); setReport(null); onReport?.(query.query_id, null); setIssue(''); setPhase('idle'); }
   async function load() {
     invalidate(); const generation = gate.current.current();
     try {
@@ -24,10 +37,31 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
       const controller = new AbortController(); abort.current = controller; setPhase('loading');
       const result = await jsonRequest<ResearchEnvelope<SingleResult>>(request.path, { signal: controller.signal });
       if (!gate.current.isCurrent(generation)) return;
-      assertResearchReply(result, request.expected); setReport(result); onReport?.(query.query_id, result); setPhase('ready');
+      assertResearchReply(result, request.expected);
+      // Consumers must treat each published report as read-only. Every complete
+      // acceptance is a new ownership generation, even for the same object/ID.
+      setSelection(null); active.current = null; setAccepted(null); setPathIssue('');
+      if (request.expected.parameters.horizon === 5) {
+        try {
+          const next = acceptEventPath(result, context, request.expected);
+          active.current = next; acceptedGeneration.current = generation; setAccepted(next);
+        } catch (error) { setPathIssue(error instanceof EventPathError ? error.code : 'identity'); }
+      }
+      setReport(result); onReport?.(query.query_id, result); setPhase('ready');
     } catch (error) { if (gate.current.isCurrent(generation)) { setIssue(explainResearch(error)); setPhase('error'); } }
   }
-  useEffect(() => { void load(); return () => { gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
+  useEffect(() => { void load(); return () => { active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
+  const pathAvailable = accepted !== null && active.current === accepted && acceptedGeneration.current !== null
+    && gate.current.isCurrent(acceptedGeneration.current) && horizon === '5' && eventPathBelongs(accepted, report, context);
+  const shown = pathAvailable && selection?.token === accepted.token ? selection : null;
+  function choosePath(position: number, button: HTMLButtonElement) {
+    if (!accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
+      || horizon !== '5' || !eventPathBelongs(accepted, report, currentContext.current)) return;
+    trigger.current = button;
+    if (selection?.token === accepted.token && selection.position === position) { closePath(); return; }
+    try { setSelection({ token: accepted.token, position, projection: captureEventPath(accepted, position), issue: '' }); }
+    catch (error) { setSelection({ token: accepted.token, position, projection: null, issue: error instanceof EventPathError ? error.code : 'event_link' }); }
+  }
   const result = report?.result; const latest = result?.series.at(-1);
   const evaluation = result?.events;
   const part = evaluation?.partitions[partition] ?? evaluation?.partitions.descriptive ?? evaluation;
@@ -74,7 +108,20 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
           <details className="calculation-note"><summary>怎样理解这些数字</summary><p>价格变化 = 观察跨度末收盘价 ÷ 事件日收盘价 − 1。只纳入截止日前已成熟、路径有效的标签；不把尚未成熟的事件算成零。</p><p>{evaluation?.test_start ? `测试段从 ${evaluation.test_start} 开始。训练标签跨过切点时排除；切点和规则未经过搜索。` : '尚未指定测试切点；当前为全段描述，不称样本外检验。'}</p><p>基线采用相同时间分区、突破前窗可计算且标签有效的全部日期。它不是随机对照。</p></details>
         </article>
       </div>
-      <details className="calculation-note"><summary>查看事件记录（{evaluation?.rows.length ?? 0}）</summary><div className="table-scroll"><table><thead><tr><th>事件日期</th><th>标签终点</th><th>价格变化</th><th>评价状态</th></tr></thead><tbody>{evaluation?.rows.slice(-100).map(row => <tr key={`${row.ordinal}-${row.date}`}><th>{row.date}</th><td>{row.label_end ?? '尚未成熟'}</td><td>{formatPercent(row.price_change)}</td><td>{researchReason(row.evaluation_status)}{row.label_reason ? ` · ${researchReason(row.label_reason)}` : ''}</td></tr>)}</tbody></table></div><p className="subtle">显示最近 100 个事件；上方统计使用完整研究范围。</p></details>
+      <details className="calculation-note" onToggle={event => { if (!event.currentTarget.open) closePath(); }} onKeyDown={event => { if (event.key === 'Escape' && shown) { event.preventDefault(); event.stopPropagation(); closePath(); } }}>
+        <summary>查看事件记录（{evaluation?.rows.length ?? 0}）</summary>
+        {horizon !== '5' && <p className="subtle">六槽原价查看仅适用于观察跨度5；切换跨度会重新研究。</p>}
+        {pathIssue && <p role="status">六槽关联校验未通过；原报告按原响应展示，未重新认证。（{pathIssue}）</p>}
+        <div className="table-scroll"><table><thead><tr><th>事件日期</th><th>标签终点</th><th>价格变化</th><th>评价状态</th>{pathAvailable && <th>六槽证据</th>}</tr></thead><tbody>{evaluation?.rows.slice(-100).map((row, offset) => {
+          const position = Math.max(0, evaluation.rows.length - 100) + offset, open = shown?.position === position;
+          return <Fragment key={`${row.ordinal}-${row.date}`}><tr><th>{row.date}</th><td>{row.label_end ?? '尚未成熟'}</td><td>{formatPercent(row.price_change)}</td><td>{researchReason(row.evaluation_status)}{row.label_reason ? ` · ${researchReason(row.label_reason)}` : ''}</td>
+            {pathAvailable && <td><button type="button" aria-expanded={open} aria-controls={`${pathId}-${position}`} onClick={event => choosePath(position, event.currentTarget)}>查看6槽原价</button></td>}</tr>
+            {open && shown && <tr><td colSpan={5} id={`${pathId}-${position}`}>{shown.projection
+              ? <SingleEventPath projection={shown.projection} partition={evaluation.test_start ? partition : 'descriptive'} onClose={closePath} />
+              : <section aria-label="六槽关联错误"><p role="alert">本条六槽证据与原响应的关联不一致，暂不展开（event_path_inconsistent）。原事件和原报告仍保留。</p><p>事件 index {row.index} · {row.date} · 源序号 {row.ordinal} · selected：{row.selected ? '是' : '否'} · partition：{row.partition} · label_status：{row.label_status} · evaluation_status：{row.evaluation_status}</p><p>诊断：{shown.issue}</p><button type="button" onClick={closePath}>收起六槽</button></section>}</td></tr>}
+          </Fragment>;
+        })}</tbody></table></div><p className="subtle">显示最近 100 个事件；上方统计使用完整研究范围。</p>
+      </details>
       <ResearchProvenance report={report} />
     </>}
     {report && !latest && <p className="research-loading">截止范围内没有可研究的日线记录。</p>}

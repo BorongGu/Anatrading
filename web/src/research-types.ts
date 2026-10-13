@@ -25,7 +25,7 @@ export interface SingleResult {
   series: SingleRow[];
   events: EventPartition & {
     rows: { date: string; ordinal: number; index: number; partition: string; selected: boolean; evaluation_status: string; label_status: string;
-      label_reason: string | null; label_end: string | null; price_change: number | null; signal_as_of: string; evaluation_as_of: string }[];
+      start_close: string; end_close: string | null; label_reason: string | null; label_end: string | null; price_change: number | null; signal_as_of: string; evaluation_as_of: string }[];
     partitions: Record<string, EventPartition>; test_start: string | null; evaluation_as_of: string | null;
     mode: string; lookback: number; horizon: number;
   };

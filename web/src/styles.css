@@ -938,3 +938,8 @@ button, summary, a, tr[tabindex] { touch-action: manipulation; }
   .historical-path-provenance .metadata-list { grid-template-columns: minmax(0, 1fr); }
   .historical-path-provenance .metadata-list dd { margin-bottom: 10px; }
 }
+
+.single-event-path { padding: 1rem; text-align: left; white-space: normal; }
+.event-path-identity, .event-path-identity dd, .event-path-price { overflow-wrap: anywhere; white-space: normal; }
+.event-path-identity dd { margin: 0 0 .6rem; }
+.event-path-identity dt { font-weight: 600; }
