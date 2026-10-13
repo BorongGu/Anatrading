@@ -13,9 +13,9 @@ const render=(c,p)=>renderToStaticMarkup(createElement(c,p));
 const build=f=>buildGroupSourcePath(f.reply,f.expected,{yieldControl:async()=>{}});
 test('054 is default folded and mounted only with actual request context',()=>{
  const f=fixtures.T2,html=render(GroupSourcePath,{report:f.reply,expected:f.expected,onOpen(){}});
- assert.match(html,/组来源平均路径与共同最深段/);assert.doesNotMatch(html,/<details open|<table|组来源平均路径结果|正在核对/);
+ assert.match(html,/组内平均走势与最大回撤/);assert.doesNotMatch(html,/<details open|<table|组来源平均路径结果|正在核对/);
  const original=render(DrawdownEpisodeResults,{report:f.reply,name:'',onOpen(){}});assert.match(original,/缺少本次已核请求，附件不可计算/);
- const integrated=render(DrawdownEpisodeResults,{report:f.reply,expected:f.expected,name:'',onOpen(){}});assert.match(integrated,/固定原起点等权/);assert.match(integrated,/最深回撤段/);
+ const integrated=render(DrawdownEpisodeResults,{report:f.reply,expected:f.expected,name:'',onOpen(){}});assert.match(integrated,/各股以窗口首日价格为1，再取等权平均/);assert.match(integrated,/最深回撤段/);
 });
 test('one common witness keeps every signed member, original start and complete curve',async()=>{
  const result=await build(fixtures.T2),html=render(GroupSourcePathReadout,{result,onOpen(){}});

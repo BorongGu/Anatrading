@@ -17,7 +17,7 @@ function Evidence({label,point,id,onOpen}: {label:string;point:DrawdownPoint;id:
 export function GroupSourcePathCurve({result}: {result:GroupSourcePathResult}) {
   const {parent,attachment:a}=result;
   return (
-        <div className="table-scroll"><table><caption>固定原起点的完整归一化来源价格均值；位置对应父报告端点，未抽样或删点</caption>
+        <div className="table-scroll"><table><caption>固定原起点的完整归一化来源价格均值；位置对应原报告端点，未抽样或删点</caption>
           <thead><tr><th>窗口位置</th><th>来源日期</th><th>路径精确值</th><th>共同见证</th></tr></thead>
           <tbody>{a.sums!.map((s,i)=><tr key={i}><td>{i}</td><th>{parent.dates![i]}</th><td><Fraction n={s} d={a.denominator!}/></td>
             <td>{[i===0?'固定原起点':'',i===a.peak_index?'共同峰':'',i===a.trough_index?'共同谷':''].filter(Boolean).join('、') || '—'}</td></tr>)}</tbody>
@@ -35,7 +35,7 @@ export function GroupSourcePathReadout({result,onOpen}: {result:GroupSourcePathR
   const {parent,attachment:a}=result;
   return <section aria-label="组来源平均路径结果" data-parent-content-hash={a.parent_content_hash}>
     <p>原选全部 {a.selected} 个成员 · 截止 {parent.parameters.cutoff} · {parent.parameters.lookback} 个来源区间。</p>
-    <p className="inline-note">固定原起点等权归一化来源价格平均，起点为1，之后不逐期重置权重。保留原起点才能复核共同段。
+    <p className="inline-note">各股以窗口首日价格为1，再取等权平均，之后不逐期重置权重。保留原起点才能复核共同段。
       仅描述已观察来源收盘；当前成员与最深段属于回顾。全体共同缺日、窗口前峰、柱内极值、复权语义、公司行动覆盖和历史可得性仍未知。
       不提供投资财富、经济收益、因果归因、删股改善、CDaR、优化权重或预测。</p>
     {a.status==='unavailable' ? <>
@@ -62,10 +62,10 @@ export function GroupSourcePathReadout({result,onOpen}: {result:GroupSourcePathR
       </article>)}
       <GroupSourcePathCurveDetails key={a.attachment_id} result={result}/>
     </>}
-    <details><summary>独立附件与完整父内容身份</summary>
-      <p>附件 <code>{a.attachment_id}</code> · 父分析 <code>{a.parent_analysis_id}</code></p>
-      <p>完整父内容 SHA256 <code>{a.parent_content_hash}</code> · {a.method_id} · {a.rule_version}</p>
-      <p>hash只标识内容，不认证原件真实性。此附件须与完整父报告共同复核。父报告与附件各有独立2MiB限，未证明总内存或响应性能。</p>
+    <details><summary>独立附件与完整原报告内容身份</summary>
+      <p>附件 <code>{a.attachment_id}</code> · 原分析 <code>{a.parent_analysis_id}</code></p>
+      <p>完整原报告内容 SHA256 <code>{a.parent_content_hash}</code> · {a.method_id} · {a.rule_version}</p>
+      <p>hash只标识内容，不认证原件真实性。此附件须与完整原报告共同复核。原报告与附件各有独立2MiB限，未证明总内存或响应性能。</p>
     </details>
   </section>;
 }
@@ -97,8 +97,8 @@ export function GroupSourcePath({report,expected,onOpen}: {report:DrawdownReport
   const [open,setOpen]=useState(false);
   const content=binding(report,expected);
   return <details onToggle={e=>setOpen(e.currentTarget.open)}>
-    <summary>组来源平均路径与共同最深段（回顾）</summary>
-    <p>固定原起点等权，仅使用本次全部已核来源价格；保留所有成员的同段拉低与抵消。</p>
-    {open && (content===null?<p role="alert">完整父报告或请求内容未通过核对，组来源路径不可计算。</p>:<Calculation report={report} expected={expected} content={content} onOpen={onOpen}/>)}
+    <summary>组内平均走势与最大回撤（回顾）</summary>
+    <p>各股以窗口首日价格为1，再取等权平均，之后不逐期重置权重。仅使用本次全部已核来源收盘价，保留所有成员的同段拉低与抵消。</p>
+    {open && (content===null?<p role="alert">完整原报告或请求内容未通过核对，组来源路径不可计算。</p>:<Calculation report={report} expected={expected} content={content} onOpen={onOpen}/>)}
   </details>;
 }

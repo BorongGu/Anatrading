@@ -168,7 +168,7 @@ export function DrawdownEpisodeResults({ report, name, onOpen, expected }: {
         </article>
       ))}
       {expected ? <GroupSourcePath report={report} expected={expected} onOpen={onOpen}/> : <details>
-        <summary>组来源平均路径与共同最深段（回顾）</summary>
+        <summary>组内平均走势与最大回撤（回顾）</summary>
         <p>缺少本次已核请求，附件不可计算。原回撤结果保留。</p>
       </details>}
       <details>
