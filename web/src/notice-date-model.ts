@@ -1,12 +1,15 @@
 /** 053: bounded explicit-notice comparison of the validated 051 date DTO only.
  * No Store reads, price calculation, inferred sessions or original report edits.
  */
-import bundledReference from './notice-reference-v1.json' with { type: 'json' };
+import bundledReference from './notice-reference-v2.json' with { type: 'json' };
 import { assertGroupPairs, verifyGroupPairIdentity } from './group-pair-model.ts';
 import type { GroupPairReport } from './group-pair-model.ts';
 import { validGroupDate } from './group-endpoint-model.ts';
 
 export const NOTICE_REFERENCE_HASH = 'f3ad5c46bde683f3d713259e2aa35166f7469296956d7cc82538734c60a90264';
+export const NOTICE_REFERENCE_V2_HASH = 'ddf593eafb72f6dbd3f18da6112fc7f67e7a351d11f5831ac6c3dcdbea489ff7';
+// Keep the original exported v1 hash stable for historical replay.
+const pinnedReferenceHash = (value: unknown) => (value as NoticeReference | null)?.schema === 'explicit-notice-reference-v1' ? NOTICE_REFERENCE_HASH : NOTICE_REFERENCE_V2_HASH;
 export const NOTICE_METHOD = 'group-pairs-explicit-notice-diagnostic-v1';
 const RULE = 'qualified-source-claims-complete-date-groups-v1';
 const MAX_REFERENCE_BYTES = 128 * 1024, MAX_ATTACHMENT_BYTES = 2 * 1024 * 1024;
@@ -17,11 +20,18 @@ export interface NoticeSource {
   publication_date: string; original_sha256: string;
   closed_ranges: [string,string][]; closed_dates: string[]; reopen_dates: string[];
 }
-export interface NoticeReference {
-  schema: 'explicit-notice-reference-v1'; version: string; scope: [string,string]; timezone: 'Asia/Shanghai';
+interface NoticeReferenceBase {
+  version: string; scope: [string,string]; timezone: 'Asia/Shanghai';
   mode: 'retrospective'; exception_coverage: 'unknown'; historical_availability: 'unknown';
-  accepted_facts_sha256: string; reviewed_on: string; notices: NoticeSource[];
+  reviewed_on: string;
 }
+export type NoticeReference = NoticeReferenceBase & ({
+  schema: 'explicit-notice-reference-v1'; accepted_facts_sha256: string; notices: NoticeSource[];
+} | {
+  schema: 'explicit-notice-reference-v2'; historical_content_identity: 'unknown'; known_at: 'unknown';
+  evidence_by_exchange: Partial<Record<NoticeExchange,{accepted_facts_sha256:string;review_sha256:string}>>;
+  notices: (NoticeSource & {retrieved_at_utc:string})[];
+});
 export interface NoticeMember {
   snapshot_id: string; batch_id: string; query_id: string; symbol: string | null;
   exchange: NoticeExchange | null; present: string[]; absence_span: [string,string] | null;
@@ -74,15 +84,35 @@ export async function noticeHash(value: unknown): Promise<string> {
 }
 export function assertNoticeReference(value: unknown): asserts value is NoticeReference {
   const r = value as NoticeReference;
-  keys(r,['schema','version','scope','timezone','mode','exception_coverage','historical_availability','accepted_facts_sha256','reviewed_on','notices']);
-  ensure(r.schema === 'explicit-notice-reference-v1' && text(r.version,128) && /^[a-z0-9-]+$/.test(r.version));
+  ensure(r !== null && typeof r === 'object');
+  ensure(r.schema === 'explicit-notice-reference-v1' || r.schema === 'explicit-notice-reference-v2');
+  keys(r,['schema','version','scope','timezone','mode','exception_coverage','historical_availability','reviewed_on','notices',
+    ...(r.schema === 'explicit-notice-reference-v1' ? ['accepted_facts_sha256'] : ['evidence_by_exchange','historical_content_identity','known_at'])]);
+  ensure(text(r.version,128) && /^[a-z0-9-]+$/.test(r.version));
   ensure(r.timezone === 'Asia/Shanghai' && r.mode === 'retrospective' && r.exception_coverage === 'unknown' && r.historical_availability === 'unknown');
-  ensure(hex(r.accepted_facts_sha256) && day(r.reviewed_on));
+  ensure(day(r.reviewed_on));
+  if (r.schema === 'explicit-notice-reference-v1') ensure(hex(r.accepted_facts_sha256));
+  else {
+    ensure(r.historical_content_identity === 'unknown' && r.known_at === 'unknown');
+    const evidence = r.evidence_by_exchange;
+    ensure(evidence !== null && typeof evidence === 'object' && !Array.isArray(evidence));
+    ensure(Object.keys(evidence).every(e => exchanges.includes(e as NoticeExchange)));
+    for (const item of Object.values(evidence)) {
+      keys(item,['accepted_facts_sha256','review_sha256']);
+      ensure(hex(item.accepted_facts_sha256) && hex(item.review_sha256));
+    }
+  }
   ensure(Array.isArray(r.scope) && r.scope.length === 2 && r.scope.every(day) && r.scope[0] <= r.scope[1] && spanSize(...r.scope) <= 800);
   ensure(Array.isArray(r.notices) && r.notices.length <= 16);
   const ids = new Set<string>(); let facts = 0;
   for (const n of r.notices) {
-    keys(n,['id','exchange','document_id','url','publication_date','original_sha256','closed_ranges','closed_dates','reopen_dates']);
+    keys(n,['id','exchange','document_id','url','publication_date','original_sha256','closed_ranges','closed_dates','reopen_dates',
+      ...(r.schema === 'explicit-notice-reference-v2' ? ['retrieved_at_utc'] : [])]);
+    if (r.schema === 'explicit-notice-reference-v2') {
+      ensure(Object.hasOwn(r.evidence_by_exchange,n.exchange));
+      const captured = (n as NoticeSource & {retrieved_at_utc:string}).retrieved_at_utc;
+      ensure(typeof captured === 'string' && /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d{1,6})?(?:Z|\+00:00)$/.test(captured) && day(captured.slice(0,10)));
+    }
     ensure(text(n.id,128) && /^[a-z0-9-]+$/.test(n.id) && !ids.has(n.id)); ids.add(n.id);
     ensure(exchanges.includes(n.exchange) && text(n.document_id,128) && hex(n.original_sha256) && day(n.publication_date));
     ensure(text(n.url,2048));
@@ -98,7 +128,12 @@ export function assertNoticeReference(value: unknown): asserts value is NoticeRe
   }
   ensure(new TextEncoder().encode(JSON.stringify(r)).length <= MAX_REFERENCE_BYTES,'notice_reference_limit');
 }
-export async function verifyNoticeReference(value: unknown, expectedHash = NOTICE_REFERENCE_HASH) {
+/** Coverage names describe only the exchanges with explicit facts in this reference. */
+export function noticeReferenceExchanges(reference: unknown = bundledReference): NoticeExchange[] {
+  assertNoticeReference(reference);
+  return exchanges.filter(e=>reference.notices.some(n=>n.exchange===e && n.closed_ranges.length+n.closed_dates.length+n.reopen_dates.length>0));
+}
+export async function verifyNoticeReference(value: unknown, expectedHash = pinnedReferenceHash(value)) {
   assertNoticeReference(value);
   ensure(hex(expectedHash) && await noticeHash(value) === expectedHash,'notice_reference_integrity');
 }
@@ -175,7 +210,7 @@ export function matchNoticeDates(report: GroupPairReport, reference: NoticeRefer
   }
   return {selected:members.length,window,members,unknown_members:members.filter(m=>m.exchange===null).map(m=>m.snapshot_id),exchanges:output,status:!window?'no_overlap':comparable?'evaluated':'not_evaluated',differences};
 }
-export async function buildNoticeDiagnostic(report: GroupPairReport, reference: unknown = bundledReference, expectedHash = NOTICE_REFERENCE_HASH): Promise<NoticeDiagnostic> {
+export async function buildNoticeDiagnostic(report: GroupPairReport, reference: unknown = bundledReference, expectedHash = pinnedReferenceHash(reference)): Promise<NoticeDiagnostic> {
   // Freeze this calculation before any asynchronous SHA work; never mutate the parent DTO.
   const r = structuredClone(report), ref = structuredClone(reference);
   assertGroupPairs(r,{ids:r.members.map(m=>m.snapshot_id),cutoff:r.parameters.cutoff});

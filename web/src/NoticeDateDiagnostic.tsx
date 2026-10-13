@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
-import { buildNoticeDiagnostic } from './notice-date-model.ts';
+import { buildNoticeDiagnostic, noticeReferenceExchanges } from './notice-date-model.ts';
 import type { NoticeDate, NoticeDiagnostic, NoticeExchangeResult, NoticeMember } from './notice-date-model.ts';
 import type { GroupPairReport } from './group-pair-model.ts';
 import { groupPairReason } from './group-pair-model.ts';
 
 const PAGE_SIZE = 50;
 const exchangeLabel = { SSE:'上交所', SZSE:'深交所' };
+// Optional reference metadata must never take down the original 051 readout.
+// Null means invalid/unavailable; the empty string means valid but no listed facts.
+function coverageNames(reference?: unknown): string | null {
+  try { return noticeReferenceExchanges(reference).map(e=>exchangeLabel[e]).join('、'); }
+  catch { return null; }
+}
+
 const unknownLabels: Record<string,string> = {
   exchange_claim_unverified:'来源交易所声明未核实', endpoint_date_unverified:'存在未可靠定位的端点日期',
   date_array_empty:'来源日期数组为空', cutoff_not_enumerated:'日期数组未包含原截止日',
@@ -67,6 +74,7 @@ function ExchangeReadout({result,diagnostic,onOpen}: {result:NoticeExchangeResul
   </section>;
 }
 export function NoticeDateReadout({diagnostic:d,onOpen}: {diagnostic:NoticeDiagnostic;onOpen:(id:string,date:string)=>void}) {
+  const coverage=coverageNames(d.reference);
   return <section aria-label="有限公告日期核对结果">
     <p>按本次公告参考回顾 · {d.window ? `${d.window[0]} → ${d.window[1]}` : '与参考范围无交叠'}。原选 {d.selected} 个成员，交易所声明未核实 {d.unknown_members.length} 个。</p>
     <p className="inline-note amber">仅按来源声明的交易所和现有A股/日期基准假设核对；未认证证券主数据身份、实际交易、个股应有行情或历史当时可得性。候选只覆盖各所声明已核的成员，未核身份成员不能算入“全部缺席”。</p>
@@ -81,8 +89,13 @@ export function NoticeDateReadout({diagnostic:d,onOpen}: {diagnostic:NoticeDiagn
       <p>{d.reference.version} · 静态参考范围 {d.reference.scope.join(' → ')} · Asia/Shanghai · 归档复核 {d.reference.reviewed_on}</p>
       <p>临时事件与更正全集未知；命名恢复开市仅核对该单日。公告计划不保证实际全日开市或个股成交。</p>
       <p>仅校验本地派生参考内容hash；原件hash记录归档时字节身份，本次没有重新读取或认证官方原件。</p>
-      <p>附件 {d.attachment_id}；原报告 {d.parent_analysis_id}；参考 {d.reference_hash}；已核事实 {d.reference.accepted_facts_sha256}</p>
-      <ul>{d.reference.notices.map(n=><li key={n.id}><a href={n.url} target="_blank" rel="noopener noreferrer">{n.document_id}</a> · {n.exchange} · 声明发布 {n.publication_date} · 归档原字节 SHA256 {n.original_sha256}</li>)}</ul>
+      <p>{coverage===null?'公告参考覆盖信息暂不可用。':coverage?`本参考含${coverage}有限公告日期；其它日期仍未覆盖。`:'本参考未列出交易所公告日期。'}</p>
+      <p>附件 {d.attachment_id}；原报告 {d.parent_analysis_id}；参考 {d.reference_hash}</p>
+      {d.reference.schema==='explicit-notice-reference-v1' ? <p>已核事实 {d.reference.accepted_facts_sha256}（v1归档参考）</p> : <>
+        <p>原件历史内容身份与known_at未知；获取时间不表示历史当时可得。审查hash仅标识归档审查记录，本包未附审查全文，也未实时核验官方来源。</p>
+        <ul>{Object.entries(d.reference.evidence_by_exchange).map(([exchange,evidence])=><li key={exchange}>{exchange} · 已核事实 {evidence.accepted_facts_sha256} · 归档审查 {evidence.review_sha256}</li>)}</ul>
+      </>}
+      <ul>{d.reference.notices.map(n=><li key={n.id}><a href={n.url} target="_blank" rel="noopener noreferrer">{n.document_id}</a> · {n.exchange} · 声明发布 {n.publication_date} · 归档原字节 SHA256 {n.original_sha256}{'retrieved_at_utc' in n && <> · 获取时间 {String(n.retrieved_at_utc)}</>}</li>)}</ul>
     </details>
   </section>;
 }
@@ -102,9 +115,10 @@ function Calculation({report,onOpen}: {report:GroupPairReport;onOpen:(id:string,
 }
 export function NoticeDateDiagnostic({report,onOpen}: {report:GroupPairReport;onOpen:(id:string,date:string)=>void}) {
   const [open,setOpen]=useState(false);
+  const coverage=coverageNames();
   return <details onToggle={e=>setOpen(e.currentTarget.open)}>
     <summary>已核公告日期核对（回顾）</summary>
-    <p>本包仅含深交所有限公告日期，上交所未覆盖。不生成完整交易日历，不改原窗口或来源资格。</p>
+    <p>{coverage===null?'公告参考覆盖信息暂不可用；展开后可查看核对失败原因并重试。':coverage?`本包仅含${coverage}有限公告日期，其它日期未覆盖。`:'本包未列出交易所公告日期。'}不生成完整交易日历，不改原窗口或来源资格。</p>
     {open && <Calculation report={report} onOpen={onOpen}/>}
   </details>;
 }
