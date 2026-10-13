@@ -126,10 +126,14 @@ export function captureEventPath(accepted: AcceptedEventPath, eventPosition: num
   return Object.freeze({ identity: Object.freeze({ snapshotId: accepted.context.snapshotId, ownerQueryId: accepted.context.ownerQueryId, researchQueryId: report.inputs[0].query_id, analysisId: report.analysis_id }),
     parameters: Object.freeze({ lookback: events.lookback, horizon: 5 as const, testStart: events.test_start, requestedCutoff: accepted.context.cutoff, evaluationAsOf: events.evaluation_as_of }), event, slots: Object.freeze(slots) });
 }
+export function eventPathPartitionName(value: string): string {
+  return value === 'descriptive' ? '全段描述' : value === 'train' ? '训练段' : value === 'test' ? '测试段' : '未识别分段';
+}
 export function eventPathMembership(projection: EventPathProjection, displayedPartition: string): string {
-  const e = projection.event;
+  const e = projection.event, original = eventPathPartitionName(e.partition), current = eventPathPartitionName(displayedPartition);
   if (e.selected && e.evaluation_status === 'valid') return e.partition === displayedPartition
-    ? `按原响应，此事件计入当前 ${displayedPartition} 的有效事件样本。`
-    : `按原响应，此事件属于 ${e.partition} 的有效事件样本；当前上方显示 ${displayedPartition}，本条不计入该分段。`;
-  return `本条未计入当前上方的有效事件样本。原评价状态：${e.evaluation_status}；原分段：${e.partition}。`;
+    ? `按原报告，此事件计入当前${current}的有效事件样本。`
+    : `按原报告，此事件属于${original}的有效事件样本；当前上方显示${current}，本条不计入该分段。`;
+  const reason = e.evaluation_status === 'overlap_excluded' ? '与此前已保留事件重叠' : e.evaluation_status === 'purged' ? '后续窗口跨过分段日期' : e.evaluation_status === 'immature' ? '后续记录尚未满5步' : '原标签无效';
+  return `本条未计入当前上方的有效事件样本：${reason}。原所属分段为${original}。`;
 }

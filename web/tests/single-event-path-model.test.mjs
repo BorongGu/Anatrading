@@ -47,7 +47,7 @@ test('owned projection keeps exact fields without source aliases or freezing sou
 });
 test('actual displayed partition explains original membership without rewriting state', () => {
   const f=fixture('P5_OTHER_PART'),p=captureEventPath(accept(f),f.eventPosition),before=structuredClone(p);
-  assert.match(eventPathMembership(p,'test'),/本条不计入/);assert.match(eventPathMembership(p,'train'),/计入当前 train/);assert.deepEqual(p,before);
+  assert.match(eventPathMembership(p,'test'),/本条不计入/);assert.match(eventPathMembership(p,'train'),/计入当前训练段/);assert.deepEqual(p,before);
   const x=fixture('P5_OVERLAP');assert.match(eventPathMembership(captureEventPath(accept(x),x.eventPosition),'descriptive'),/未计入/);
 });
 const malformed = [
