@@ -1,3 +1,6 @@
+import { CloseReversalRecords } from './CloseReversalRecords.tsx';
+import { captureReversalSource, reversalContextMatches } from './close-reversal.ts';
+import type { ReversalSource, ReversalContext } from './close-reversal.ts';
 import { Fragment, useEffect, useId, useRef, useState } from 'react';
 import { SingleEventPath } from './SingleEventPath.tsx';
 import { acceptEventPath, captureEventPath, eventPathBelongs, EventPathError } from './single-event-path.ts';
@@ -18,6 +21,11 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const [report, setReport] = useState<ResearchEnvelope<SingleResult> | null>(null);
   const [accepted, setAccepted] = useState<AcceptedEventPath | null>(null);
   const [pathIssue, setPathIssue] = useState('');
+  const [reversalSource, setReversalSource] = useState<ReversalSource | null>(null);
+  const [reversalIssue, setReversalIssue] = useState('');
+  const activeReversal = useRef<ReversalSource | null>(null);
+  const reversalContext: ReversalContext = { ownerQueryId: query.query_id, snapshotId: query.snapshot_id, batchId: query.batch_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
+  const currentReversalContext = useRef(reversalContext); currentReversalContext.current = reversalContext;
   type PathSelection = { token: object; position: number; projection: EventPathProjection | null; issue: string; trigger: HTMLButtonElement };
   const [selection, setSelection] = useState<PathSelection | null>(null);
   const selected = useRef<PathSelection | null>(null);
@@ -28,6 +36,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const context: EventPathContext = { ownerQueryId: query.query_id, snapshotId: query.snapshot_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
   const currentContext = useRef(context); currentContext.current = context;
   const previousContext = useRef(context);
+  const previousReversalContext = useRef(reversalContext);
   function closePath() {
     if (!accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
       || !eventPathBelongs(accepted, report, currentContext.current) || !selection || selected.current !== selection || selection.token !== accepted.token) return;
@@ -36,14 +45,15 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading');
   const [issue, setIssue] = useState('');
   const gate = useRef(new Generation()); const abort = useRef<AbortController | null>(null);
-  function invalidate() { active.current = null; acceptedGeneration.current = null; setAccepted(null); selectPath(null); setPathIssue(''); gate.current.invalidate(); abort.current?.abort(); setReport(null); onReport?.(query.query_id, null); setIssue(''); setPhase('idle'); }
+  function invalidate() { activeReversal.current = null; setReversalSource(null); setReversalIssue(''); active.current = null; acceptedGeneration.current = null; setAccepted(null); selectPath(null); setPathIssue(''); gate.current.invalidate(); abort.current?.abort(); setReport(null); onReport?.(query.query_id, null); setIssue(''); setPhase('idle'); }
   async function load() {
     invalidate(); const generation = gate.current.current();
+    const requestedReversalContext = { ...reversalContext };
     try {
       const request = buildResearchRequest('single', [query.snapshot_id], query.selection.cutoff ?? '', Number(lookback), Number(horizon), testStart);
       const controller = new AbortController(); abort.current = controller; setPhase('loading');
       const result = await jsonRequest<ResearchEnvelope<SingleResult>>(request.path, { signal: controller.signal });
-      if (!gate.current.isCurrent(generation)) return;
+      if (!gate.current.isCurrent(generation) || !reversalContextMatches(requestedReversalContext, currentReversalContext.current)) return;
       assertResearchReply(result, request.expected);
       // Consumers must treat each published report as read-only. Every complete
       // acceptance is a new ownership generation, even for the same object/ID.
@@ -54,17 +64,23 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
           active.current = next; acceptedGeneration.current = generation; setAccepted(next);
         } catch (error) { setPathIssue(error instanceof EventPathError ? error.code : 'identity'); }
       }
+      try {
+        const next = captureReversalSource(result, requestedReversalContext, request.expected);
+        activeReversal.current = next; setReversalSource(next);
+      } catch { setReversalIssue('来源证据未能完整对应，收盘反转暂不可计算；原研究保留。'); }
       setReport(result); onReport?.(query.query_id, result); setPhase('ready');
     } catch (error) { if (gate.current.isCurrent(generation)) { setIssue(explainResearch(error)); setPhase('error'); } }
   }
   useEffect(() => {
+    const previousReversal = previousReversalContext.current; previousReversalContext.current = reversalContext;
+    if (previousReversal.ownerQueryId === reversalContext.ownerQueryId && !reversalContextMatches(previousReversal, reversalContext)) invalidate();
     const previous = previousContext.current; previousContext.current = context;
     // A normal query-ID replacement is handled by load below. An abnormal
     // same-ID context change still permanently invalidates, with no auto-fetch.
     if (previous.ownerQueryId === context.ownerQueryId && (previous.snapshotId !== context.snapshotId || previous.cutoff !== context.cutoff
       || previous.ordinalStart !== context.ordinalStart || previous.ordinalEnd !== context.ordinalEnd)) invalidate();
-  }, [query.query_id, query.snapshot_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end]);
-  useEffect(() => { void load(); return () => { active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
+  }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end]);
+  useEffect(() => { void load(); return () => { activeReversal.current = null; active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
   const pathAvailable = accepted !== null && active.current === accepted && acceptedGeneration.current !== null
     && gate.current.isCurrent(acceptedGeneration.current) && horizon === '5' && eventPathBelongs(accepted, report, context);
   const shown = pathAvailable && selection?.token === accepted.token ? selection : null;
@@ -137,6 +153,8 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
       </details>
       <ResearchProvenance report={report} />
     </>}
+    {reversalIssue && <p role="status">{reversalIssue}</p>}
+    {reversalSource && <CloseReversalRecords source={reversalSource} isCurrent={source => activeReversal.current === source && source.report === report && reversalContextMatches(source.context, currentReversalContext.current)} />}
     {report && !latest && <p className="research-loading">截止范围内没有可研究的日线记录。</p>}
   </section><HistoricalPathResearch query={query} /></>;
 }
