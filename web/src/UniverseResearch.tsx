@@ -1,3 +1,5 @@
+import { DrawdownEpisodeResults } from './DrawdownEpisodeResults.tsx';
+import { explainDrawdownError } from './drawdown-episode-model.ts';
 import { PeerNeighborResults } from './PeerNeighborResults.tsx';
 import { explainPeerNeighborError } from './peer-neighbor-model.ts';
 import { GroupEndpointResults } from './GroupEndpointResults.tsx';
@@ -90,25 +92,42 @@ export function UniverseResearch({ snapshots, onImport, onOpen, draft: controlle
             return <li key={id}><span>{snapshot ? snapshotName(snapshot) : '版本暂不可用'} <code>{id}</code></span><button type="button" className="quiet" aria-label={`移除版本 ${id.slice(0, 8)}`} onClick={() => edit({ ids: draft.ids.filter(value => value !== id) })}>移除</button></li>;
           })}</ul></details>}
           {!!unavailable.length && <p className="inline-note amber" role="status">{unavailable.length} 个已选版本暂不可用，请核对数据管理或明确移除后再运行；成员没有自动删除。</p>}
-          <label>研究方式<select value={draft.mode} onChange={event => edit({ mode: event.target.value as UniverseDraft['mode'] })}><option value="existing">原始分项与条件</option><option value="explanation">个股与参考组</option><option value="group_endpoints">共同端点单组</option><option value="peer_neighbors">双窗有符号相关</option></select></label>
+          <label>研究方式<select value={draft.mode} onChange={event => edit({ mode: event.target.value as UniverseDraft['mode'] })}><option value="drawdown_episodes">回撤持续与恢复</option><option value="existing">原始分项与条件</option><option value="explanation">个股与参考组</option><option value="group_endpoints">共同端点单组</option><option value="peer_neighbors">双窗有符号相关</option></select></label>
           {draft.mode === 'explanation' && <fieldset><legend>明确参考组（每组至少两只）</legend><p>逐只解释全部成员；每次从同伴均值中剔除该只股票。范围假设为A股、CNY、中国日线源日期；不认证行业或复权语义。仅支持腾讯日线既有格式。</p>{draft.ids.map(id => {
             const displayName = snapshotName(daily.find(item => item.snapshot_id === id) ?? { snapshot_id: id, metadata: {} } as Snapshot);
             return <label key={id}>{displayName}<select aria-label={`参考组 ${displayName}，版本 ${id.slice(0, 8)}`} value={draft.explanation.roles[id] ?? ''} onChange={event => edit({ explanation: { ...draft.explanation, roles: { ...draft.explanation.roles, [id]: event.target.value as 'A' | 'B' | '' } } })}><option value="">请明确分组</option><option value="A">参考组A</option><option value="B">参考组B</option></select></label>;
           })}<label>当前区间起点<input type="date" required value={draft.explanation.start} onChange={event => edit({ explanation: { ...draft.explanation, start: event.target.value } })} /></label><p>前序固定60个所选源区间，截至当前起点；当前终点使用下方统一截止日期。任一点缺失会关闭全部模型，不补齐或前移。</p></fieldset>}
+          {draft.mode === 'drawdown_episodes' && (
+            <fieldset>
+              <legend>全组已观察回撤摘要</legend>
+              <p>
+                2–50个不同证券版本，仅支持已核格式的腾讯日线。各股独立取截至精确截止日的完整窗口；
+                全部来源和日期数组一致才计算。保留失败成员，不取日期交集，不回退截止日。
+              </p>
+            </fieldset>
+          )}
           {draft.mode === 'peer_neighbors' && <fieldset><legend>一个明确组 · 双窗有符号相关</legend><p>2–50个版本，明确指定一只目标。仅支持已核对格式的腾讯日线。目标截至精确截止日的最后121个来源日期，各成员日期必须完整一致；前60与当前60区间并列，缺失或额外日期关闭整组计算，不补齐、不前移。</p><label>目标股票<select id="universe-peer-target" required value={draft.peerTarget} aria-invalid={errorTarget === 'universe-peer-target' || undefined} aria-describedby={errorTarget === 'universe-peer-target' ? 'universe-error-summary' : undefined} onChange={event => edit({ peerTarget: event.target.value })}><option value="">请明确选择目标</option>{draft.ids.map(id => <option key={id} value={id}>{snapshotName(daily.find(item => item.snapshot_id === id) ?? { snapshot_id: id, metadata: {} } as Snapshot)}</option>)}</select></label><p>使用精确简单源价变化相关，与既有双股对数变化口径不同。保留全部候选及反向关系，位次不授予同伴或未来稳定资格。</p></fieldset>}
           {draft.mode === 'group_endpoints' && <fieldset><legend>一个明确组 · 共同端点</legend><p>选择4–50个版本；仅支持已核对格式的腾讯日线。完整来源无需训练历史，缺失成员保留，不回退日期。</p><label>共同起点日期<input id="universe-group-start" type="date" required value={draft.groupStart} aria-invalid={errorTarget === 'universe-group-start' || undefined} aria-describedby={errorTarget === 'universe-group-start' ? 'universe-error-summary' : undefined} onChange={event => edit({ groupStart: event.target.value })} /></label></fieldset>}
           <div className="research-controls cross-controls"><label>统一截止日期<input id="universe-cutoff" type="date" required value={draft.cutoff} aria-invalid={errorTarget === 'universe-cutoff' || undefined} aria-describedby={errorTarget === 'universe-cutoff' ? 'universe-error-summary' : undefined} onChange={event => edit({ cutoff: event.target.value })} /></label>
-            {draft.mode === 'existing' && <label>观察窗口<input id="universe-lookback" type="number" min="2" max="252" step="1" required value={draft.lookback} aria-invalid={errorTarget === 'universe-lookback' || undefined} aria-describedby={errorTarget === 'universe-lookback' ? 'universe-lookback-hint universe-error-summary' : 'universe-lookback-hint'} onChange={event => edit({ lookback: event.target.value })} /><small id="universe-lookback-hint">来源区间；每股实际起点可能不同</small></label>}
+            {(draft.mode === 'existing' || draft.mode === 'drawdown_episodes') && <label>观察窗口<input id="universe-lookback" type="number" min="2" max="252" step="1" required value={draft.lookback} aria-invalid={errorTarget === 'universe-lookback' || undefined} aria-describedby={errorTarget === 'universe-lookback' ? 'universe-lookback-hint universe-error-summary' : 'universe-lookback-hint'} onChange={event => edit({ lookback: event.target.value })} /><small id="universe-lookback-hint">{draft.mode === 'drawdown_episodes' ? '2–252个来源区间；全组完整日期数组必须一致' : '来源区间；每股实际起点可能不同'}</small></label>}
             <label>集合名称（可选）<input value={draft.groupName} maxLength={80} onChange={event => edit({ groupName: event.target.value }, false)} placeholder="如：我的自选样本" /></label></div>
           {draft.mode === 'existing' && <FilterEditor draft={draft.filter} onChange={filter => edit({ filter })} inputError={requestState.error instanceof FilterInputError ? requestState.error : undefined} />}
-          {requestState.status === 'error' && <p className="error-banner" role="alert" id="universe-error-summary" tabIndex={-1}>{draft.mode === 'peer_neighbors' && explainPeerNeighborError(requestState.error) || draft.mode === 'group_endpoints' && explainGroupEndpointError(requestState.error) || draft.mode === 'explanation' && explainExplanationError(requestState.error) || explainFilter(requestState.error)}</p>}
-          <div className="button-group filter-run"><button id="universe-run" className="primary" disabled={busy || draft.ids.length < (draft.mode === 'existing' || draft.mode === 'peer_neighbors' ? 2 : 4) || !!unavailable.length}>{busy ? '核验并计算中…' : requestState.status === 'error' ? '按当前输入重试' : draft.mode === 'peer_neighbors' ? '核对全部双窗候选' : draft.mode === 'group_endpoints' ? '核对共同端点单组' : draft.mode === 'explanation' ? '解释全部所选成员' : draft.filter.enabled ? '按条件研究' : '研究所选股票'}</button>
+          {requestState.status === 'error' && <p className="error-banner" role="alert" id="universe-error-summary" tabIndex={-1}>{draft.mode === 'drawdown_episodes' && explainDrawdownError(requestState.error) || draft.mode === 'peer_neighbors' && explainPeerNeighborError(requestState.error) || draft.mode === 'group_endpoints' && explainGroupEndpointError(requestState.error) || draft.mode === 'explanation' && explainExplanationError(requestState.error) || explainFilter(requestState.error)}</p>}
+          <div className="button-group filter-run"><button id="universe-run" className="primary" disabled={busy || draft.ids.length < (draft.mode === 'existing' || draft.mode === 'peer_neighbors' || draft.mode === 'drawdown_episodes' ? 2 : 4) || !!unavailable.length}>{busy ? '核验并计算中…' : requestState.status === 'error' ? '按当前输入重试' : draft.mode === 'drawdown_episodes' ? '核对回撤摘要' : draft.mode === 'peer_neighbors' ? '核对全部双窗候选' : draft.mode === 'group_endpoints' ? '核对共同端点单组' : draft.mode === 'explanation' ? '解释全部所选成员' : draft.filter.enabled ? '按条件研究' : '研究所选股票'}</button>
             {busy && <button type="button" onClick={() => controller().cancel()}>取消等待</button>}</div>
         </form>
         <p className="inline-note">缺少截止当日记录时保留待核，不回退日期。重复证券版本由服务端拒绝。集合名称只用于显示，不认证行业归属。</p>
       </section>
       <p className="research-request-status" role="status" aria-live="polite">{status}</p>
       {!report && !busy && requestState.status !== 'error' && <div className="workflow-hint"><span>接下来</span><p>{draft.ids.length ? '输入已保留，重新运行可核验当前数据版本。刷新页面不会保存这些草稿。' : '勾选 2–50 只股票，指定截止日期；可直接查看原始分项，也可添加有限条件。'}</p></div>}
+      {report?.kind === 'drawdown_episodes' && (
+        <DrawdownEpisodeResults
+          key={report.report.analysis_id}
+          report={report.report}
+          name={draft.groupName}
+          onOpen={onOpen}
+        />
+      )}
       {report?.kind === 'peer_neighbors' && <PeerNeighborResults key={report.report.analysis_id} report={report.report} name={draft.groupName} onOpen={onOpen} />}
       {report?.kind === 'group_endpoints' && <GroupEndpointResults key={report.report.analysis_id} report={report.report} name={draft.groupName} onOpen={onOpen} />}
       {report?.kind === 'explanation' && <TwoGroupResults key={report.report.analysis_id} report={report.report} onOpen={onOpen} />}
