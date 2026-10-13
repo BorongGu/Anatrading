@@ -1,0 +1,82 @@
+{
+  "protocol_sha256": "8bf431f68d885e35a9db9d1ab64e917587ff24d1d19e1a740bc09698cf33d0bc",
+  "boundary": [
+    {
+      "lattice": "-1",
+      "accepted": false
+    },
+    {
+      "lattice": "0",
+      "accepted": true
+    },
+    {
+      "lattice": "1",
+      "accepted": true
+    },
+    {
+      "lattice": "99999999999999999999999999999999999999",
+      "accepted": true
+    },
+    {
+      "lattice": "100000000000000000000000000000000000000",
+      "accepted": false
+    }
+  ],
+  "fixtures": {
+    "all_zero": {
+      "mean": "0",
+      "variance": "0",
+      "D": "0",
+      "D_bits": 0,
+      "pairwise_equal": true,
+      "centered_fraction_equal": true,
+      "lower_negative": false,
+      "zero_coincident_bounds": true
+    },
+    "alternating_zero_unit_price": {
+      "mean": "1/2",
+      "variance": "1/4",
+      "D": "100000000000000000000000000000000000000",
+      "D_bits": 127,
+      "pairwise_equal": true,
+      "centered_fraction_equal": true,
+      "lower_negative": true,
+      "zero_coincident_bounds": false
+    },
+    "alternating_zero_minimum": {
+      "mean": "1/2000000000000000000",
+      "variance": "1/4000000000000000000000000000000000000",
+      "D": "100",
+      "D_bits": 7,
+      "pairwise_equal": true,
+      "centered_fraction_equal": true,
+      "lower_negative": true,
+      "zero_coincident_bounds": false
+    },
+    "alternating_minimum_maximum": {
+      "mean": "50000000000000000000",
+      "variance": "2499999999999999999999999999999999999900000000000000000000000000000000000001/1000000000000000000000000000000000000",
+      "D": "999999999999999999999999999999999999960000000000000000000000000000000000000400",
+      "D_bits": 260,
+      "pairwise_equal": true,
+      "centered_fraction_equal": true,
+      "lower_negative": true,
+      "zero_coincident_bounds": false
+    },
+    "nineteen_zero_one_unit_price": {
+      "mean": "1/20",
+      "variance": "19/400",
+      "D": "19000000000000000000000000000000000000",
+      "D_bits": 124,
+      "pairwise_equal": true,
+      "centered_fraction_equal": true,
+      "lower_negative": true,
+      "zero_coincident_bounds": false
+    }
+  },
+  "limitations": [
+    "lattice predicate only; no product Decimal parser or adapter",
+    "no square-root display rounding test",
+    "no market, Store, performance or product test"
+  ]
+}

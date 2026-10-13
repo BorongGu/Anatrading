@@ -1,0 +1,14 @@
+{"name":"alternating","n":"20","sum":"2000","mean":"2000/20","variance":"400/400"}
+{"name":"sparse","n":"20","sum":"2000","mean":"2000/20","variance":"40/400"}
+{"name":"linear","n":"20","sum":"2190","mean":"2190/20","variance":"13300/400"}
+{"name":"constant","n":"20","sum":"2000","mean":"2000/20","variance":"0/400"}
+{"name":"decimal_collision_scaled1e18","n":"20","sum":"20000000000000000010","mean":"20000000000000000010/20","variance":"100/400"}
+{"collision_float_values":[1,1],"collision_float_equal":true,"collision_exact_sigma":"0.0000000000000000005","within_source_decimal38_18":true}
+{"name":"constant_min","exact_pair_oracle_matches":true,"D":"0","bits":1,"variance":"0/400000000000000000000000000000000000000","zero_iff_constant":true,"lower_negative":false}
+{"name":"constant_max","exact_pair_oracle_matches":true,"D":"0","bits":1,"variance":"0/400000000000000000000000000000000000000","zero_iff_constant":true,"lower_negative":false}
+{"name":"alternating_min","exact_pair_oracle_matches":true,"D":"100","bits":7,"variance":"100/400000000000000000000000000000000000000","zero_iff_constant":true,"lower_negative":false}
+{"name":"alternating_max","exact_pair_oracle_matches":true,"D":"100","bits":7,"variance":"100/400000000000000000000000000000000000000","zero_iff_constant":true,"lower_negative":false}
+{"name":"max_outlier","exact_pair_oracle_matches":true,"D":"189999999999999999999999999999999999992400000000000000000000000000000000000076","bits":257,"variance":"189999999999999999999999999999999999992400000000000000000000000000000000000076/400000000000000000000000000000000000000","zero_iff_constant":true,"lower_negative":true}
+{"name":"positive_negative_lower","exact_pair_oracle_matches":true,"D":"186219000000000000000000000000000000000000","bits":138,"variance":"186219000000000000000000000000000000000000/400000000000000000000000000000000000000","zero_iff_constant":true,"lower_negative":true}
+{"source_validation":[{"lattice":"-1","valid":false},{"lattice":"0","valid":false},{"lattice":"1","valid":true},{"lattice":"99999999999999999999999999999999999999","valid":true},{"lattice":"100000000000000000000000000000000000000","valid":false}]}
+{"warmup":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18],"invalid":[25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44],"first_recovered":45,"computed_count":21}

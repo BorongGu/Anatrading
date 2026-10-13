@@ -1,0 +1,58 @@
+{
+  "unit_collision": {
+    "exact_variance": "1/4000000000000000000000000000000000000",
+    "integer_formula_equal": true,
+    "D_bits": 7,
+    "sigma_decimal100": "5E-19",
+    "float_input_sigma": 0.0,
+    "source_distinct_values": 2,
+    "float_distinct_values": 1
+  },
+  "large_offset_collision": {
+    "exact_variance": "1/4",
+    "integer_formula_equal": true,
+    "D_bits": 127,
+    "sigma_decimal100": "0.5",
+    "float_input_sigma": 0.0,
+    "source_distinct_values": 2,
+    "float_distinct_values": 1
+  },
+  "minimum_scale": {
+    "exact_variance": "1/4000000000000000000000000000000000000",
+    "integer_formula_equal": true,
+    "D_bits": 7,
+    "sigma_decimal100": "5E-19",
+    "float_input_sigma": 5e-19,
+    "source_distinct_values": 2,
+    "float_distinct_values": 2
+  },
+  "sparse": {
+    "exact_variance": "1/10",
+    "integer_formula_equal": true,
+    "D_bits": 125,
+    "sigma_decimal100": "0.3162277660168379331998893544432718533719555139325216826857504852792594438639238221344248108379300295",
+    "float_input_sigma": 0.31622776601683794,
+    "source_distinct_values": 3,
+    "float_distinct_values": 3
+  },
+  "constant": {
+    "exact_variance": "0",
+    "integer_formula_equal": true,
+    "D_bits": 0,
+    "sigma_decimal100": "0",
+    "float_input_sigma": 0.0,
+    "source_distinct_values": 1,
+    "float_distinct_values": 1
+  },
+  "existing_channel_proxy": {
+    "qualification": "synthetic flat valid positiveOHLC with consecutive source dates; no production import",
+    "alternating_prior20": [
+      99,
+      101
+    ],
+    "sparse_prior20": [
+      99,
+      101
+    ]
+  }
+}
