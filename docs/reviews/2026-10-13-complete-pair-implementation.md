@@ -79,3 +79,11 @@
 ### 可见说明后的最终回归
 
 上述真实capture/API/DTO/SSR及独立oracle证据对应796cca5；后续仅新增结果页说明与SSR文字断言，后端/API/DTO未变，未重复导入或重跑真实capture，不把旧SSR记录冒充新UI验收。新增文字断言先实际失败，再加说明后完整Node **692通过、0失败/跳过/取消**；TypeScript/Vite及diff检查通过，既有npm环境和大chunk警告保留。Python产品未改，本轮不重复Python。早先新增测试脚本因工作目录前缀写错未执行成功，随后未命中新测试的运行不计验收；修正路径后才取得真实红断言。原始日志留在隔离证据目录。
+
+## 第三轮精确0f79f86复审：解释器路径与全源预算提示
+
+Codex新增两项P2均接受并先取得红测试：051 fixture固定POSIX解释器路径会阻断Windows测试注册；全源行预算错误沿共享提示建议提前截止，但全源读取量不会因此减少。解释器沿仓内既有process.platform分支惯例选择Windows Scripts/python.exe或POSIX bin/python，不新增依赖/helper体系。纯表达式单测核win32/linux/darwin路径，不修改运行系统身份，不代表Windows原生执行通过。
+
+只在全成对错误字典覆盖research_row_limit及universe_row_limit，说明完整来源预算、减少成员或改用较小数据版本；其他研究模式共享提示保持不变。实际banner表达式回归核对两个代码均不建议改变截止。最终相关Node **66通过**，完整Node **694通过、0失败/跳过/取消**；TypeScript/Vite及diff检查通过，既有npm环境与大chunk警告保留。一次相关命令工作目录不符导致文件未找到，保留原始失败后在正确目录执行，不计为测试通过。
+
+产品Python、API、DTO验证/身份/预算算法未改，本轮不重复Python、真实capture或JSDOM；此前分版本证据边界保持，Windows原生及实际浏览器等仍未验。

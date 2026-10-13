@@ -9,7 +9,7 @@ import { createServer } from 'vite';
 import { assertGroupPairs,verifyGroupPairIdentity,groupPairRequest,groupPairReason } from '../src/group-pair-model.ts';
 import { createUniverseDraft,prepareUniverseRequest,loadUniverseRequest } from '../src/universe-request.ts';
 import { ResearchRequestController,canonicalJson } from '../src/filter-model.ts';
-const fixtures=JSON.parse(execFileSync(fileURLToPath(new URL('../../.venv/bin/python',import.meta.url)),[fileURLToPath(new URL('../../tests/group_pair_fixture_bridge.py',import.meta.url))],{encoding:'utf8',maxBuffer:4*1024*1024}));
+const fixtures=JSON.parse(execFileSync(fileURLToPath(new URL(process.platform === 'win32' ? '../../.venv/Scripts/python.exe' : '../../.venv/bin/python',import.meta.url)),[fileURLToPath(new URL('../../tests/group_pair_fixture_bridge.py',import.meta.url))],{encoding:'utf8',maxBuffer:4*1024*1024}));
 const f=(name='complete')=>structuredClone(fixtures[name]);
 const draftFor=f=>({...createUniverseDraft(),mode:'group_pairs',ids:f.expected.ids,cutoff:f.expected.cutoff,peerTarget:'ignored',lookback:'ignored',filter:{enabled:true,groups:[]}});
 const tick=()=>new Promise(resolve=>setImmediate(resolve));

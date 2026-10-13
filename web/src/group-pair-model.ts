@@ -273,6 +273,8 @@ export async function fetchGroupPairs(request: ReturnType<typeof groupPairReques
   assertGroupPairs(result,request.expected); await verifyGroupPairIdentity(result); return result;
 }
 const explanations: Record<string,string> = {
+  research_row_limit:'完整来源超过单版本20,000条或合计200,000条预算，请减少成员或改用较小的数据版本',
+  universe_row_limit:'完整来源合计超过200,000条预算，请减少成员或改用较小的数据版本',
   invalid_group_pair_response:'全成对响应与输入或格式约定不符，结果已清空',
   group_pair_result_limit:'完整成对结果超过2MiB，本次整组未发布',
   member_grid_unavailable:'有成员未具备截止当日完整121日期组，未回退或补足',

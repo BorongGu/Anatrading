@@ -39,3 +39,20 @@ test('051 request guidance retains known limits and shared recovery', () => {
   }
   assert.equal(banner(new Error('peer_neighbor_integer_limit')), '精确相关计算失败，整组未发布（peer_neighbor_integer_limit）');
 });
+
+test('051 full-source budget errors suggest fewer members or smaller versions, not a cutoff change', () => {
+  for (const code of ['research_row_limit','universe_row_limit']) {
+    const text = banner(new Error(code));
+    assert.match(text,/完整来源/); assert.match(text,/减少成员/); assert.match(text,/较小的数据版本/);
+    assert.doesNotMatch(text,/提前截止|修改日期|调整截止/);
+    assert.notEqual(text, explainFilter(new Error(code)));
+  }
+});
+test('051 fixture interpreter path selects Windows and POSIX using a pure platform expression', () => {
+  const script = readFileSync(new URL('./group-pair.test.mjs', import.meta.url), 'utf8');
+  const expression = script.match(/new URL\(([^,]+),import.meta.url\)\)\s*,\[fileURLToPath/)?.[1];
+  assert.ok(expression);
+  const select = new Function('platform', `return (${expression.replaceAll('process.platform','platform')});`);
+  assert.equal(select('win32'),'../../.venv/Scripts/python.exe');
+  for (const platform of ['linux','darwin']) assert.equal(select(platform),'../../.venv/bin/python');
+});
