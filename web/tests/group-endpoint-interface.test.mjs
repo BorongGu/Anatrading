@@ -12,13 +12,13 @@ const render=(c,p)=>renderToStaticMarkup(createElement(c,p));
 test('SSR new mode reuses selection and requires common endpoints without old window or roles',()=>{
  const f=fixtures.complete,draft={...createUniverseDraft(),mode:'group_endpoints',ids:f.expected.ids,cutoff:f.expected.end,groupStart:f.expected.start};
  const html=render(UniverseResearch,{draft,snapshots:f.expected.ids.map(id=>({snapshot_id:id,row_count:2,metadata:{period:'1d',source_code:id.slice(0,6)}})),onImport(){},onOpen(){}});
- assert.match(html,/共同起点日期/);assert.match(html,/核对共同端点单组/);assert.match(html,/4–50/);assert.match(html,/腾讯日线/);
+ assert.match(html,/<option value="group_endpoints" selected="">区间收盘变化对比<\/option>/);assert.match(html,/<legend>统一起止日期 · 源收盘变化<\/legend>/);assert.match(html,/共同起点日期/);assert.match(html,/比较区间收盘变化/);assert.match(html,/4–50/);assert.match(html,/腾讯日线/);
  assert.doesNotMatch(html,/id="universe-lookback"|aria-label="参考组 |添加条件/);assert.equal((html.match(/type="checkbox"/g)||[]).length,5);
 });
 for(const name of ['complete','partial','rejected','near_zero'])test(`SSR ${name} keeps all source rows and exact limitations`,()=>{
  const r=fixtures[name].reply,html=render(GroupEndpointResults,{report:r,name:'人工组',onOpen(){}});
  assert.equal((html.match(/打开此版本至起点日期/g)||[]).length,r.counts.selected);assert.equal((html.match(/打开此版本至终点日期/g)||[]).length,r.counts.selected);
- assert.match(html,/原组/);assert.match(html,/精确正／零／负/);assert.match(html,/Type7/);assert.match(html,/未提供事件附件/);assert.match(html,/不自动聚焦源序号/);
+ assert.match(html,/<h2>区间收盘变化对比 · 人工组<\/h2>/);assert.match(html,/原组/);assert.match(html,/精确正／零／负/);assert.match(html,/Type7/);assert.match(html,/未提供事件附件/);assert.match(html,/不自动聚焦源序号/);
  if(name==='partial')assert.match(html,/完整组均值、中位数、Q1、Q3均留空/);
  if(name==='rejected')assert.match(html,/端点和异常尚未检查/);
  if(name==='near_zero')assert.match(html,/显示舍入/);
