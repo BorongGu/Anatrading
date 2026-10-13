@@ -2,6 +2,8 @@
 
 2026-10-13已实现：[多股已观察回撤摘要](qualification/drawdown-episodes.md)提供同日期数组下的最深段、已观察跨度最长段和截止未恢复段；本地验收与独立实现审查通过，公开发布状态以对应提交/PR为准。[050研究稿](research/050-observed-drawdown-episodes.md)与[编码前验收协议](plans/2026-10-13-drawdown-episode-acceptance.md)保留编码前冻结原文，当前实现范围、验证及未验边界见验收记录。
 
+050 后续[有限真实捕获兼容验收](qualification/drawdown-episodes-real-capture.md)接受六个预先冻结案例：30 份原捕获、19,200 行经新隔离 Store → ASGI → DTO/静态 SSR 与独立参考核对；三案可计算，三案按预期关闭比较并保留全部成员。原来源限定不变，040 仍为 0/15；浏览器、Windows、性能及金融效果未验。
+
 后续研究：[固定股票组的下一段变化幅度对照](research/046-fixed-basket-variance.md)中的OAS胜过短窗直接方差，但在三个固定股票组都未胜长窗直接方差与中心化指数加权方差，已停止本轮候选。该结果不新增产品功能，也不扩大样本外或交易价值结论。
 
 路径读数对照：[固定旧库的三例未收缩标签读数](research/047-unshrunk-path-label-readout.md)在原30股960个成熟位置未胜五个预定基线，经独立全量复核后停止本轮读数。Q1局部改善保留；这一结果不否定041描述性检索或更一般的路径信息。
