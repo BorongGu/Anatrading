@@ -22,12 +22,14 @@ function Calculation({report,expected,pair,onOpen,isOpen}:Props & {isOpen:()=>bo
   void buildPairSignAttachment(report,expected,pair,{signal:controller.signal}).then(({attachment})=>{if(valid())setState({...context,attachment});}).catch(error=>{if(valid())setState({...context,error:error instanceof Error?error.message:'invalid_context'});});
   return()=>{live.current=false;controller.abort();};
  },[report,expected,pair.left_snapshot_id,pair.right_snapshot_id,generation]);
- const valid=()=>live.current&&isOpen()&&state?.generation===current.current.generation&&state?.binding!==null&&state?.binding===binding()&&state?.report===current.current.report&&state?.expected===current.current.expected&&state?.left===current.current.left&&state?.right===current.current.right;
- const attachment=valid()?state?.attachment:undefined;
+ const valid=(readBinding=binding)=>live.current&&isOpen()&&state?.generation===current.current.generation&&state?.binding!==null&&state?.binding===readBinding()&&state?.report===current.current.report&&state?.expected===current.current.expected&&state?.left===current.current.left&&state?.right===current.current.right;
+ // Reuse only within this render; actions and completion must read fresh input.
+ const validAtRender=valid(()=>text);
+ const attachment=validAtRender?state?.attachment:undefined;
  const download=()=>{if(!valid()||!attachment)return;const url=URL.createObjectURL(new Blob([JSON.stringify(attachment)],{type:'application/json'}));try{const a=document.createElement('a');a.href=url;a.download='涨跌分项共变核查.json';a.click();}finally{URL.revokeObjectURL(url);}};
  const open=(id:string,date:string)=>{if(valid()&&attachment)onOpen(id,date);};
  if(text===null)return <p role="status">分项核查未完成：来源上下文已失效或超过资源限制。</p>;
- if(!attachment)return <p role="status">{valid()&&state?.error?'分项核查未完成：来源上下文、数值或资源限制未通过。':'正在核查选中对的精确变化…'}</p>;
+ if(!attachment)return <p role="status">{validAtRender&&state?.error?'分项核查未完成：来源上下文、数值或资源限制未通过。':'正在核查选中对的精确变化…'}</p>;
  return <>
   <p>同涨、同跌及异向部分和使用原变化乘积。减去均值校正后才得到中心化交叉乘积总和；此处未除59。显示为5位有效数字，无百分比或年化。</p>
   <p className="inline-note amber">来源价格回顾；公司行动与历史当时可得性未知。不能据此归因、推断尾部依赖、预测、组合收益或避险能力；实际人效未验证。</p>
