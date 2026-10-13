@@ -18,6 +18,19 @@
 
 ## 冻结合成验收及失败条件
 
-先异常测试，所有Store仅新指定TMPDIR内构建。四成员：u=(1,1,−1,−1), v=(1,−1,1,−1)，每窗前四变化乘0.1、后56为0，T=D=u/B=v/C=v或−v；T摘要与全部端点相同，B–C从+1变−1。六成员3u+3v与4u+v+w有同计数不同成员结构。独立有理数/手算核与逐目标049全部对对照。恒价/恒定非零/近常量、全相同/符号翻转、2/50成员及2450cells，缺/额外/重复日期、截止缺失、全局身份反证、共同缺日未知、置换/未来合法追加、受控整数/显示/2MiB失败，DTO篡改/SHA及SSR/异步失效。
+先异常测试，所有Store仅新指定TMPDIR内构建。四成员：u=(1,1,−1,−1), v=(1,−1,1,−1)，每窗前四变化乘0.1、后56为0，T=D=u/B=v/C=v或−v；T的相关摘要与各成员共同起止端点相同，B–C从+1变−1。六成员3u+3v与4u+v+w有同计数不同成员结构。独立有理数/手算核与逐目标049全部对对照。恒价/恒定非零/近常量、全相同/符号翻转、2/50成员及2450cells，缺/额外/重复日期、截止缺失、全局身份反证、共同缺日未知、置换/未来合法追加、受控整数/显示/2MiB失败，DTO篡改/SHA及SSR/异步失效。
 
 保留原始失败，最终重跑受影响Python、新合成API、完整Node、TS/Vite；不跑fullpytest，不启动服务/端口/浏览器、真实行情、旧Store、性能benchmark、依赖安装、账户/部署。本次50成员只验正确性/序列化；资源异常立即停止。Windows、真实来源、浏览器实际挂载、性能和预测效果未验。变更共享helpers、来源语义或预算先重新审查。
+
+## 可公开复核的研究依据与候选取舍
+
+以下阅读归属均为前序研究的定向一手阅读，本次实现者只复核其公式及相关仓内代码，未重新阅读全文：
+
+- Roy & Vetterli, EUSIPCO 2007，pp.606–607 §2.1定义与§2.2性质，归一化奇异值的熵有效秩；未复核其余证明/实验：[会议原文](https://www.eurasip.org/Proceedings/Eusipco/Eusipco2007/Papers/a5p-h05.pdf)。对PSD相关矩阵奇异值等于特征值，对数据矩阵则不能混用。
+- Mazzucato, Fontanini & La Camera (2016)，Methods Dimensionality measure与有限试次理论，借用PR定义及有限样本提醒，未迁移神经科学效果到股票：[正式论文](https://www.frontiersin.org/journals/systems-neuroscience/articles/10.3389/fnsys.2016.00011/full)。前序网页部分公式缺失，同论文PMC索引辅助核对，未复现模型。
+- SciPy pearsonr Warnings/Notes：常量未定义、近常量浮点风险及Pearson公式；不采用p值或置信区间：[官方文档](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.pearsonr.html)。NumPy corrcoef定义/rowvar/Notes：标准化及浮点对称/范围局限：[官方文档](https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html)。现行实现采用049精确核，官方浮点实现不替代本项目验收。
+- TradingView Pine矩阵、请求与限制定义的前序定向阅读：[Matrices](https://www.tradingview.com/pine-script-docs/language/matrices/)、[请求概念](https://www.tradingview.com/pine-script-docs/concepts/other-timeframes-and-data/)、[限制](https://www.tradingview.com/pine-script-docs/writing/limitations/#number-of-calls)。其支持多源及矩阵能力；未实测竞品同任务，不宣称其缺少全相关矩阵。
+
+三路线：逐目标049可恢复全部成对相关，是强简单基线；本片增加一次明确批量读取与来源回查操作价值，不声称新增原始数学信息。完整有符号表直接保留成员关系，采用。PCA/谱摘要不直接返回谁与谁同向/反向，本题没有额外必要性，停止。前序043/046/049失败决定不因本片恢复。
+
+固定N、非恒定列相关矩阵R及M=N(N−1)/2，q=Σ(i<j)ρ²/M。有tr(R²)=N+2Σρ²，因此D_PR=(tr R)²/tr(R²)=N/[1+(N−1)q]；固定N时只是平均相关平方的一一变换。熵有效秩exp(−Σp log p)与PR不同。任意符号对角D满足D²=I，R和DRD同谱；全同向与半数反向可有同一谱，不能以谱集中度解释全组同涨同跌。六成员3+3与4+1+1各6正9零，计数也不返回成员结构。四成员反例只比较T相关摘要和共同起止端点；C完整121价格序列不同，049完整端点仍足以重算全部关系。
