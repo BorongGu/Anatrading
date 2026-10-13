@@ -43,3 +43,15 @@
 覆盖11成员55对完整与不可算报告的两窗默认折叠、50→5→50分页、边界按钮、全55对保留、双方实际日期回调和关闭选中端点；真实UniverseResearch的group_pairs接线中，一次提交仅一个GET意图，取消/切换模式/改截止/卸载各自晚到成功与拒绝共8条路径不污染新结果；不同合法analysis_id后折叠、页码及选择重置。重置使用实际父级，加载时控制器也清空结果，不能独立证明key的因果作用。
 
 本验收使用真实React与JSDOM模拟DOM、合成fetch，不是实际浏览器或HTTP验收；未跑50成员25页DOM遍历、pagehide/pageshow、视觉布局、键盘/焦点、真实Store、Windows、性能或金融效果。隔离测试未纳入仓库持续回归。
+
+## PR41精确9909d98复审：Unicode原文失败报告
+
+[Codex P2评论](https://github.com/BorongGu/Anatrading/pull/41#discussion_r4255415051)指出完整响应预算误用ASCII专用canonicalJson，合法“停牌”原始价格token会令整份失败报告被拒绝。此前静态无阻断和有界DOM结论均没有覆盖这条路径，本轮不重放那些结论。
+
+先增加实际Python解码合成capture生成的失败报告，包含中文价格原文、引号/反斜杠、换行/tab/NUL、U+2028/U+2029、128个astral字符，以及中文与constructor/__proto__/toString原始失败码。取得3项跨语言红失败。只改完整响应预算后，继续复现128个码点被JavaScript UTF-16 length误判；修复码点长度后，又复现诊断计数same调用仍以ASCII序列化中文键。三阶段原始失败均保留。
+
+最终新model以JSON.stringify后UTF-8字节数执行原2MiB硬限，原文长度按码点与Python len一致，诊断计数按自身键逐项比较；保留ASCII计算身份canonicalJson/SHA和全部共享helpers/旧协议。独立只读复审重新核查所有same调用，剩余用途只有固定格式、身份ID、日期和计数，无允许的原始Unicode字段；此次复核未执行测试。
+
+实际跨语言测试确认完整Python ensure_ascii=False序列化字节数与前端一致（含特殊字符），反转对象键顺序不改字节数；多字节输入即使UTF-16文本长度低于2MiB，真实UTF-8过限仍整份拒绝。新SSR验证GroupPairResults全部成员、两窗全部不可算对，以及选中来源的中文/astral原文和未知码安全回退；未将SSR称为实际浏览器或重跑的JSDOM验收。
+
+最终受影响Python测试27通过（包含新增fixture验证及新功能API）；产品Python无修改，原194项记录仍适用于原代码，本轮未重跑全套194。完整Node **691通过、0失败/跳过/取消**；TypeScript/Vite及diff检查通过，原npm环境/大chunk警告保留。真实行情、实际浏览器、Windows、性能/人效和金融效果仍未验。该修复推送到PR41同分支，禁止用旧head的review状态代表新head；合并仍待精确新head复审。

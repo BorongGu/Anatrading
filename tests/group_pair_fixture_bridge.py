@@ -1,7 +1,8 @@
 """Test-only fresh synthetic DTO bridge. No database or network access."""
 from copy import deepcopy
 import json
-from test_group_pair_research import world, run
+from test_group_pair_research import world, run, unicode_failure_fixture
+from anatrading.group_pair_research import serialize_report
 from test_peer_neighbor_research import fixture
 from test_peer_relative_research import recount, fail
 
@@ -26,6 +27,8 @@ def fixtures():
     fail(q[1]['unlocated'][0],'source_date_range');fail(q[1]['unlocated'][1],'synthetic_future_check')
     recount(q[1]);add('all_unknown',q,days)
     q,days=fixture(50);add('maximum',q,days)
+    q,days,_=unicode_failure_fixture();add('unicode_failure',q,days)
+    result['unicode_failure']['serialized_bytes']=len(serialize_report(result['unicode_failure']['reply']))
     return result
 
 if __name__=='__main__':

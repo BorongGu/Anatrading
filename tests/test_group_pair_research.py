@@ -241,3 +241,29 @@ def test_future_append_new_source_identities_preserve_fixed_cutoff_values():
     old,new=by_symbol(before),by_symbol(after)
     for pair in old:
         for w in ('previous','current'):assert old[pair][w]['correlation']==new[pair][w]['correlation']
+
+
+def unicode_failure_fixture():
+    """Decode real synthetic capture bytes with invalid Unicode price tokens."""
+    q,days=fixture(3)
+    tokens=['停牌', '报价“未知”\\\"\n\t\x00', '未\u2028知\u2029𠀀', '🛑'*128]
+    prices=[point['values']['close'] for point in q[1]['rows']]
+    for index,token in enumerate(tokens,10): prices[index]=token
+    q[1]=source_query('600001.SH',prices,days)
+    for code in ('未知核验','constructor','__proto__','toString'):
+        fail(q[1]['rows'][10],code)
+    return q,days,tokens
+
+
+def test_unicode_failure_report_preserves_source_tokens_and_utf8_bytes():
+    import json
+    q,days,tokens=unicode_failure_fixture();r=run(q,days)
+    member=next(m for m in r['members'] if m['symbol']=='600001.SH')
+    assert r['status']=='unavailable' and len(r['members'])==3 and len(r['pairs'])==3
+    assert [p['close_token'] for p in member['endpoints'][10:14]]==tokens
+    assert member['anomalies']['counts']['未知核验']==1
+    assert all(p[w]['correlation'] is None for p in r['pairs'] for w in ('previous','current'))
+    data=serialize_report(r)
+    assert '停牌'.encode() in data and b'\\u0000' in data
+    assert json.loads(data)==r
+    assert len(data)==len(json.dumps(r,ensure_ascii=False,separators=(',',':'),allow_nan=False).encode('utf-8'))

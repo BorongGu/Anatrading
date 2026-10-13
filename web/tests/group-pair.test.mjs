@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createServer } from 'vite';
-import { assertGroupPairs,verifyGroupPairIdentity,groupPairRequest } from '../src/group-pair-model.ts';
+import { assertGroupPairs,verifyGroupPairIdentity,groupPairRequest,groupPairReason } from '../src/group-pair-model.ts';
 import { createUniverseDraft,prepareUniverseRequest,loadUniverseRequest } from '../src/universe-request.ts';
 import { ResearchRequestController,canonicalJson } from '../src/filter-model.ts';
 const fixtures=JSON.parse(execFileSync(fileURLToPath(new URL('../../.venv/bin/python',import.meta.url)),[fileURLToPath(new URL('../../tests/group_pair_fixture_bridge.py',import.meta.url))],{encoding:'utf8',maxBuffer:4*1024*1024}));
@@ -111,4 +111,37 @@ test('051 page selection buttons select a single exact pair without requests',()
  const r=f('maximum').reply,selected=[],pages=[],tree=GroupPairPage({report:r,window:'previous',page:1,onPage:p=>pages.push(p),onSelect:p=>selected.push(p)});
  visit(tree,n=>{if(n.type==='button')n.props.onClick();});assert.deepEqual(pages,[0,2]);assert.deepEqual(selected,r.pairs.slice(50,100));
  const source=readFileSync(new URL('../src/GroupPairResults.tsx',import.meta.url),'utf8');assert.match(source,/useState<GroupPair \| null>\(null\)/);assert.match(source,/setSelected\(null\)/);assert.doesNotMatch(source,/fetch\(/);
+});
+
+
+test('051 Python Unicode failure DTO uses full UTF-8 budget and ASCII-only identity',async()=>{
+ const x=f('unicode_failure');assertGroupPairs(x.reply,x.expected);await verifyGroupPairIdentity(x.reply);
+ assert.equal(new TextEncoder().encode(JSON.stringify(x.reply)).byteLength,x.serialized_bytes);
+ const m=x.reply.members.find(m=>m.symbol==='600001.SH');
+ assert.equal(m.endpoints[10].close_token,'停牌');assert.equal([...m.endpoints[13].close_token].length,128);
+ assert.equal(x.reply.status,'unavailable');assert.equal(x.reply.members.length,3);assert.equal(x.reply.pairs.length,3);
+ for(const code of ['未知核验','constructor','__proto__','toString']) assert.equal(groupPairReason(code),`来源限制：${code}`);
+ const reordered=Object.fromEntries(Object.entries(x.reply).reverse());assertGroupPairs(reordered,x.expected);
+ assert.equal(new TextEncoder().encode(JSON.stringify(reordered)).byteLength,x.serialized_bytes);
+});
+test('051 Unicode source failures render original tokens, all members and unavailable pairs',()=>{
+ const x=f('unicode_failure');assertGroupPairs(x.reply,x.expected);
+ const html=render(GroupPairResults,{report:x.reply,name:'Unicode合成',onOpen(){}});
+ assert.match(html,/原组 3/);assert.match(html,/全部相关关闭/);for(const m of x.reply.members)assert.ok(html.includes(m.snapshot_id));
+ const member=x.reply.members.find(m=>m.symbol==='600001.SH');
+ const source=render(GroupPairSource,{member,commonDates:x.reply.used_dates,onOpen(){}});
+ assert.match(source,/原文 停牌/);assert.match(source,/来源限制：未知核验/);assert.match(source,/来源限制：constructor/);assert.match(source,/来源限制：__proto__/);
+ assert.ok(source.includes('🛑'.repeat(128)));assert.doesNotMatch(source,/native code|function Object/);
+ for(const window of ['previous','current']){const table=render(GroupPairPage,{report:x.reply,window,page:0,onPage(){},onSelect(){}});assert.equal((table.match(/回查双方/g)||[]).length,3);assert.match(table,/不可算/);}
+});
+
+test('051 Unicode byte budget rejects multi-byte overflow below the UTF-16 text count',()=>{
+ const x=f('unicode_failure'),m=x.reply.members.find(m=>m.symbol==='600001.SH');
+ const code='未知'.repeat(180000);
+ m.anomalies.counts[code]=m.anomalies.counts['未知核验'];delete m.anomalies.counts['未知核验'];
+ const example=m.anomalies.examples.find(e=>e.codes.includes('未知核验'));
+ example.codes[example.codes.indexOf('未知核验')]=code;
+ const text=JSON.stringify(x.reply);
+ assert.ok(text.length<2*1024*1024);assert.ok(new TextEncoder().encode(text).byteLength>2*1024*1024);
+ assert.throws(()=>assertGroupPairs(x.reply,x.expected),/invalid_group_pair_response/);
 });

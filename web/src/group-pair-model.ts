@@ -130,7 +130,7 @@ const memberReasons = [
 function endpoint(p: SourceEndpoint, day: string) {
   keys(p, ['date', 'ordinal', 'close_token', 'close_exact', 'reasons']);
   ensure(p.date === day && (p.ordinal === null || integer(p.ordinal, Number.MAX_SAFE_INTEGER) && p.ordinal>0));
-  ensure(p.close_token === null || typeof p.close_token === 'string' && p.close_token.length <= 128);
+  ensure(p.close_token === null || typeof p.close_token === 'string' && [...p.close_token].length <= 128);
   ensure(p.close_exact === null || typeof p.close_exact === 'string' &&
     p.close_exact.length <= 40 &&
     /^-?(?:0|[1-9]\d{0,19})(?:\.\d{0,17}[1-9])?$/.test(p.close_exact) &&
@@ -179,7 +179,9 @@ function anomalies(member: GroupPairMember, cutoff: string) {
       if (e.codes.includes(code)) ensure(member.reasons.includes(code));
     }
   }
-  if (!a.truncated) ensure(same(counted,a.counts));
+  // Raw diagnostic names may contain Unicode and prototype-like keys.
+  if (!a.truncated) ensure(Object.keys(counted).length === Object.keys(a.counts).length &&
+    Object.entries(counted).every(([code,count]) => Object.hasOwn(a.counts,code) && a.counts[code] === count));
   for (const code of ['global_source_conflict','endpoint_integrity_unknown']) if (Object.hasOwn(a.counts,code)) ensure(member.reasons.includes(code));
   if (['source_code','instrument_identity','declared_instrument','declared_venue','source_adjustflag','source_adjustment','declared_adjustment','structure','known_negative_sample'].some(c => Object.hasOwn(a.counts,c))) ensure(member.reasons.includes('global_source_conflict'));
   ensure(member.date_array.every(d => d <= cutoff));
@@ -187,7 +189,9 @@ function anomalies(member: GroupPairMember, cutoff: string) {
 export function assertGroupPairs(value: unknown, expected: GroupPairExpected): asserts value is GroupPairReport {
   const r = value as GroupPairReport;
   keys(r,['method_id','rule_version','source_rule_version','analysis_id','parameters','scope','limitations','events','used_dates','grid_reasons','members','pairs','windows','counts','source_panel_complete','reasons','status']);
-  ensure(new TextEncoder().encode(canonicalJson(r)).length <= 2*1024*1024);
+  // Full source text is UTF-8 JSON, matching Python ensure_ascii=False.
+  // ASCII canonicalization remains confined to identity/fixed-schema comparisons.
+  ensure(new TextEncoder().encode(JSON.stringify(r)).length <= 2*1024*1024);
   ensure(r.method_id === GROUP_PAIR_METHOD && r.rule_version === GROUP_PAIR_RULE && r.source_rule_version === 'peer-relative-eligibility-v1' && hash(r.analysis_id));
   keys(r.parameters,['cutoff','rules']); ensure(r.parameters.cutoff === expected.cutoff && validGroupDate(expected.cutoff) && same(r.parameters.rules,rules));
   ensure(same(r.scope,scope) && same(r.limitations,limitations) && Array.isArray(r.events) && r.events.length === 0);
