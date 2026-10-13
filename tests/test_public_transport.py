@@ -183,7 +183,7 @@ def test_proxy_credentials_environment_and_fd_not_inherited(tmp_path, monkeypatc
 def test_absolute_deadline_reaps_real_subprocess_even_when_bytes_arrive(tmp_path, monkeypatch, kind):
     prefix = f"import importlib.util,time,socket,sys,io\nspec=importlib.util.spec_from_file_location('w', {str(Path(worker.__file__).resolve())!r})\nw=importlib.util.module_from_spec(spec);spec.loader.exec_module(w)\n"
     if kind == "dns":
-        code = prefix + "socket.getaddrinfo=lambda *a,**k: time.sleep(60)\nw.main()\n"
+        code = prefix + "socket.create_connection=lambda *a,**k: time.sleep(60)\nw.main()\n"
     elif kind == "tls":
         code = prefix + "class C:\n def __enter__(self): return self\n def __exit__(self,*a): pass\nsocket.create_connection=lambda *a,**k:C()\nw.ssl.create_default_context=lambda: type('TLS',(),{'wrap_socket':lambda *a,**k:time.sleep(60)})()\nw.main()\n"
     elif kind == "headers":
@@ -313,8 +313,9 @@ def test_unconfirmed_shutdown_holds_until_real_exit_then_reports_explicitly(tmp_
         return child
     monkeypatch.setattr(transport.subprocess, "Popen", launch)
     started = time.monotonic()
-    with pytest.raises(transport.PublicTransportError, match="transport_shutdown_unconfirmed"):
+    with pytest.raises(transport.PublicTransportError, match="transport_shutdown_unconfirmed") as caught:
         fetch_after(.12)
+    assert getattr(caught.value, "phase", "unknown") == "unknown"
     assert time.monotonic()-started >= .4
     assert children[0].poll() is not None
 

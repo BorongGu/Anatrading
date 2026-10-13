@@ -66,3 +66,41 @@
 - Windows原生自动采集：未跑。当前新采集路径要求no-follow目录描述符及目录fsync，能力不足的平台在联网前明确失败；既有跨平台Store行为未改。
 - 强断电、网络盘、跨OS共享互斥、浏览器、长期来源可用性及最终性能：本轮未验证。
 - 市场完整覆盖、标准数量单位、历史当时可得、预测／交易增量：本轮不授予资格。legacy历史重建依旧明确缺少运输和头重复性证据。
+
+## 2026-10-13：有界运输阶段诊断（限定本地验收）
+
+编码前已接受[冻结设计与16组矩阵](../research/055-bounded-transport-phase-diagnostics.md)。新增 `transport_diagnostics` 是当前命令内存中的失败摘要：每条仅 `run_id/attempt_number/block_id/code/phase`，最多10条，现有首次运输失败即停意味着通常最多1条。没有本次运输错误时为 `[]`；resume 不回填旧失败，使用真实的新 attempt 编号。字段不写 journal、plan、reservation、capture 或 source-state，所有原版本及四键 transport 持久约定不变。
+
+phase 精确取 `dns/connect/tls/http/read/unknown`。仅窄 create_connection 调用中的 gaierror 和 ConnectionRefusedError 分别给 dns/connect；其余通用连接异常／超时保守 unknown。TLS 包装、HTTP发送／头读取、实体读取分别标明已知位置；关闭、父截止／取消、损坏IPC和未知异常不继承最后阶段。phase 不参与分类、配额、恢复或来源许可。可信401/403/429仍优先blocked；无效IPC整条拒绝且不捞取status。
+
+新parent接受旧worker缺phase的错误，显示unknown。旧parent拒绝新worker的phase字段，必须同版本交付，无混搭兼容承诺。旧summary读取者应把缺失字段视为 `[]`；仓内CLI原样JSON及按键消费者适用，外部精确字段消费者可能需更新。新增诊断不含URL/host/IP/异常原文；原summary本来已有request，不宣称整个summary无URL。
+
+验证仅本地合成及故障进程，无真实请求或DNS，不打开旧私有数据库、Store或行情原件。实现前新增测试83失败/14通过；首次最小实现97通过。最终增补矩阵、受影响套件与允许的全仓回归结果见下。真实来源、Windows原生、浏览器、性能与金融效果均未验证。全仓两个localhost慢流测试 `test_http_slow_chunks_do_not_reset_absolute_deadline[header/body]` 因零网络边界明确未跑。
+
+### 最终证据与负结果
+
+- 产品冻结于 `5b8246d2787266ad8880903941232848638d582d`：三个产品文件之后逐字不变。最终追加15个永久回归测试及验收文档，不改产品；独立审查、字节oracle与全仓产品证据继续适用。
+- 最终受影响8个测试文件：**587 passed / 0 failed / 0 skipped，17.86秒**。包含130个新增阶段用例、运输监督、采集／对抗／CLI及 strict-v1/legacy 完整黄金摘要。
+- 冻结产品全仓允许子集：**3470 passed / 0 failed / 49 skipped / 2 deselected，143.61秒**。49项跳过来自缺失私有样本及Windows原生证据；2项为上列实际localhost慢流测试。保留1条现有FastAPI/Starlette TestClient弃用warning，未改依赖。后续仅测试/文档变化没有另跑全仓，已重跑最终受影响587项并核对三产品文件SHA-256相同。
+- 独立持久化oracle对照基线 `62448850dca41ced7d494aad205411c9242b4bb8` 与冻结产品：33组合成场景、114份plan/reservation/journal/source/capture JSON直接逐字一致；旧摘要所有字段相同，仅增加诊断列表；旧异常精确属性、15份旧worker错误元数据相同。9组可信受限status仍blocked，15组非法IPC整条拒绝、不保留status且无源限制记录。数据库文件本身不在逐字一致主张内。
+- 独立实现审查GO，无代码阻断。额外77个操作／退出差分、18个非零部分实体故障、24个恶意IPC探针均通过。已将建议的9个部分实体故障往返和6个独立资源进入／退出边界保留为仓内回归。
+- 所有验收使用现有依赖。父pytest审计钩子阻止socket连接、DNS及bind；子进程均为已检查的本地注入脚本，worker调用前替换create_connection。合成临时Store仅位于独立验证根，不打开旧私有数据或旧Store。
+- 失败保留：首次新增测试83失败/14通过（实现前预期）；首次全仓外部runner缺少 `__main__` 保护，spawn重复运行pytest导致2个锁测试失败（3468通过、49跳过、2未跑）。只修仓外runner后，锁套件17通过，冻结产品完整允许子集重跑结果见上。首次本地提交因未配置作者身份失败，使用已确认公开noreply身份的单命令参数后成功，无全局／仓库git配置修改。
+
+### 冻结矩阵对应
+
+| 组 | 可重复证据 |
+|---|---|
+| P1–P2 | `test_p1_connect_narrow_boundary`、`test_p2_p4_operation_boundaries`；仅窄连接异常可标dns/connect |
+| P3 | 两组cleanup/entry回归，distinct raw/secured/stream六站点unknown；独立77项差分 |
+| P4–P5 | 状态/头/体异常、分块/trailer/end/超限；9个已收1字节后故障保留hash/count/status并往返parent |
+| P6 | 200/interim/restriction/500/302/404与既有完整实体测试 |
+| R1–R2 | 各3种受限status×5类有效故障／非法IPC；持久blocked优先与整条拒绝分开断言 |
+| I1–I2 | 六合法枚举、缺失属性、非法类型/重复键/NaN/成功结果extra键、worker白名单 |
+| I3 | 本地故障进程、截止/取消/spawn/退出/两IPC上限/半截JSON/pipe、既有shutdown回收测试 |
+| A1–A2 | 五键本次失败列表、恶意本地phase、部分成功、独立run、resume第2–10次及零新请求空列表 |
+| A3 | 独立33案例/114文件逐字对照及版本/身份静态核对 |
+| A4 | 既有reservation/capture崩溃点、10次预算、COMMIT ACK、取消及source-block恢复对抗回归 |
+| C1 | CLI成功/错误退出、按键读取／旧summary缺字段约定、strict-v1/legacy黄金摘要 |
+
+当前仅本地提交，未推送／创建PR／合并。上述结果不赋予实源出口、长期来源可用性、Windows原生、浏览器、性能或预测资格。

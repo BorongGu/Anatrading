@@ -31,6 +31,7 @@ def test_public_cli_commit_query_export_and_resume(tmp_path, monkeypatch, capsys
     assert cli.main(arguments) == 0
     result = json.loads(capsys.readouterr().out)
     assert result['status'] == 'committed' and result['coverage'] == 'unverified'
+    assert result['transport_diagnostics'] == []
     sid = result['blocks'][0]['snapshot_id']
     assert cli.main(['--root', str(root), 'query', sid]) == 0
     query = json.loads(capsys.readouterr().out)
@@ -57,6 +58,10 @@ def test_public_cli_stops_with_nonzero_safe_status(tmp_path, monkeypatch, capsys
     assert cli.main(arguments) == 2
     result = json.loads(capsys.readouterr().out)
     assert result['status'] == expected and result['error_code'] == status
+    assert result['transport_diagnostics'] == [dict(run_id=result['run_id'], attempt_number=1,
+        block_id=result['blocks'][0]['block_id'], code=status, phase='unknown')]
+    legacy = {key: value for key, value in result.items() if key != 'transport_diagnostics'}
+    assert legacy.get('transport_diagnostics', []) == []
 
 
 @pytest.mark.parametrize('run_id', ['../escape', '/tmp/elsewhere', 'A'*32, 'a'*31])
