@@ -13,6 +13,12 @@ const fixtures=JSON.parse(execFileSync(fileURLToPath(new URL('../../.venv/bin/py
 const f=(name='complete')=>structuredClone(fixtures[name]);
 const draftFor=f=>({...createUniverseDraft(),mode:'group_pairs',ids:f.expected.ids,cutoff:f.expected.cutoff,peerTarget:'ignored',lookback:'ignored',filter:{enabled:true,groups:[]}});
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
+// Vite middleware transforms SSR modules only; no listening port, service or browser.
+const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]}});
+const {GroupPairResults,GroupPairPage,GroupPairSource,groupPairPage}=await server.ssrLoadModule('/src/GroupPairResults.tsx');
+const {UniverseResearch}=await server.ssrLoadModule('/src/UniverseResearch.tsx');
+const render=(component,props)=>renderToStaticMarkup(createElement(component,props));
+after(()=>server.close());
 for(const name of Object.keys(fixtures))test(`051 actual Python ${name} strict DTO and SHA`,async()=>{const x=f(name);assertGroupPairs(x.reply,x.expected);await verifyGroupPairIdentity(x.reply);});
 const changes={
  extra_key:r=>r.target='x', rule:r=>r.parameters.rules.transform='log', scope:r=>r.scope.price_currency.value='USD',limitation:r=>r.limitations.trading_calendar='known',
@@ -71,11 +77,6 @@ test('051 cancel, invalidate, dispose and late fetch/hash cannot publish obsolet
  try{const c=new ResearchRequestController(()=>{}),task=c.run(()=>prepareUniverseRequest(draft,draft.ids),loadUniverseRequest);await tick();c.invalidate();await finish();await task;assert.equal(c.state.result,null);c.dispose();}finally{crypto.subtle.digest=oldDigest;}
  }finally{globalThis.fetch=original;}
 });
-// Vite middleware transforms SSR modules only; no listening port, service or browser.
-const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]}});after(()=>server.close());
-const {GroupPairResults,GroupPairPage,GroupPairSource,groupPairPage}=await server.ssrLoadModule('/src/GroupPairResults.tsx');
-const {UniverseResearch}=await server.ssrLoadModule('/src/UniverseResearch.tsx');
-const render=(component,props)=>renderToStaticMarkup(createElement(component,props));
 test('051 SSR explicit targetless entry and default unchanged with no automatic request',()=>{
  const x=f(),draft=draftFor(x),html=render(UniverseResearch,{draft,snapshots:x.expected.ids.map(id=>({snapshot_id:id,row_count:121,metadata:{period:'1d',source_code:id.slice(0,6)}})),onImport(){},onOpen(){}});
  assert.match(html,/无目标/);assert.match(html,/核对完整成对双窗/);assert.doesNotMatch(html,/id="universe-peer-target"|id="universe-lookback"|id="universe-group-start"/);

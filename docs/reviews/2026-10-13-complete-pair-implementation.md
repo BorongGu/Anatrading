@@ -10,7 +10,7 @@
 
 051初版“T摘要与全部端点相同”已明确纠正为“T的相关摘要与各成员共同起止端点相同”；两世界C完整121价格序列不同。验收公式和反例未调整。一手阅读归属及公开链接已补全。
 
-## 实际通过（最终代码）
+## 首实现5fbd42c的实际通过
 
 - 受影响Python 194 passed，0 failed/skip：test_group_pair_research、test_group_pair_api、test_peer_neighbor_research、test_peer_neighbor_api、test_peer_relative_research、test_drawdown_episode_research、test_drawdown_episode_api、test_research_api。
 - 完整Node 684 passed，0 failed/skip；其中051的新DTO/请求/SSR/回调56项。全部Node以test-concurrency=1运行，合成Store仅指定的新临时根；未读取旧研究Store。
@@ -22,6 +22,15 @@
 
 ## 原始失败与未验范围
 
-保留首次异常测试因模块尚不存在的收集失败，以及上述独立审查P2真实回归失败；最终所列检查无遗留失败。初版测试未出现其他失败。原始日志保留在实施环境的专用临时证据目录，不提交个人或运行产物。
+保留首次异常测试因模块尚不存在的收集失败，以及上述独立审查P2真实回归失败；最终所列检查无遗留失败。初版测试未出现其他失败。原始日志保留在实施环境的专用临时证据目录，不提交个人或运行产物。后续复核另发现下述原因码和测试生命周期问题，首轮无阻断结论不覆盖它们。
 
 未跑fullpytest；未启动监听服务/端口/浏览器、未接真实行情、旧Store、账户/依赖/部署。SSR使用Vite middleware-only转换，无listen；API为ASGI内存transport。SSR/回调与控制器测试不等于浏览器实际挂载/布局/焦点验收。Windows原生、真实样本兼容、实际浏览器、性能/峰值内存、真人效率、预测/交易效果均未验。未重新启动任何已停止的性能基准。
+
+
+## 后续原因码与测试生命周期修复
+
+负责人复核发现新增错误字典未限定自身属性：constructor/__proto__/toString等继承键可被当成说明，导致诊断返回函数或请求提示泄漏native code文本。上轮静态审查漏检。新增独立错误测试先实际取得2项失败，再将两处查找改为Object.hasOwn，并将peer_neighbor_泛前缀匹配收窄到三个明确的核错误；陌生、安全或不安全错误保持既有安全回退。实际banner表达式测试覆盖原型键、陌生前缀、非Error、不安全内容、已知预算和原件/服务恢复提示。独立只读复核认可修复，无新代码阻断。
+
+本轮完整Node首跑682通过、1测试文件失败：先注册的DTO测试结束时after关闭Vite runner，而同文件顶层await仍在加载SSR，5项SSR测试尚未注册。修为SSR模块全部加载完成后再注册测试和清理hook；所有原断言保留。修脚本曾因工作目录前缀错误失败，意外启动的未修重跑已取消，其日志保留，不计通过。
+
+最终相关Node 59项通过，完整Node **687通过、0失败/跳过/取消**；TypeScript/Vite再次通过，原npm环境及大chunk警告保持。Python没有修改，沿用同一Python代码的194项通过记录，本轮未重复Python。git diff --check通过。README和research-status补入当前功能入口，直接链接本实施记录；没有新增资格副本。实际DOM/浏览器、真实行情、Windows、性能和金融效果的未验边界不变。

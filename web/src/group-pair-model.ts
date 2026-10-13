@@ -276,7 +276,7 @@ const explanations: Record<string,string> = {
   history_insufficient:'截止及以前不足121个来源日期组',
   cutoff_missing:'本成员缺少指定截止日记录',
 };
-export const groupPairReason = (code: string) => explanations[code] ?? peerReason(code);
+export const groupPairReason = (code: string) => Object.hasOwn(explanations, code) ? explanations[code] : peerReason(code);
 export function explainGroupPairError(error: unknown) {
-  const code = safeCode(error); return explanations[code] ? `${explanations[code]}（${code}）` : code.startsWith('peer_neighbor_') ? `精确相关计算失败，整组未发布（${code}）` : explainFilter(error);
+  const code = safeCode(error); return Object.hasOwn(explanations, code) ? `${explanations[code]}（${code}）` : ['peer_neighbor_integer_limit', 'peer_neighbor_display_failure', 'peer_neighbor_arithmetic_failure'].includes(code) ? `精确相关计算失败，整组未发布（${code}）` : explainFilter(error);
 }
