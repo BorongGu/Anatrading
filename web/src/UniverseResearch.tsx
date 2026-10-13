@@ -134,7 +134,7 @@ export function UniverseResearch({ snapshots, onImport, onOpen, draft: controlle
           onOpen={onOpen}
         />
       )}
-      {report?.kind === 'group_pairs' && <GroupPairResults key={report.report.analysis_id} report={report.report} name={draft.groupName} onOpen={onOpen} />}
+      {report?.kind === 'group_pairs' && <GroupPairResults key={report.report.analysis_id} report={report.report} expected={report.expected} name={draft.groupName} onOpen={onOpen} />}
       {report?.kind === 'peer_neighbors' && <PeerNeighborResults key={report.report.analysis_id} report={report.report} name={draft.groupName} onOpen={onOpen} />}
       {report?.kind === 'group_endpoints' && <GroupEndpointResults key={report.report.analysis_id} report={report.report} name={draft.groupName} onOpen={onOpen} />}
       {report?.kind === 'explanation' && <TwoGroupResults key={report.report.analysis_id} report={report.report} onOpen={onOpen} />}
