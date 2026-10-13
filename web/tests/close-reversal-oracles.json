@@ -1,0 +1,601 @@
+[
+  {
+    "case": "F01",
+    "initial_mode": "up",
+    "events": [
+      {
+        "direction": "down",
+        "anchor_index": 0,
+        "confirmation_index": 1,
+        "anchor_close_exact": "100",
+        "confirmation_close_exact": "90",
+        "signed_relative_change": {
+          "numerator": "-1",
+          "denominator": "10"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "up",
+        "first_event_initialization_warning": true
+      },
+      {
+        "direction": "up",
+        "anchor_index": 1,
+        "confirmation_index": 2,
+        "anchor_close_exact": "90",
+        "confirmation_close_exact": "100",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "up",
+        "first_event_initialization_warning": false
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 7,
+      "extreme_close_exact": "120",
+      "last_observation_index": 7,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F01",
+    "initial_mode": "down",
+    "events": [
+      {
+        "direction": "up",
+        "anchor_index": 1,
+        "confirmation_index": 2,
+        "anchor_close_exact": "90",
+        "confirmation_close_exact": "100",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "down",
+        "first_event_initialization_warning": true
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 7,
+      "extreme_close_exact": "120",
+      "last_observation_index": 7,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F02",
+    "initial_mode": "up",
+    "events": [
+      {
+        "direction": "down",
+        "anchor_index": 0,
+        "confirmation_index": 1,
+        "anchor_close_exact": "100",
+        "confirmation_close_exact": "90",
+        "signed_relative_change": {
+          "numerator": "-1",
+          "denominator": "10"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "up",
+        "first_event_initialization_warning": true
+      },
+      {
+        "direction": "up",
+        "anchor_index": 1,
+        "confirmation_index": 2,
+        "anchor_close_exact": "90",
+        "confirmation_close_exact": "100",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "up",
+        "first_event_initialization_warning": false
+      },
+      {
+        "direction": "down",
+        "anchor_index": 4,
+        "confirmation_index": 6,
+        "anchor_close_exact": "120",
+        "confirmation_close_exact": "110",
+        "signed_relative_change": {
+          "numerator": "-1",
+          "denominator": "12"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "12"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "up",
+        "first_event_initialization_warning": false
+      },
+      {
+        "direction": "up",
+        "anchor_index": 6,
+        "confirmation_index": 7,
+        "anchor_close_exact": "110",
+        "confirmation_close_exact": "120",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "11"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "11"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "up",
+        "first_event_initialization_warning": false
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 7,
+      "extreme_close_exact": "120",
+      "last_observation_index": 7,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F02",
+    "initial_mode": "down",
+    "events": [
+      {
+        "direction": "up",
+        "anchor_index": 1,
+        "confirmation_index": 2,
+        "anchor_close_exact": "90",
+        "confirmation_close_exact": "100",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "9"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "down",
+        "first_event_initialization_warning": true
+      },
+      {
+        "direction": "down",
+        "anchor_index": 4,
+        "confirmation_index": 6,
+        "anchor_close_exact": "120",
+        "confirmation_close_exact": "110",
+        "signed_relative_change": {
+          "numerator": "-1",
+          "denominator": "12"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "12"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "down",
+        "first_event_initialization_warning": false
+      },
+      {
+        "direction": "up",
+        "anchor_index": 6,
+        "confirmation_index": 7,
+        "anchor_close_exact": "110",
+        "confirmation_close_exact": "120",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "11"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "11"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "down",
+        "first_event_initialization_warning": false
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 7,
+      "extreme_close_exact": "120",
+      "last_observation_index": 7,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F03",
+    "initial_mode": "up",
+    "events": [],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 3,
+      "extreme_close_exact": "120",
+      "last_observation_index": 3,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F03",
+    "initial_mode": "down",
+    "events": [
+      {
+        "direction": "up",
+        "anchor_index": 0,
+        "confirmation_index": 2,
+        "anchor_close_exact": "100",
+        "confirmation_close_exact": "110",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "down",
+        "first_event_initialization_warning": true
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 3,
+      "extreme_close_exact": "120",
+      "last_observation_index": 3,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F04",
+    "initial_mode": "up",
+    "events": [],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 0,
+      "extreme_close_exact": "100",
+      "last_observation_index": 2,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F04",
+    "initial_mode": "down",
+    "events": [],
+    "terminal": {
+      "mode": "down",
+      "extreme_index": 0,
+      "extreme_close_exact": "100",
+      "last_observation_index": 2,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F05",
+    "initial_mode": "up",
+    "events": [
+      {
+        "direction": "down",
+        "anchor_index": 0,
+        "confirmation_index": 2,
+        "anchor_close_exact": "100",
+        "confirmation_close_exact": "94",
+        "signed_relative_change": {
+          "numerator": "-3",
+          "denominator": "50"
+        },
+        "magnitude": {
+          "numerator": "3",
+          "denominator": "50"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "up",
+        "first_event_initialization_warning": true
+      },
+      {
+        "direction": "up",
+        "anchor_index": 2,
+        "confirmation_index": 4,
+        "anchor_close_exact": "94",
+        "confirmation_close_exact": "99.64",
+        "signed_relative_change": {
+          "numerator": "3",
+          "denominator": "50"
+        },
+        "magnitude": {
+          "numerator": "3",
+          "denominator": "50"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "up",
+        "first_event_initialization_warning": false
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 4,
+      "extreme_close_exact": "99.64",
+      "last_observation_index": 4,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F05",
+    "initial_mode": "down",
+    "events": [
+      {
+        "direction": "up",
+        "anchor_index": 2,
+        "confirmation_index": 4,
+        "anchor_close_exact": "94",
+        "confirmation_close_exact": "99.64",
+        "signed_relative_change": {
+          "numerator": "3",
+          "denominator": "50"
+        },
+        "magnitude": {
+          "numerator": "3",
+          "denominator": "50"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "down",
+        "first_event_initialization_warning": true
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 4,
+      "extreme_close_exact": "99.64",
+      "last_observation_index": 4,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F06",
+    "initial_mode": "up",
+    "events": [
+      {
+        "direction": "down",
+        "anchor_index": 1,
+        "confirmation_index": 3,
+        "anchor_close_exact": "110",
+        "confirmation_close_exact": "103.4",
+        "signed_relative_change": {
+          "numerator": "-3",
+          "denominator": "50"
+        },
+        "magnitude": {
+          "numerator": "3",
+          "denominator": "50"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "up",
+        "first_event_initialization_warning": true
+      },
+      {
+        "direction": "up",
+        "anchor_index": 3,
+        "confirmation_index": 5,
+        "anchor_close_exact": "103.4",
+        "confirmation_close_exact": "110",
+        "signed_relative_change": {
+          "numerator": "3",
+          "denominator": "47"
+        },
+        "magnitude": {
+          "numerator": "3",
+          "denominator": "47"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "up",
+        "first_event_initialization_warning": false
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 5,
+      "extreme_close_exact": "110",
+      "last_observation_index": 5,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F06",
+    "initial_mode": "down",
+    "events": [
+      {
+        "direction": "up",
+        "anchor_index": 0,
+        "confirmation_index": 1,
+        "anchor_close_exact": "100",
+        "confirmation_close_exact": "110",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "10"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "down",
+        "first_event_initialization_warning": true
+      },
+      {
+        "direction": "down",
+        "anchor_index": 1,
+        "confirmation_index": 3,
+        "anchor_close_exact": "110",
+        "confirmation_close_exact": "103.4",
+        "signed_relative_change": {
+          "numerator": "-3",
+          "denominator": "50"
+        },
+        "magnitude": {
+          "numerator": "3",
+          "denominator": "50"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "down",
+        "first_event_initialization_warning": false
+      },
+      {
+        "direction": "up",
+        "anchor_index": 3,
+        "confirmation_index": 5,
+        "anchor_close_exact": "103.4",
+        "confirmation_close_exact": "110",
+        "signed_relative_change": {
+          "numerator": "3",
+          "denominator": "47"
+        },
+        "magnitude": {
+          "numerator": "3",
+          "denominator": "47"
+        },
+        "confirmation_delay_source_intervals": 2,
+        "initial_mode": "down",
+        "first_event_initialization_warning": false
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 5,
+      "extreme_close_exact": "110",
+      "last_observation_index": 5,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F07",
+    "initial_mode": "up",
+    "events": [
+      {
+        "direction": "down",
+        "anchor_index": 0,
+        "confirmation_index": 1,
+        "anchor_close_exact": "100",
+        "confirmation_close_exact": "80",
+        "signed_relative_change": {
+          "numerator": "-1",
+          "denominator": "5"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "5"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "up",
+        "first_event_initialization_warning": true
+      },
+      {
+        "direction": "up",
+        "anchor_index": 1,
+        "confirmation_index": 2,
+        "anchor_close_exact": "80",
+        "confirmation_close_exact": "120",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "up",
+        "first_event_initialization_warning": false
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 2,
+      "extreme_close_exact": "120",
+      "last_observation_index": 2,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F07",
+    "initial_mode": "down",
+    "events": [
+      {
+        "direction": "up",
+        "anchor_index": 1,
+        "confirmation_index": 2,
+        "anchor_close_exact": "80",
+        "confirmation_close_exact": "120",
+        "signed_relative_change": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "magnitude": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "confirmation_delay_source_intervals": 1,
+        "initial_mode": "down",
+        "first_event_initialization_warning": true
+      }
+    ],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 2,
+      "extreme_close_exact": "120",
+      "last_observation_index": 2,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F08",
+    "initial_mode": "up",
+    "events": [],
+    "terminal": {
+      "mode": "up",
+      "extreme_index": 0,
+      "extreme_close_exact": "100",
+      "last_observation_index": 2,
+      "confirmed": false
+    }
+  },
+  {
+    "case": "F08",
+    "initial_mode": "down",
+    "events": [],
+    "terminal": {
+      "mode": "down",
+      "extreme_index": 0,
+      "extreme_close_exact": "100",
+      "last_observation_index": 2,
+      "confirmed": false
+    }
+  }
+]
