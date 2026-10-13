@@ -1,4 +1,5 @@
-import type { DrawdownReport, DrawdownEpisode, DrawdownPoint } from './drawdown-episode-model.ts';
+import { GroupSourcePath } from './GroupSourcePath.tsx';
+import type { DrawdownReport, DrawdownEpisode, DrawdownPoint, DrawdownExpected } from './drawdown-episode-model.ts';
 
 const reasonLabels: Record<string, string> = {
   cutoff_missing: '缺少精确截止日',
@@ -75,8 +76,9 @@ function Episode({ title, episode, onOpen }: {
   );
 }
 
-export function DrawdownEpisodeResults({ report, name, onOpen }: {
+export function DrawdownEpisodeResults({ report, name, onOpen, expected }: {
   report: DrawdownReport;
+  expected?: DrawdownExpected;
   name: string;
   onOpen: (id: string, cutoff: string) => void;
 }) {
@@ -165,6 +167,10 @@ export function DrawdownEpisodeResults({ report, name, onOpen }: {
           </details>
         </article>
       ))}
+      {expected ? <GroupSourcePath report={report} expected={expected} onOpen={onOpen}/> : <details>
+        <summary>组来源平均路径与共同最深段（回顾）</summary>
+        <p>缺少本次已核请求，附件不可计算。原回撤结果保留。</p>
+      </details>}
       <details>
         <summary>分析标识</summary>
         <code>{report.analysis_id}</code>
