@@ -55,3 +55,9 @@
 实际跨语言测试确认完整Python ensure_ascii=False序列化字节数与前端一致（含特殊字符），反转对象键顺序不改字节数；多字节输入即使UTF-16文本长度低于2MiB，真实UTF-8过限仍整份拒绝。新SSR验证GroupPairResults全部成员、两窗全部不可算对，以及选中来源的中文/astral原文和未知码安全回退；未将SSR称为实际浏览器或重跑的JSDOM验收。
 
 最终受影响Python测试27通过（包含新增fixture验证及新功能API）；产品Python无修改，原194项记录仍适用于原代码，本轮未重跑全套194。完整Node **691通过、0失败/跳过/取消**；TypeScript/Vite及diff检查通过，原npm环境/大chunk警告保留。真实行情、实际浏览器、Windows、性能/人效和金融效果仍未验。该修复推送到PR41同分支，禁止用旧head的review状态代表新head；合并仍待精确新head复审。
+
+### Unicode修复后的独立模拟DOM复验
+
+在75ed3e0产品提交上，原冻结harness逐字不改复跑13组全通过，另事前冻结Unicode增量1组通过；14组React/JSDOM/window错误与警告均为空。真实Python合成失败报告经新DTO及SHA验证后，实际GroupPairResults保留全部3个不可算对，点击选中双方，textContent精确保留4个原始Unicode token（含“停牌”、引号/控制/分隔字符及128个补充平面字符），双方日期回调身份正确。该样本42829字节，不是近预算UI测试；字节预算证据仍来自独立单元测试。前后5756代码/既有依赖文件哈希不变，无增删，HEAD及干净工作树不变。
+
+该执行属于React/JSDOM模拟DOM复验，未改变前述实际浏览器、HTTP/Store、Windows、性能等未验边界；textContent不能证明屏幕字形与控制字符实际呈现。分析key因果仍未独立隔离，pagehide/pageshow及N50的25页DOM遍历仍未跑。仅追加公开结论，不提交隔离脚本、样本或运行日志。
