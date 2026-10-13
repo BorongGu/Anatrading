@@ -1,0 +1,265 @@
+{
+  "schema": "explicit-notice-reference-v2",
+  "version": "sse-szse-explicit-20261013-v2",
+  "scope": [
+    "2024-10-11",
+    "2026-10-09"
+  ],
+  "timezone": "Asia/Shanghai",
+  "mode": "retrospective",
+  "exception_coverage": "unknown",
+  "historical_availability": "unknown",
+  "reviewed_on": "2026-10-13",
+  "historical_content_identity": "unknown",
+  "known_at": "unknown",
+  "evidence_by_exchange": {
+    "SSE": {
+      "accepted_facts_sha256": "7db3ac48ad6991b9a8302462bbded7f363b0eb4da0d34b87abb3b3555dbd8ba8",
+      "review_sha256": "b17dfdb89abd03b5deeb919f0c3c8895934815be0d3a6894fe48391085a0bd27"
+    },
+    "SZSE": {
+      "accepted_facts_sha256": "d667d14bd1c6a761aef53a8a6ecf9c412e996211b45518eb58a967f815ccc541",
+      "review_sha256": "c3d0a3ce5087b6f9e2973deea084d8d6c29f50f9a37e323df60d82c184b640a7"
+    }
+  },
+  "notices": [
+    {
+      "id": "sse-2024",
+      "exchange": "SSE",
+      "document_id": "上证公告〔2023〕47号",
+      "url": "https://www.sse.com.cn/disclosure/announcement/general/c/c_20231226_5733939.shtml",
+      "publication_date": "2023-12-26",
+      "original_sha256": "402ccc7431dd80f2ebece21bb8d8701f4d7b079326a9102aa657ef6bc9c41125",
+      "closed_ranges": [],
+      "closed_dates": [
+        "2024-10-12"
+      ],
+      "reopen_dates": [],
+      "retrieved_at_utc": "2026-10-13T08:57:11.505516+00:00"
+    },
+    {
+      "id": "sse-2025",
+      "exchange": "SSE",
+      "document_id": "上证公告〔2024〕38号",
+      "url": "https://www.sse.com.cn/disclosure/announcement/general/c/c_20241223_10767108.shtml",
+      "publication_date": "2024-12-23",
+      "original_sha256": "b88e5777d868192c156b85f7514fafcba8638a8bcec0cd80190b2e67769f5fff",
+      "closed_ranges": [
+        [
+          "2025-01-01",
+          "2025-01-01"
+        ],
+        [
+          "2025-01-28",
+          "2025-02-04"
+        ],
+        [
+          "2025-04-04",
+          "2025-04-06"
+        ],
+        [
+          "2025-05-01",
+          "2025-05-05"
+        ],
+        [
+          "2025-05-31",
+          "2025-06-02"
+        ],
+        [
+          "2025-10-01",
+          "2025-10-08"
+        ]
+      ],
+      "closed_dates": [
+        "2025-01-26",
+        "2025-02-08",
+        "2025-04-27",
+        "2025-09-28",
+        "2025-10-11"
+      ],
+      "reopen_dates": [
+        "2025-01-02",
+        "2025-02-05",
+        "2025-04-07",
+        "2025-05-06",
+        "2025-06-03",
+        "2025-10-09"
+      ],
+      "retrieved_at_utc": "2026-10-13T08:57:14.483829+00:00"
+    },
+    {
+      "id": "sse-2026",
+      "exchange": "SSE",
+      "document_id": "上证公告〔2025〕45号",
+      "url": "https://www.sse.com.cn/disclosure/announcement/general/c/c_20251222_10802507.shtml",
+      "publication_date": "2025-12-22",
+      "original_sha256": "4e260b815ce1309175ed994e6490a4ccd51b998a5f92bcdc41cec00fc6823dc7",
+      "closed_ranges": [
+        [
+          "2026-01-01",
+          "2026-01-03"
+        ],
+        [
+          "2026-02-15",
+          "2026-02-23"
+        ],
+        [
+          "2026-04-04",
+          "2026-04-06"
+        ],
+        [
+          "2026-05-01",
+          "2026-05-05"
+        ],
+        [
+          "2026-06-19",
+          "2026-06-21"
+        ],
+        [
+          "2026-09-25",
+          "2026-09-27"
+        ],
+        [
+          "2026-10-01",
+          "2026-10-07"
+        ]
+      ],
+      "closed_dates": [
+        "2026-01-04",
+        "2026-02-14",
+        "2026-02-28",
+        "2026-05-09",
+        "2026-09-20"
+      ],
+      "reopen_dates": [
+        "2026-01-05",
+        "2026-02-24",
+        "2026-04-07",
+        "2026-05-06",
+        "2026-06-22",
+        "2026-09-28",
+        "2026-10-08"
+      ],
+      "retrieved_at_utc": "2026-10-13T08:55:57.320074+00:00"
+    },
+    {
+      "id": "szse-2024",
+      "exchange": "SZSE",
+      "document_id": "深证会〔2023〕409号",
+      "url": "https://www.szse.cn/disclosure/notice/t20231226_605108.html",
+      "publication_date": "2023-12-26",
+      "original_sha256": "2c9906bac2116f3bc6190f0d0a74e0be40f1e4307f71e34cc12007d411e88b13",
+      "closed_ranges": [],
+      "closed_dates": [
+        "2024-10-12"
+      ],
+      "reopen_dates": [],
+      "retrieved_at_utc": "2026-10-13T08:16:21.195574+00:00"
+    },
+    {
+      "id": "szse-2025",
+      "exchange": "SZSE",
+      "document_id": "深证会〔2024〕413号",
+      "url": "https://www.szse.cn/disclosure/notice/t20241223_611283.html",
+      "publication_date": "2024-12-23",
+      "original_sha256": "1c89289137907b6afd00c27059919dedcb8414f4402a38b995ff9eccd465874e",
+      "closed_ranges": [
+        [
+          "2025-01-01",
+          "2025-01-01"
+        ],
+        [
+          "2025-01-28",
+          "2025-02-04"
+        ],
+        [
+          "2025-04-04",
+          "2025-04-06"
+        ],
+        [
+          "2025-05-01",
+          "2025-05-05"
+        ],
+        [
+          "2025-05-31",
+          "2025-06-02"
+        ],
+        [
+          "2025-10-01",
+          "2025-10-08"
+        ]
+      ],
+      "closed_dates": [
+        "2025-01-26",
+        "2025-02-08",
+        "2025-04-27",
+        "2025-09-28",
+        "2025-10-11"
+      ],
+      "reopen_dates": [
+        "2025-01-02",
+        "2025-02-05",
+        "2025-04-07",
+        "2025-05-06",
+        "2025-06-03",
+        "2025-10-09"
+      ],
+      "retrieved_at_utc": "2026-10-13T08:16:23.037831+00:00"
+    },
+    {
+      "id": "szse-2026",
+      "exchange": "SZSE",
+      "document_id": "深证会〔2025〕481号",
+      "url": "https://www.szse.cn/disclosure/notice/general/t20251222_618087.html",
+      "publication_date": "2025-12-22",
+      "original_sha256": "1656d8708d5faed33c7588538639d96128f39fdface02cfa6eb66d796c40f14e",
+      "closed_ranges": [
+        [
+          "2026-01-01",
+          "2026-01-03"
+        ],
+        [
+          "2026-02-15",
+          "2026-02-23"
+        ],
+        [
+          "2026-04-04",
+          "2026-04-06"
+        ],
+        [
+          "2026-05-01",
+          "2026-05-05"
+        ],
+        [
+          "2026-06-19",
+          "2026-06-21"
+        ],
+        [
+          "2026-09-25",
+          "2026-09-27"
+        ],
+        [
+          "2026-10-01",
+          "2026-10-07"
+        ]
+      ],
+      "closed_dates": [
+        "2026-01-04",
+        "2026-02-14",
+        "2026-02-28",
+        "2026-05-09",
+        "2026-09-20"
+      ],
+      "reopen_dates": [
+        "2026-01-05",
+        "2026-02-24",
+        "2026-04-07",
+        "2026-05-06",
+        "2026-06-22",
+        "2026-09-28",
+        "2026-10-08"
+      ],
+      "retrieved_at_utc": "2026-10-13T08:16:21.479608+00:00"
+    }
+  ]
+}

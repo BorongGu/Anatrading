@@ -14,7 +14,7 @@ after(()=>server.close());
 const render=(component,props)=>renderToStaticMarkup(createElement(component,props));
 const diagnostic=name=>buildNoticeDiagnostic(structuredClone(fixtures[name].reply));
 test('051 optional panel is folded with no diagnostic calculation mounted on SSR',()=>{
- const html=render(NoticeDateDiagnostic,{report:fixtures.complete.reply,onOpen(){}});assert.match(html,/已核公告日期核对（回顾）/);assert.doesNotMatch(html,/<details open|<table|有限公告日期核对结果|正在核对/);assert.match(html,/上交所未覆盖/);
+ const html=render(NoticeDateDiagnostic,{report:fixtures.complete.reply,onOpen(){}});assert.match(html,/已核公告日期核对（回顾）/);assert.doesNotMatch(html,/<details open|<table|有限公告日期核对结果|正在核对/);assert.match(html,/上交所、深交所有限公告日期，其它日期未覆盖/);
 });
 test('readout displays full denominator, unknown identity, source-claim scope and honest static evidence boundary',async()=>{
  const d=await diagnostic('refused'),html=render(NoticeDateReadout,{diagnostic:d,onOpen(){}});assert.match(html,/原选 2 个成员，交易所声明未核实 1 个/);assert.match(html,/交易所声明已核为SZSE的 1 个成员/);assert.match(html,/未认证证券主数据身份/);assert.match(html,/没有重新读取或认证官方原件/);assert.match(html,/前缀|截至|更早来源日/);for(const m of d.members)assert.ok(html.includes(m.snapshot_id));
@@ -44,4 +44,14 @@ test('source buttons preserve complete snapshot ID and requested cutoff even for
 });
 test('production module never fetches or invokes backend and holds immutable derived facts only',()=>{
  const source=readFileSync(new URL('../src/NoticeDateDiagnostic.tsx',import.meta.url),'utf8')+readFileSync(new URL('../src/notice-date-model.ts',import.meta.url),'utf8');assert.doesNotMatch(source,/fetch\(|\/api\/|localStorage|sessionStorage/);assert.match(source,/active=false/);assert.match(source,/state\?\.report!==report/);
+});
+
+test('v2 and legacy readouts display the actual reference coverage and separately linked official evidence',async()=>{
+ const modern=await diagnostic('mixed'),html=render(NoticeDateReadout,{diagnostic:modern,onOpen(){}});
+ assert.match(html,/本参考含上交所、深交所有限公告日期/);assert.match(html,/审查hash仅标识归档审查记录/);assert.match(html,/获取时间不表示历史当时可得/);
+ for(const n of modern.reference.notices){assert.ok(html.includes(`href="${n.url}"`));assert.ok(html.includes(n.document_id));assert.ok(html.includes(n.retrieved_at_utc));}
+ for(const evidence of Object.values(modern.reference.evidence_by_exchange)){assert.ok(html.includes(evidence.accepted_facts_sha256));assert.ok(html.includes(evidence.review_sha256));}
+ const legacy=JSON.parse(readFileSync(new URL('../src/notice-reference-v1.json',import.meta.url),'utf8'));
+ const old=await buildNoticeDiagnostic(structuredClone(fixtures.mixed.reply),legacy),oldHtml=render(NoticeDateReadout,{diagnostic:old,onOpen(){}});
+ assert.match(oldHtml,/本参考含深交所有限公告日期/);assert.match(oldHtml,/该所日期计划本包未覆盖/);assert.doesNotMatch(oldHtml,/本参考含上交所/);
 });

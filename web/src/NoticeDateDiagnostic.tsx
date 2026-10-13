@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { buildNoticeDiagnostic } from './notice-date-model.ts';
+import { buildNoticeDiagnostic, noticeReferenceExchanges } from './notice-date-model.ts';
 import type { NoticeDate, NoticeDiagnostic, NoticeExchangeResult, NoticeMember } from './notice-date-model.ts';
 import type { GroupPairReport } from './group-pair-model.ts';
 import { groupPairReason } from './group-pair-model.ts';
@@ -81,8 +81,13 @@ export function NoticeDateReadout({diagnostic:d,onOpen}: {diagnostic:NoticeDiagn
       <p>{d.reference.version} · 静态参考范围 {d.reference.scope.join(' → ')} · Asia/Shanghai · 归档复核 {d.reference.reviewed_on}</p>
       <p>临时事件与更正全集未知；命名恢复开市仅核对该单日。公告计划不保证实际全日开市或个股成交。</p>
       <p>仅校验本地派生参考内容hash；原件hash记录归档时字节身份，本次没有重新读取或认证官方原件。</p>
-      <p>附件 {d.attachment_id}；原报告 {d.parent_analysis_id}；参考 {d.reference_hash}；已核事实 {d.reference.accepted_facts_sha256}</p>
-      <ul>{d.reference.notices.map(n=><li key={n.id}><a href={n.url} target="_blank" rel="noopener noreferrer">{n.document_id}</a> · {n.exchange} · 声明发布 {n.publication_date} · 归档原字节 SHA256 {n.original_sha256}</li>)}</ul>
+      <p>本参考含{noticeReferenceExchanges(d.reference).map(e=>exchangeLabel[e]).join('、') || '零个交易所'}有限公告日期；其它日期仍未覆盖。</p>
+      <p>附件 {d.attachment_id}；原报告 {d.parent_analysis_id}；参考 {d.reference_hash}</p>
+      {d.reference.schema==='explicit-notice-reference-v1' ? <p>已核事实 {d.reference.accepted_facts_sha256}（v1归档参考）</p> : <>
+        <p>原件历史内容身份与known_at未知；获取时间不表示历史当时可得。审查hash仅标识归档审查记录，本包未附审查全文，也未实时核验官方来源。</p>
+        <ul>{Object.entries(d.reference.evidence_by_exchange).map(([exchange,evidence])=><li key={exchange}>{exchange} · 已核事实 {evidence.accepted_facts_sha256} · 归档审查 {evidence.review_sha256}</li>)}</ul>
+      </>}
+      <ul>{d.reference.notices.map(n=><li key={n.id}><a href={n.url} target="_blank" rel="noopener noreferrer">{n.document_id}</a> · {n.exchange} · 声明发布 {n.publication_date} · 归档原字节 SHA256 {n.original_sha256}{'retrieved_at_utc' in n && <> · 获取时间 {String(n.retrieved_at_utc)}</>}</li>)}</ul>
     </details>
   </section>;
 }
@@ -104,7 +109,7 @@ export function NoticeDateDiagnostic({report,onOpen}: {report:GroupPairReport;on
   const [open,setOpen]=useState(false);
   return <details onToggle={e=>setOpen(e.currentTarget.open)}>
     <summary>已核公告日期核对（回顾）</summary>
-    <p>本包仅含深交所有限公告日期，上交所未覆盖。不生成完整交易日历，不改原窗口或来源资格。</p>
+    <p>本包仅含{noticeReferenceExchanges().map(e=>exchangeLabel[e]).join('、')}有限公告日期，其它日期未覆盖。不生成完整交易日历，不改原窗口或来源资格。</p>
     {open && <Calculation report={report} onOpen={onOpen}/>}
   </details>;
 }
