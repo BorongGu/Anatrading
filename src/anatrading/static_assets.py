@@ -71,6 +71,7 @@ def _load_manifest(root):
                 or not isinstance(data["assets"], list) or len(data["assets"]) > 1024):
             raise ValueError("manifest_schema")
         result = {}
+        folded_paths = set()
         for item in data["assets"]:
             if not isinstance(item, dict) or set(item) != set(_Asset.__dataclass_fields__):
                 raise ValueError("manifest_asset_schema")
@@ -83,9 +84,10 @@ def _load_manifest(root):
                            for size in (asset.identity_bytes, asset.gzip_bytes))
                     or any(not isinstance(tag, str) or not re.fullmatch(r"[0-9a-f]{64}", tag)
                            for tag in (asset.identity_sha256, asset.gzip_sha256))
-                    or asset.identity_path in result):
+                    or asset.identity_path.casefold() in folded_paths):
                 raise ValueError("manifest_asset_value")
             result[asset.identity_path] = asset
+            folded_paths.add(asset.identity_path.casefold())
         return result
     except (OSError, ValueError, TypeError, RecursionError) as error:
         raise ValueError("invalid_static_encoding_manifest") from error
@@ -124,6 +126,7 @@ class EncodedStaticFiles(StaticFiles):
         super().__init__(directory=directory, **kwargs)
         self.root = Path(directory).resolve()
         self.assets = _load_manifest(self.root)
+        self.folded_paths = frozenset(path.casefold() for path in self.assets)
 
     async def __call__(self, scope, receive, send):
         if _reserved(scope["path"]):
@@ -176,7 +179,10 @@ class EncodedStaticFiles(StaticFiles):
         if _reserved(path):
             return Response(status_code=404)
         # StaticFiles normalizes using platform paths; manifest paths use '/'.
-        asset = self.assets.get(path.replace(os.sep, "/"))
+        normalized = path.replace(os.sep, "/")
+        asset = self.assets.get(normalized)
+        if asset is None and normalized.casefold() in self.folded_paths:
+            return Response(status_code=404)
         if asset is None:
             return await super().get_response(path, scope)
         headers = {"Vary": "Accept-Encoding", "Accept-Ranges": "none", "X-Content-Type-Options": "nosniff"}

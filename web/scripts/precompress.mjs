@@ -26,13 +26,16 @@ export async function precompress(directory) {
   const root = resolve(directory);
   await directoryOnly(root);
   await directoryOnly(join(root, 'assets'));
+  const entries = (await readdir(join(root, 'assets'))).filter(name => /\.(js|css)$/.test(name)).sort();
+  if (entries.length > 1024) throw new Error('too_many_generated_assets');
+  if (new Set(entries.map(name => name.toLowerCase())).size !== entries.length) {
+    throw new Error('generated_asset_case_collision');
+  }
   await directoryOnly(join(root, '.encoded'), true);
   await directoryOnly(join(root, '.encoded/assets'), true);
   await outputOnly(join(root, '.static-encodings.json'));
   const assets = [];
-  const entries = (await readdir(join(root, 'assets'))).sort();
   for (const name of entries) {
-    if (!/\.(js|css)$/.test(name)) continue;
     if (!assetName.test(name)) throw new Error('invalid_generated_asset_name');
     const identity_path = `assets/${name}`;
     const source = join(root, identity_path);
@@ -49,7 +52,6 @@ export async function precompress(directory) {
       identity_bytes: identity.length, gzip_bytes: encoded.length,
       media_type: name.endsWith('.js') ? 'text/javascript' : 'text/css', cap: CAP });
   }
-  if (assets.length > 1024) throw new Error('too_many_generated_assets');
   const manifest = JSON.stringify({ schema_version: 1, assets }, null, 2) + '\n';
   if (Buffer.byteLength(manifest) > 1_048_576) throw new Error('manifest_size_cap');
   await writeFile(join(root, '.static-encodings.json'), manifest);

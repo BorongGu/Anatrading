@@ -291,3 +291,29 @@ def test_fifo_rejected_before_open(built):
     manifest.unlink(); os.mkfifo(manifest)
     with pytest.raises(ValueError, match="invalid_static_encoding_manifest"):
         module.EncodedStaticFiles(directory=root)
+
+
+@pytest.mark.parametrize("alias", ["ASSETS/index-12345678.js", "assets/INDEX-12345678.js", "assets/index-12345678.JS"])
+@pytest.mark.parametrize("method", ["GET", "HEAD"])
+def test_target_case_alias_never_reaches_legacy_fallback(built, monkeypatch, alias, method):
+    # Explicit synthetic permissive fallback, not a claim of native Windows testing.
+    delegated = []
+    async def permissive_fallback(self, path, request):
+        delegated.append(path)
+        return module.Response(BODY, headers={"X-Synthetic-Legacy": "reached"})
+    monkeypatch.setattr(module.StaticFiles, "get_response", permissive_fallback)
+    root, _, _ = built
+    result = run(root, path="/"+alias, method=method, headers=[
+        (b"accept-encoding", b"gzip,identity;q=0"), (b"range", b"bytes=0-4")])
+    assert result[0] == 404
+    assert not delegated and not result[2]
+
+
+def test_manifest_rejects_casefold_target_collision(built):
+    root, manifest, _ = built
+    other = dict(manifest["assets"][0], identity_path="assets/Index-12345678.js",
+                 gzip_path=".encoded/assets/Index-12345678.js.gz")
+    manifest["assets"].append(other)
+    (root / module.MANIFEST).write_text(json.dumps(manifest))
+    with pytest.raises(ValueError, match="invalid_static_encoding_manifest"):
+        module.EncodedStaticFiles(directory=root)

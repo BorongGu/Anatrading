@@ -78,3 +78,24 @@ test('build rejects symlink parents, outputs and manifest without writing throug
     assert.equal(await readFile(join(outside, 'sentinel'), 'utf8'), 'unchanged');
   }
 });
+
+test('1025 generated targets fail before creating any encoded outputs', async (t) => {
+  const root = await fixture(t);
+  for (let i = 0; i < 1025; i++) await writeFile(join(root, `assets/part${i}-12345678.js`), 'synthetic');
+  await assert.rejects(precompress(root), /too_many_generated_assets/);
+  await assert.rejects(readFile(join(root, '.static-encodings.json')), { code: 'ENOENT' });
+  const { lstat } = await import('node:fs/promises');
+  await assert.rejects(lstat(join(root, '.encoded')), { code: 'ENOENT' });
+});
+
+test('case-colliding generated names cannot produce a runtime-invalid manifest', async (t) => {
+  const root = await fixture(t);
+  await writeFile(join(root, 'assets/name-12345678.js'), 'synthetic');
+  await writeFile(join(root, 'assets/Name-12345678.js'), 'synthetic');
+  const { readdir } = await import('node:fs/promises');
+  if ((await readdir(join(root, 'assets'))).length !== 2) {
+    t.skip('filesystem cannot represent the two case-colliding names'); return;
+  }
+  await assert.rejects(precompress(root), /generated_asset_case_collision/);
+  await assert.rejects(readFile(join(root, '.static-encodings.json')), { code: 'ENOENT' });
+});
