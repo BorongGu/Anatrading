@@ -104,3 +104,7 @@ phase 精确取 `dns/connect/tls/http/read/unknown`。仅窄 create_connection �
 | C1 | CLI成功/错误退出、按键读取／旧summary缺字段约定、strict-v1/legacy黄金摘要 |
 
 当前仅本地提交，未推送／创建PR／合并。上述结果不赋予实源出口、长期来源可用性、Windows原生、浏览器、性能或预测资格。
+
+## 2026-10-13：capture-only隔离模式
+
+新增 `acquire-public --capture-only` 及不可变v2计划路由，具体范围、失败记录和最终离线证据见[067验收](067-capture-only-public-acquisition.md)。默认v1导入继续保留，捕获模式不构造Store、不触碰数据库，共享原锁／来源状态／发送预算；捕获不等于入库或研究已验。原历史来源限制与预算未恢复，真实发送仍NO-GO，本节不更新上列真实来源资格，也不支持用空目录重置历史。

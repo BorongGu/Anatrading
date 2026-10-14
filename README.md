@@ -107,6 +107,8 @@ Windows 将可执行文件替换为 `.\.venv\Scripts\anatrading.exe`，其余参
 
 `acquire-public` 和 `resume-public` 已实现，仅支持显式声明为股票的沪深证券：腾讯日线按指定日期范围分块，新浪 1m/5m 读取最近窗口。代码和交易所格式通过不等于证券品类已核实；请求未复权也不自动证明来源调整口径。
 
+可选 `acquire-public --capture-only` 仅保存未经研究资格验收的捕获，不打开数据库；要求原 `root/public_acquisition/sources` 已存在并保留来源限制／预算历史。非空成功为 `captured`，不等于已导入；`resume-public RUN_ID` 自动坚持原计划模式，无切换选项。完整捕获恢复不重发，混合完成与失败返回 `partial`／exit2。旧二进制可能在拒绝v2计划前打开Store，必须配套升级，禁止降级恢复。当前真实网络仍NO-GO，不能用新建空目录代替旧历史核验。[离线范围与验收](docs/qualification/067-capture-only-public-acquisition.md)。
+
 在服务关闭时使用以下 Linux 命令示例；日期和证券须按实际任务修改：
 
 ```bash

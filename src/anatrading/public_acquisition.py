@@ -19,10 +19,11 @@ from .models import DecodeError, NonMarketPayload, VERSIONS
 from .public_market import (CAPTURE_VERSION, MAX_CAPTURE_BYTES, build_capture, build_request, canonical_json,
                             capture_rows, decoder_identity, preflight_capture, validate_capture, validate_request)
 from .public_http_worker import _SAFE_CODES as _TRANSPORT_ERRORS
-from .store import EvidenceStore, StoreError, _identity
+from .store import EvidenceStore, StoreError, _identity, _DirectoryLock
 
 
 _PLAN_VERSION = 'public-market-plan-v1'
+_CAPTURE_PLAN_VERSION = 'public-market-plan-v2'
 _JOURNAL_VERSION = 'public-market-journal-v1'
 _RESERVATION_VERSION = 'public-market-reservation-v1'
 _MAX_ATTEMPTS = 10
@@ -239,7 +240,7 @@ class _Directory:
         self.sync()
 
 
-def _plan(source, symbol, asset_type, period, start=None, end=None, count=None, *, run_id=None, reference=None):
+def _plan(source, symbol, asset_type, period, start=None, end=None, count=None, *, run_id=None, reference=None, capture_only=False):
     if asset_type != 'stock' or type(asset_type) is not str:
         _fail('explicit_stock_declaration_required')
     if type(source) is not str or source not in _FORMAT:
@@ -287,6 +288,8 @@ def _plan(source, symbol, asset_type, period, start=None, end=None, count=None, 
                 maximum_attempts=_MAX_ATTEMPTS,
                 parameters=dict(source=source, symbol=symbol, asset_type=asset_type, period=period,
                                 start=start, end=end, count=count), blocks=blocks)
+    if capture_only:
+        plan.update(version=_CAPTURE_PLAN_VERSION, execution_mode='capture_only')
     plan['plan_sha256'] = _hash(canonical_json(plan))
     return plan
 
@@ -297,7 +300,8 @@ def _read_plan(directory, run_id):
         for block in value['blocks']:
             if block['decoder_identity'] != decoder_identity(block['format_id']):
                 _fail('decoder_version_mismatch')
-        expected = _plan(**value['parameters'], run_id=run_id, reference=value['observation_reference_utc'])
+        expected = _plan(**value['parameters'], run_id=run_id, reference=value['observation_reference_utc'],
+                         capture_only=value.get('version') == _CAPTURE_PLAN_VERSION)
         if value != expected:
             _fail('plan_identity_mismatch')
         return value
@@ -410,6 +414,14 @@ def _read_journal(directory, plan):
             elif any(item[key] is not None for key in committed_fields):
                 _fail('corrupt_journal')
             if item['status'] in {'captured', 'empty_result'} and item['capture_sha256'] is None:
+                _fail('corrupt_journal')
+        if _capture_only(plan):
+            for item in result['attempts']:
+                if (item['status'] == 'committed' or item['reused']
+                        or any(item[key] is not None for key in ('store_attempt_id', 'raw_sha256', 'batch_id', 'snapshot_id'))
+                        or 'revision' in item['diagnostics']):
+                    _fail('corrupt_journal')
+            if any(type(block) is not dict or block.get('status') == 'committed' for block in result['blocks']):
                 _fail('corrupt_journal')
         for block, expected in zip(result['blocks'], template['blocks']):
             if (type(block) is not dict or set(block) != set(expected) or block['block_id'] != expected['block_id']
@@ -566,6 +578,25 @@ def _revision(store, decoded, capture, block):
                 body_changed_without_market_rows=(old == new and previous['metadata'].get('body_sha256') != capture.envelope['body_sha256']))
 
 
+def _capture_only(plan):
+    return plan.get('execution_mode') == 'capture_only'
+
+
+def _finalize_capture(store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled):
+    """Validate source shape only; never import or confer research qualification."""
+    try:
+        capture = validate_capture(raw, plan['blocks'][index]['format_id'])
+        diagnostics = _diagnostics(capture, plan)
+        if attempt['status'] in {'captured', 'empty_result'} and attempt['diagnostics'] and attempt['diagnostics'] != diagnostics:
+            _fail('commit_identity_mismatch')
+        attempt['diagnostics'] = diagnostics
+        _state(journal, index, 'captured' if capture.payload else 'empty_result', attempt=attempt)
+        _save(directory, journal)
+    except DecodeError as error:
+        _state(journal, index, 'failed_terminal', error.code, attempt)
+        _save(directory, journal)
+
+
 def _commit(store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled):
     block = plan['blocks'][index]
     try:
@@ -674,7 +705,8 @@ def _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelle
                     if attempt['status'] not in {'committed', 'empty_result'}:
                         _state(journal, index, 'captured', attempt=attempt)
                         _save(directory, journal)
-                    _commit(store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled)
+                    (_finalize_capture if _capture_only(plan) else _commit)(
+                        store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled)
             elif attempt['capture_sha256'] is not None or attempt['status'] in {'captured', 'committed', 'empty_result'}:
                 _fail('missing_capture')
             elif attempt['status'] == 'requested':
@@ -709,6 +741,7 @@ def _source_blocked(source_dir, source):
 
 def _summary(store, plan, journal, elapsed, transport_diagnostics):
     states = [block['status'] for block in journal['blocks']]
+    capture_only = _capture_only(plan)
     stopped = next((b for b in journal['blocks'] if b['status'] not in {'committed', 'empty_result', 'pending'}), None)
     if all(state == 'committed' for state in states):
         status = 'committed'
@@ -718,6 +751,15 @@ def _summary(store, plan, journal, elapsed, transport_diagnostics):
         status = 'empty_result'
     else:
         status = stopped['status'] if stopped else 'interrupted'
+    if capture_only:
+        done = {'captured', 'empty_result'}
+        stopped = next((b for b in journal['blocks'] if b['status'] not in done | {'pending'}), None)
+        if all(state in done for state in states):
+            status = 'captured' if 'captured' in states else 'empty_result'
+        elif any(state in done for state in states):
+            status = 'partial'
+        else:
+            status = stopped['status'] if stopped else 'interrupted'
     allowed = bool(stopped and stopped['status'] in {'failed_transient', 'interrupted'}
                    and stopped['error_code'] != 'transport_shutdown_unconfirmed'
                    and len(journal['attempts']) < _MAX_ATTEMPTS)
@@ -727,7 +769,7 @@ def _summary(store, plan, journal, elapsed, transport_diagnostics):
         spec = validate_request(definition['request'], definition['source'])
         requested_range = dict(start=spec['start'], end=spec['end']) if spec['start'] is not None else None
         view = None
-        if block['status'] == 'committed' and requested_range is not None:
+        if not capture_only and block['status'] == 'committed' and requested_range is not None:
             query = store.query(attempt['snapshot_id'])
             rows = [dict(ordinal=row['ordinal'], locator=row['locator'], label=row['label']) for row in query['rows']
                     if requested_range['start'] <= row['label'] <= requested_range['end']]
@@ -739,13 +781,63 @@ def _summary(store, plan, journal, elapsed, transport_diagnostics):
         blocks.append({**block, **{key: attempt.get(key) for key in ('snapshot_id', 'store_attempt_id', 'raw_sha256',
                        'batch_id', 'capture_sha256', 'reused', 'diagnostics')}, 'attempt_id': attempt.get('store_attempt_id'),
                        'request': definition['request'], 'requested_range': requested_range, 'target_view': view})
-    return dict(run_id=plan['run_id'], plan_sha256=plan['plan_sha256'], source=plan['parameters']['source'],
+        if capture_only:
+            blocks[-1]['reused'] = False
+    return dict(**({'execution_mode': 'capture_only'} if capture_only else {}),
+                run_id=plan['run_id'], plan_sha256=plan['plan_sha256'], source=plan['parameters']['source'],
                 requested_symbol=plan['parameters']['symbol'], period=plan['parameters']['period'], status=status,
                 error_code=stopped['error_code'] if stopped else None, stop_reason=stopped['error_code'] if stopped else None,
                 resume_allowed=allowed, attempts_used=len(journal['attempts']),
                 attempts_remaining=_MAX_ATTEMPTS-len(journal['attempts']), blocks=blocks,
                 quantity_normalization='unstandardized', coverage='unverified', elapsed_seconds=round(elapsed, 3),
                 transport_diagnostics=transport_diagnostics)
+
+
+class _CaptureLockPath:
+    """Narrow path adapter: reuse Store's OS lock with a no-follow dirfd open."""
+    def __init__(self, directory):
+        self.directory = directory
+
+    def __truediv__(self, name):
+        if name != '.operation.lock':
+            _fail('unsafe_path')
+        return self
+
+    def open(self, mode):
+        if mode != 'a+b':
+            _fail('unsafe_path')
+        self.directory.exists('.operation.lock')
+        fd = os.open('.operation.lock', os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW,
+                     0o600, dir_fd=self.directory.fd)
+        try:
+            info = os.fstat(fd)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                _fail('unsafe_path')
+            return os.fdopen(fd, mode)
+        except BaseException:
+            os.close(fd)
+            raise
+
+
+def _verify_capture_root(root, directory, guard, public=None, source_dir=None):
+    with _Directory.root(root, create=False) as current:
+        expected, actual = os.fstat(directory.fd), os.fstat(current.fd)
+        if (expected.st_dev, expected.st_ino) != (actual.st_dev, actual.st_ino):
+            _fail('unsafe_path')
+    if public is not None:
+        with directory.child('public_acquisition') as current_public:
+            with current_public.child('sources') as current_sources:
+                for old, current in ((public, current_public), (source_dir, current_sources)):
+                    expected, actual = os.fstat(old.fd), os.fstat(current.fd)
+                    if (expected.st_dev, expected.st_ino) != (actual.st_dev, actual.st_ino):
+                        _fail('unsafe_path')
+    held = os.fstat(guard.stream.fileno())
+    named = os.stat('.operation.lock', dir_fd=directory.fd, follow_symlinks=False)
+    if (not stat.S_ISREG(named.st_mode) or named.st_nlink != 1
+            or (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)):
+        _fail('unsafe_path')
+    if '.restore-incomplete' in directory.names():
+        _fail('restore_incomplete')
 
 
 def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, cancelled=None):
@@ -756,15 +848,44 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
     deadline = started + _COMMAND_SECONDS
     resuming = plan is None
     with ExitStack() as stack:
-        safe_root = stack.enter_context(_Directory.root(root, create=not resuming))
-        store = stack.enter_context(EvidenceStore(root, checkpoint=lambda stage: checkpoint('store.' + stage)))
-        if safe_root.path != store.root or os.fstat(safe_root.fd).st_ino != os.stat(store.root).st_ino:
-            _fail('unsafe_path')
-        public = stack.enter_context(safe_root.child('public_acquisition', create=True))
-        source_dir = stack.enter_context(public.child('sources', create=True))
+        routed_plan = None
+        if resuming:
+            # Read-only routing: no recovery, source-state adoption, or Store access.
+            with _Directory.root(root, create=False) as routing_root:
+                routing_identity = os.fstat(routing_root.fd)
+                with routing_root.child('public_acquisition') as routing_public:
+                    with routing_public.child(run_id) as routing_run:
+                        routed_plan = _read_plan(routing_run, run_id)
+            plan = routed_plan
+        capture_only = _capture_only(plan)
+        done = {'captured', 'empty_result'} if capture_only else {'committed', 'empty_result'}
+        safe_root = stack.enter_context(_Directory.root(root, create=not resuming and not capture_only))
+        if capture_only:
+            # Existing authority directories must be available before any lock/run write.
+            with safe_root.child('public_acquisition') as checked_public:
+                with checked_public.child('sources'):
+                    pass
+            guard = stack.enter_context(_DirectoryLock(_CaptureLockPath(safe_root)))
+            safe_root.sync()
+            _verify_capture_root(root, safe_root, guard)
+            public = stack.enter_context(safe_root.child('public_acquisition'))
+            source_dir = stack.enter_context(public.child('sources'))
+            if resuming:
+                current_identity = os.fstat(safe_root.fd)
+                if (routing_identity.st_dev, routing_identity.st_ino) != (current_identity.st_dev, current_identity.st_ino):
+                    _fail('unsafe_path')
+            store = None
+        else:
+            store = stack.enter_context(EvidenceStore(root, checkpoint=lambda stage: checkpoint('store.' + stage)))
+            if safe_root.path != store.root or os.fstat(safe_root.fd).st_ino != os.stat(store.root).st_ino:
+                _fail('unsafe_path')
+            public = stack.enter_context(safe_root.child('public_acquisition', create=True))
+            source_dir = stack.enter_context(public.child('sources', create=True))
         if resuming:
             directory = stack.enter_context(public.child(run_id))
             plan = _read_plan(directory, run_id)
+            if plan != routed_plan:
+                _fail('plan_identity_mismatch')
             journal = _read_journal(directory, plan)
         else:
             directory = stack.enter_context(public.child(plan['run_id'], create=True))
@@ -776,7 +897,7 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
         next_send = time.monotonic() + (_SEND_INTERVAL if resuming else 0)
         for index, block in enumerate(plan['blocks']):
             current = journal['blocks'][index]
-            if current['status'] in {'committed', 'empty_result'}:
+            if current['status'] in done:
                 continue
             if current['status'] in _STOP_STATES or current['error_code'] in {'commit_outcome_unavailable', 'transport_shutdown_unconfirmed'}:
                 break
@@ -810,6 +931,8 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                 _save(directory, journal)
                 checkpoint('attempt_requested')
                 try:
+                    if capture_only:
+                        _verify_capture_root(root, safe_root, guard, public, source_dir)
                     received = transport(block['request'], deadline=min(deadline, time.monotonic()+_ATTEMPT_SECONDS), cancelled=cancelled)
                     next_send = time.monotonic() + _SEND_INTERVAL
                     attempt['transport'] = dict(status=received['status'], byte_count=len(received['body']),
@@ -825,7 +948,8 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                     _state(journal, index, 'captured', attempt=attempt)
                     _save(directory, journal)
                     checkpoint('capture_recorded')
-                    _commit(store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled)
+                    (_finalize_capture if _capture_only(plan) else _commit)(
+                        store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled)
                 except PublicTransportError as error:
                     code = error.code
                     attempt['transport'] = dict(status=getattr(error, 'status', None), byte_count=getattr(error, 'byte_count', 0),
@@ -855,14 +979,16 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                 except DecodeError as error:
                     _state(journal, index, 'failed_terminal', error.code, attempt)
                     _save(directory, journal)
-            if journal['blocks'][index]['status'] not in {'committed', 'empty_result'}:
+            if journal['blocks'][index]['status'] not in done:
                 break
         return _summary(store, plan, journal, time.monotonic()-started, transport_diagnostics)
 
 
 def acquire_public(root, *, source, symbol, asset_type, period, start=None, end=None, count=None,
-                   _transport=None, _checkpoint=None, _cancelled=None, _now=None):
-    plan = _plan(source, symbol, asset_type, period, start, end, count, reference=_utc(_now))
+                   capture_only=False, _transport=None, _checkpoint=None, _cancelled=None, _now=None):
+    if type(capture_only) is not bool:
+        _fail('invalid_public_options')
+    plan = _plan(source, symbol, asset_type, period, start, end, count, reference=_utc(_now), capture_only=capture_only)
     return _execute(root, plan, transport=_transport, checkpoint=_checkpoint, cancelled=_cancelled)
 
 
