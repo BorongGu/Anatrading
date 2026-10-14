@@ -14,7 +14,11 @@ import type { Query } from './types.ts';
 import type { Distribution, ResearchEnvelope, SingleResult } from './research-types.ts';
 
 const EVENT_PAGE_SIZE = 100;
-type EventLedgerView = { token: object; report: ResearchEnvelope<SingleResult>; generation: number; context: ReversalContext; page: number };
+type ReportContext = ReversalContext & { period: string | undefined; qualification: string | undefined; knownNegative: boolean };
+function sourceContextMatches(a: ReportContext, b: ReportContext) {
+  return a.period === b.period && a.qualification === b.qualification && a.knownNegative === b.knownNegative;
+}
+type EventLedgerView = { token: object; report: ResearchEnvelope<SingleResult>; generation: number; context: ReportContext; page: number };
 
 export function SingleResearch({ query, onReport }: { query: Query; onReport?: (queryId: string, report: ResearchEnvelope<SingleResult> | null) => void }) {
   const [lookback, setLookback] = useState('20');
@@ -30,7 +34,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const [reversalSource, setReversalSource] = useState<ReversalSource | null>(null);
   const [reversalIssue, setReversalIssue] = useState('');
   const activeReversal = useRef<ReversalSource | null>(null);
-  const reversalContext: ReversalContext = { ownerQueryId: query.query_id, snapshotId: query.snapshot_id, batchId: query.batch_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
+  const reversalContext: ReportContext = { period: query.metadata.period, qualification: query.manifest?.qualification, knownNegative: query.batch_checks?.some(check => check.name === 'known_negative_sample' && check.outcome === 'fail') ?? false, ownerQueryId: query.query_id, snapshotId: query.snapshot_id, batchId: query.batch_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
   const currentReversalContext = useRef(reversalContext); currentReversalContext.current = reversalContext;
   type PathSelection = { token: object; position: number; projection: EventPathProjection | null; issue: string; trigger: HTMLButtonElement };
   const [selection, setSelection] = useState<PathSelection | null>(null);
@@ -45,7 +49,8 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const previousReversalContext = useRef(reversalContext);
   function viewIsCurrent() {
     return view !== null && activeView.current === view && view.report === report
-      && gate.current.isCurrent(view.generation) && reversalContextMatches(view.context, currentReversalContext.current);
+      && gate.current.isCurrent(view.generation) && reversalContextMatches(view.context, currentReversalContext.current)
+      && sourceContextMatches(view.context, currentReversalContext.current);
   }
   function closePath() {
     if (!viewIsCurrent() || !accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
@@ -63,7 +68,8 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
       const request = buildResearchRequest('single', [query.snapshot_id], query.selection.cutoff ?? '', Number(lookback), Number(horizon), testStart);
       const controller = new AbortController(); abort.current = controller; setPhase('loading');
       const result = await jsonRequest<ResearchEnvelope<SingleResult>>(request.path, { signal: controller.signal });
-      if (!gate.current.isCurrent(generation) || !reversalContextMatches(requestedReversalContext, currentReversalContext.current)) return;
+      if (!gate.current.isCurrent(generation) || !reversalContextMatches(requestedReversalContext, currentReversalContext.current)
+        || !sourceContextMatches(requestedReversalContext, currentReversalContext.current)) return;
       assertResearchReply(result, request.expected);
       // Consumers must treat each published report as read-only. Every complete
       // acceptance is a new ownership generation, even for the same object/ID.
@@ -84,13 +90,13 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   }
   useEffect(() => {
     const previousReversal = previousReversalContext.current; previousReversalContext.current = reversalContext;
-    if (previousReversal.ownerQueryId === reversalContext.ownerQueryId && !reversalContextMatches(previousReversal, reversalContext)) invalidate();
+    if (previousReversal.ownerQueryId === reversalContext.ownerQueryId && (!reversalContextMatches(previousReversal, reversalContext) || !sourceContextMatches(previousReversal, reversalContext))) invalidate();
     const previous = previousContext.current; previousContext.current = context;
     // A normal query-ID replacement is handled by load below. An abnormal
     // same-ID context change still permanently invalidates, with no auto-fetch.
     if (previous.ownerQueryId === context.ownerQueryId && (previous.snapshotId !== context.snapshotId || previous.cutoff !== context.cutoff
       || previous.ordinalStart !== context.ordinalStart || previous.ordinalEnd !== context.ordinalEnd)) invalidate();
-  }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end]);
+  }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end, reversalContext.period, reversalContext.qualification, reversalContext.knownNegative]);
   useEffect(() => { void load(); return () => { activeView.current = null; activeReversal.current = null; active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
   const viewCurrent = viewIsCurrent();
   const eventCount = viewCurrent ? report!.result.events.rows.length : 0;
@@ -113,7 +119,10 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
     try { selectPath({ token: accepted.token, position, projection: captureEventPath(accepted, position), issue: '', trigger: button }); }
     catch (error) { selectPath({ token: accepted.token, position, projection: null, issue: error instanceof EventPathError ? error.code : 'event_link', trigger: button }); }
   }
-  const result = report?.result; const latest = result?.series.at(-1);
+  // The accepted generation must own every report-derived display on this
+  // commit, before passive invalidation clears stale state.
+  const visibleReport = viewCurrent ? report : null;
+  const result = visibleReport?.result; const latest = result?.series.at(-1);
   const evaluation = result?.events;
   const part = evaluation?.partitions[partition] ?? evaluation?.partitions.descriptive ?? evaluation;
   return <><section className="panel research-panel" aria-label="日线趋势与历史事件">
@@ -127,8 +136,8 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
     </form>
     <p className="inline-note research-scope">趋势从截止前完整历史初始化；图形的记录序号范围不裁剪研究历史。</p>
     {issue && <p className="error-banner" role="alert">{issue}</p>}
-    {!report && !issue && <p className="research-loading" role="status">{phase === 'loading' ? '正在按同一截止日期计算完整历史…' : '参数已变更，请更新研究。'}</p>}
-    {report && latest && <>
+    {!visibleReport && !issue && <p className="research-loading" role="status">{phase === 'loading' ? '正在按同一截止日期计算完整历史…' : '参数已变更，请更新研究。'}</p>}
+    {visibleReport && latest && <>
       <div className="research-columns">
         <article className="research-subsection"><div className="section-heading"><h3>当前趋势</h3><span className="subtle">{latest.date}</span></div>
           <p className="result-statement">{latest.status === 'warming_up' ? '估计预热中' : latest.status === 'invalid' ? '当前记录无法估计' : latest.kalman_slope === null ? '斜率暂无结果' : latest.kalman_slope > 0 ? '估计斜率为正' : latest.kalman_slope < 0 ? '估计斜率为负' : '估计斜率为零'}</p>
@@ -181,11 +190,11 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
           </Fragment>;
         })}</tbody></table></div><p className="subtle">每页最多100个事件；上方统计使用完整研究范围。</p></>}
       </details>}
-      <ResearchProvenance report={report} />
+      <ResearchProvenance report={visibleReport} />
     </>}
-    {reversalIssue && <p role="status">{reversalIssue}</p>}
-    {reversalSource && <CloseReversalRecords source={reversalSource} isCurrent={source => activeReversal.current === source && source.report === report && reversalContextMatches(source.context, currentReversalContext.current)} />}
-    {report && !latest && <p className="research-loading">截止范围内没有可研究的日线记录。</p>}
+    {viewCurrent && reversalIssue && <p role="status">{reversalIssue}</p>}
+    {viewCurrent && reversalSource && <CloseReversalRecords source={reversalSource} isCurrent={source => activeReversal.current === source && source.report === report && reversalContextMatches(source.context, currentReversalContext.current)} />}
+    {visibleReport && !latest && <p className="research-loading">截止范围内没有可研究的日线记录。</p>}
   </section><HistoricalPathResearch query={query} /></>;
 }
 
