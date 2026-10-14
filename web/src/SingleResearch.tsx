@@ -13,12 +13,18 @@ import { EstimatePlot, Metric, ResearchProvenance } from './ResearchResults.tsx'
 import type { Query } from './types.ts';
 import type { Distribution, ResearchEnvelope, SingleResult } from './research-types.ts';
 
+const EVENT_PAGE_SIZE = 100;
+type EventLedgerView = { token: object; report: ResearchEnvelope<SingleResult>; generation: number; context: ReversalContext; page: number };
+
 export function SingleResearch({ query, onReport }: { query: Query; onReport?: (queryId: string, report: ResearchEnvelope<SingleResult> | null) => void }) {
   const [lookback, setLookback] = useState('20');
   const [horizon, setHorizon] = useState('5');
   const [testStart, setTestStart] = useState('');
   const [partition, setPartition] = useState('test');
   const [report, setReport] = useState<ResearchEnvelope<SingleResult> | null>(null);
+  const [view, setView] = useState<EventLedgerView | null>(null);
+  const activeView = useRef<EventLedgerView | null>(null);
+  function setLedgerView(next: EventLedgerView | null) { activeView.current = next; setView(next); }
   const [accepted, setAccepted] = useState<AcceptedEventPath | null>(null);
   const [pathIssue, setPathIssue] = useState('');
   const [reversalSource, setReversalSource] = useState<ReversalSource | null>(null);
@@ -37,15 +43,19 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const currentContext = useRef(context); currentContext.current = context;
   const previousContext = useRef(context);
   const previousReversalContext = useRef(reversalContext);
+  function viewIsCurrent() {
+    return view !== null && activeView.current === view && view.report === report
+      && gate.current.isCurrent(view.generation) && reversalContextMatches(view.context, currentReversalContext.current);
+  }
   function closePath() {
-    if (!accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
+    if (!viewIsCurrent() || !accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
       || !eventPathBelongs(accepted, report, currentContext.current) || !selection || selected.current !== selection || selection.token !== accepted.token) return;
     selectPath(null); if (selection.trigger.isConnected) selection.trigger.focus();
   }
   const [phase, setPhase] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading');
   const [issue, setIssue] = useState('');
   const gate = useRef(new Generation()); const abort = useRef<AbortController | null>(null);
-  function invalidate() { activeReversal.current = null; setReversalSource(null); setReversalIssue(''); active.current = null; acceptedGeneration.current = null; setAccepted(null); selectPath(null); setPathIssue(''); gate.current.invalidate(); abort.current?.abort(); setReport(null); onReport?.(query.query_id, null); setIssue(''); setPhase('idle'); }
+  function invalidate() { setLedgerView(null); activeReversal.current = null; setReversalSource(null); setReversalIssue(''); active.current = null; acceptedGeneration.current = null; setAccepted(null); selectPath(null); setPathIssue(''); gate.current.invalidate(); abort.current?.abort(); setReport(null); onReport?.(query.query_id, null); setIssue(''); setPhase('idle'); }
   async function load() {
     invalidate(); const generation = gate.current.current();
     const requestedReversalContext = { ...reversalContext };
@@ -68,6 +78,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
         const next = captureReversalSource(result, requestedReversalContext, request.expected);
         activeReversal.current = next; setReversalSource(next);
       } catch { setReversalIssue('来源证据未能完整对应，收盘反转暂不可计算；原研究保留。'); }
+      setLedgerView({ token: {}, report: result, generation, context: { ...requestedReversalContext }, page: 0 });
       setReport(result); onReport?.(query.query_id, result); setPhase('ready');
     } catch (error) { if (gate.current.isCurrent(generation)) { setIssue(explainResearch(error)); setPhase('error'); } }
   }
@@ -80,12 +91,23 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
     if (previous.ownerQueryId === context.ownerQueryId && (previous.snapshotId !== context.snapshotId || previous.cutoff !== context.cutoff
       || previous.ordinalStart !== context.ordinalStart || previous.ordinalEnd !== context.ordinalEnd)) invalidate();
   }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end]);
-  useEffect(() => { void load(); return () => { activeReversal.current = null; active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
-  const pathAvailable = accepted !== null && active.current === accepted && acceptedGeneration.current !== null
+  useEffect(() => { void load(); return () => { activeView.current = null; activeReversal.current = null; active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
+  const viewCurrent = viewIsCurrent();
+  const eventCount = viewCurrent ? report!.result.events.rows.length : 0;
+  const pageCount = Math.ceil(eventCount / EVENT_PAGE_SIZE);
+  const pageEnd = Math.max(0, eventCount - EVENT_PAGE_SIZE * (view?.page ?? 0));
+  const pageStart = Math.max(0, pageEnd - EVENT_PAGE_SIZE);
+  function changePage(page: number) {
+    if (!view || activeView.current !== view || !viewIsCurrent() || !Number.isSafeInteger(page) || page < 0 || page >= pageCount || page === view.page) return;
+    // Revoke the previous page synchronously, including callbacks that captured
+    // no selection. Returning to its number never restores its identity.
+    selectPath(null); setLedgerView({ ...view, page });
+  }
+  const pathAvailable = viewCurrent && accepted !== null && active.current === accepted && acceptedGeneration.current !== null
     && gate.current.isCurrent(acceptedGeneration.current) && horizon === '5' && eventPathBelongs(accepted, report, context);
   const shown = pathAvailable && selection?.token === accepted.token ? selection : null;
   function choosePath(position: number, button: HTMLButtonElement) {
-    if (!accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
+    if (!viewIsCurrent() || position < pageStart || position >= pageEnd || !accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
       || horizon !== '5' || selected.current !== selection || !eventPathBelongs(accepted, report, currentContext.current)) return;
     if (selection?.token === accepted.token && selection.position === position) { closePath(); return; }
     try { selectPath({ token: accepted.token, position, projection: captureEventPath(accepted, position), issue: '', trigger: button }); }
@@ -137,20 +159,28 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
           <details className="calculation-note"><summary>怎样理解这些数字</summary><p>价格变化 = 观察跨度末收盘价 ÷ 事件日收盘价 − 1。只纳入截止日前已成熟、路径有效的标签；不把尚未成熟的事件算成零。</p><p>{evaluation?.test_start ? `测试段从 ${evaluation.test_start} 开始。训练标签跨过切点时排除；切点和规则未经过搜索。` : '尚未指定测试切点；当前为全段描述，不称样本外检验。'}</p><p>基线采用相同时间分区、突破前窗可计算且标签有效的全部日期。它不是随机对照。</p></details>
         </article>
       </div>
-      <details className="calculation-note" onToggle={event => { if (!event.currentTarget.open) closePath(); }} onKeyDown={event => { if (event.key === 'Escape' && shown) { event.preventDefault(); event.stopPropagation(); closePath(); } }}>
+      {viewCurrent && <details className="calculation-note" onToggle={event => { if (!event.currentTarget.open) closePath(); }} onKeyDown={event => { if (event.key === 'Escape' && shown) { event.preventDefault(); event.stopPropagation(); closePath(); } }}>
         <summary>查看事件记录（{evaluation?.rows.length ?? 0}）</summary>
         {horizon !== '5' && <p className="subtle">后续收盘明细仅支持观察跨度5；切换跨度后请更新研究。</p>}
         {pathIssue && <p role="status">后续收盘与事件记录未能对应，暂不提供明细；原报告保留。（{pathIssue}）</p>}
-        <div className="table-scroll"><table><thead><tr><th>事件日期</th><th>标签终点</th><th>价格变化</th><th>评价状态</th>{pathAvailable && <th>后续收盘</th>}</tr></thead><tbody>{evaluation?.rows.slice(-100).map((row, offset) => {
-          const position = Math.max(0, evaluation.rows.length - 100) + offset, open = shown?.position === position;
+        {eventCount === 0 ? <p>当前研究范围没有突破事件。</p> : <>
+        <div aria-label="事件分页">
+          <p>第 {view!.page + 1}/{pageCount} 页（从最近一页起） · 事件 {pageStart + 1}–{pageEnd} / {eventCount}</p>
+          <button type="button" disabled={view!.page === 0} onClick={() => changePage(0)}>最近一页</button>
+          <button type="button" disabled={view!.page === 0} onClick={() => changePage(view!.page - 1)}>较新一页</button>
+          <button type="button" disabled={view!.page === pageCount - 1} onClick={() => changePage(view!.page + 1)}>较早一页</button>
+          <button type="button" disabled={view!.page === pageCount - 1} onClick={() => changePage(pageCount - 1)}>最早一页</button>
+        </div>
+        <div className="table-scroll"><table><thead><tr><th>事件日期</th><th>标签终点</th><th>价格变化</th><th>评价状态</th>{pathAvailable && <th>后续收盘</th>}</tr></thead><tbody>{evaluation?.rows.slice(pageStart, pageEnd).map((row, offset) => {
+          const position = pageStart + offset, open = shown?.position === position;
           return <Fragment key={`${row.ordinal}-${row.date}`}><tr><th>{row.date}</th><td>{row.label_end ?? '尚未成熟'}</td><td>{formatPercent(row.price_change)}</td><td>{researchReason(row.evaluation_status)}{row.label_reason ? ` · ${researchReason(row.label_reason)}` : ''}</td>
             {pathAvailable && <td><button type="button" aria-expanded={open} aria-controls={`${pathId}-${position}`} onClick={event => choosePath(position, event.currentTarget)}>查看后续收盘</button></td>}</tr>
             {open && shown && <tr><td colSpan={5} id={`${pathId}-${position}`}>{shown.projection
               ? <SingleEventPath projection={shown.projection} partition={evaluation.test_start ? partition : 'descriptive'} onClose={closePath} />
               : <section aria-label="六槽关联错误"><p role="alert">本条后续收盘与事件记录未能对应，暂不展开。原事件和原报告仍保留。</p><details><summary>数据来源与原始状态</summary><p>事件 index {row.index} · {row.date} · 源序号 {row.ordinal} · selected：{row.selected ? '是' : '否'} · partition：{row.partition} · label_status：{row.label_status} · evaluation_status：{row.evaluation_status}</p><p>诊断：event_path_inconsistent / {shown.issue}</p></details><button type="button" onClick={closePath}>收起明细</button></section>}</td></tr>}
           </Fragment>;
-        })}</tbody></table></div><p className="subtle">显示最近 100 个事件；上方统计使用完整研究范围。</p>
-      </details>
+        })}</tbody></table></div><p className="subtle">每页最多100个事件；上方统计使用完整研究范围。</p></>}
+      </details>}
       <ResearchProvenance report={report} />
     </>}
     {reversalIssue && <p role="status">{reversalIssue}</p>}
