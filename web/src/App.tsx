@@ -296,11 +296,11 @@ export default function App() {
             <div><span className="field-label">当前选择 · 无法定位</span><strong>{q.counts.unlocated_rows.toLocaleString()}<small> 条</small></strong></div>
             <div className="range-summary"><span className="field-label">选择内源标签范围</span><code>{q.rows[0]?.label ?? '空'} → {q.rows.at(-1)?.label ?? '空'}</code><small>缩放仅改变可视区域，不改变选择与导出</small></div>
           </section>
-          <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} pivots={pivotReport?.radius === pivotRadius ? pivotReport : null} />
+          <SourceChart key={`source-chart:${q.query_id}`} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} pivots={pivotReport?.radius === pivotRadius ? pivotReport : null} />
           {selected && <section className="panel detail-panel"><div className="section-heading"><h2>选中记录</h2><button className="quiet" onClick={() => setSelected(null)}>收起</button></div><RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} sourceQuery={q} sourceResearch={sourceResearch} /></section>}
           {q.metadata.period === '1d' && <SelectedCloseDispersion query={q} />}
           <OhlcDeclineBounds query={q} />
-          {q.metadata.period === '1d' && <SingleResearch key={q.query_id} query={q} onReport={receiveSourceResearch} />}
+          {q.metadata.period === '1d' && <SingleResearch key={`single-research:${q.query_id}`} query={q} onReport={receiveSourceResearch} />}
           {q.metadata.period === '1m' && <p className="inline-note">分钟线使用现有量能、聚合与日线背景研究；未应用日线趋势模型。</p>}
           <section className="panel expandable-section"><button className="section-toggle" aria-expanded={detailed} onClick={() => setDetailed(!detailed)}><span><strong>{q.metadata.period === '1m' ? '分钟研究与详细指标' : '展开详细指标'}</strong><small>价格通道、波动、量能、路径、缺口与拐点</small></span><span aria-hidden="true">{detailed ? '−' : '+'}</span></button></section>
           {detailed && <div className="advanced-analysis">
@@ -309,10 +309,10 @@ export default function App() {
           {q.metadata.period === '1d' && <VolatilityAnalysis query={q} selected={selected} period={atrPeriod} onPeriodSelect={setAtrPeriod} />}
           {q.metadata.period === '1d' && <DailyVolume query={q} selected={selected} lookback={dailyVolumeLookback} onLookbackSelect={setDailyVolumeLookback} />}
           {q.metadata.period === '1d' && <PathEfficiency query={q} selected={selected} lookback={efficiencyLookback} onLookbackSelect={setEfficiencyLookback} />}
-          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <GapAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} />}
-          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <PivotAnalysis key={q.query_id} query={q} selected={selected} onChoose={chooseRow} radius={pivotRadius} onRadiusSelect={setPivotRadius} report={pivotReport} onReport={setPivotReport} />}
-          {q.metadata.period === '1m' && <MinuteAggregation key={q.query_id} query={q} selected={selected} onChoose={chooseRow} />}
-          {q.metadata.period === '1d' && <SourceActions key={q.query_id} query={q} onChoose={chooseRow} />}
+          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <GapAnalysis key={`gap-analysis:${q.query_id}`} query={q} selected={selected} onChoose={chooseRow} />}
+          {(q.metadata.period === '1d' || q.metadata.period === '1m') && <PivotAnalysis key={`pivot-analysis:${q.query_id}`} query={q} selected={selected} onChoose={chooseRow} radius={pivotRadius} onRadiusSelect={setPivotRadius} report={pivotReport} onReport={setPivotReport} />}
+          {q.metadata.period === '1m' && <MinuteAggregation key={`minute-aggregation:${q.query_id}`} query={q} selected={selected} onChoose={chooseRow} />}
+          {q.metadata.period === '1d' && <SourceActions key={`source-actions:${q.query_id}`} query={q} onChoose={chooseRow} />}
           {q.metadata.period === '1m' && <DailyBackground query={q} selected={selected} snapshots={snapshots} dailySnapshot={backgroundSnapshot} onSelect={setBackgroundSnapshot} window={backgroundWindow} onWindowSelect={setBackgroundWindow} channelLookback={channelLookback} onChannelLookbackSelect={setChannelLookback} atrPeriod={atrPeriod} onAtrPeriodSelect={setAtrPeriod} dailyVolumeLookback={dailyVolumeLookback} onDailyVolumeLookbackSelect={setDailyVolumeLookback} efficiencyLookback={efficiencyLookback} onEfficiencyLookbackSelect={setEfficiencyLookback} />}
           {q.metadata.period === '1m' && <MinuteDailyReconciliation query={q} dailySnapshot={backgroundSnapshot} />}
           </div>}
