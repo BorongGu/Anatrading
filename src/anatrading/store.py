@@ -262,6 +262,8 @@ class EvidenceStore:
             raise StoreError("unsupported_schema")
 
     def _require_writable(self):
+        if getattr(self, '_announcement_outcome_unknown', False):
+            raise StoreError('announcement_outcome_unavailable')
         if self.read_only:
             raise StoreError("read_only_store")
 

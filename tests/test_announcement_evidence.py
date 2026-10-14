@@ -274,3 +274,61 @@ def test_asserted_nonidentity_fields_need_value_and_evidence(tmp_path, bad):
             store.register_announcement(*paths)
         assert store.announcements() == []
         assert store.db.execute('SELECT count(*) FROM raw_objects').fetchone() == (0,)
+
+
+def test_failed_rollback_never_confirms_uncommitted_row(tmp_path):
+    paths = sample(tmp_path)
+    def checkpoint(point):
+        if point == 'announcement_before_commit': raise RuntimeError('before commit')
+    with EvidenceStore(tmp_path / 'root', checkpoint=checkpoint) as store:
+        real = store.db
+        class RollbackFailure:
+            def execute(self, sql, *args):
+                if sql == 'ROLLBACK': raise RuntimeError('rollback failed')
+                return real.execute(sql, *args)
+            def __getattr__(self, name): return getattr(real, name)
+        store.db = RollbackFailure()
+        try:
+            with pytest.raises(StoreError, match='announcement_outcome_unavailable'):
+                store.register_announcement(*paths)
+            for operation in (lambda: store.register_announcement(*paths), store.announcements,
+                              lambda: store.announcement('0' * 64),
+                              lambda: store.backup(tmp_path / 'must-not-backup'),
+                              lambda: store.import_bytes(b'', 'tdx-public-text-v1')):
+                with pytest.raises(StoreError, match='announcement_outcome_unavailable'): operation()
+        finally:
+            store.db = real
+    with EvidenceStore(tmp_path / 'root', read_only=True) as store:
+        assert store.announcements() == []
+
+
+@pytest.mark.parametrize('commit_effect,rollback_fails', [('before', False), ('before', True), ('after', True)])
+def test_commit_error_outcomes(tmp_path, commit_effect, rollback_fails):
+    paths = sample(tmp_path)
+    root = tmp_path / 'root'
+    with EvidenceStore(root) as store:
+        real = store.db
+        class CommitFailure:
+            def execute(self, sql, *args):
+                if sql == 'COMMIT':
+                    if commit_effect == 'after': real.execute(sql, *args)
+                    raise RuntimeError('commit outcome uncertain')
+                if sql == 'ROLLBACK' and rollback_fails: raise RuntimeError('rollback failed')
+                return real.execute(sql, *args)
+            def __getattr__(self, name): return getattr(real, name)
+        store.db = CommitFailure()
+        try:
+            error = StoreError if rollback_fails else RuntimeError
+            message = 'announcement_outcome_unavailable' if rollback_fails else 'commit outcome uncertain'
+            with pytest.raises(error, match=message): store.register_announcement(*paths)
+            if rollback_fails:
+                for operation in (lambda: store.register_announcement(*paths), store.announcements,
+                                  lambda: store.announcement('0' * 64),
+                              lambda: store.backup(tmp_path / 'must-not-backup'),
+                              lambda: store.import_bytes(b'', 'tdx-public-text-v1')):
+                    with pytest.raises(StoreError, match='announcement_outcome_unavailable'): operation()
+        finally:
+            store.db = real
+    # Only a new connection resolves durable presence; no automatic re-registration.
+    with EvidenceStore(root, read_only=True) as store:
+        assert len(store.announcements()) == int(commit_effect == 'after')

@@ -144,7 +144,13 @@ def evidence_id(value):
     return _identity({key: value[key] for key in ('contract', 'pdf_sha256', 'receipt_sha256', 'extraction_sha256')})
 
 
+def require_known_outcome(store):
+    if getattr(store, '_announcement_outcome_unknown', False):
+        fail('announcement_outcome_unavailable')
+
+
 def schema(store):
+    require_known_outcome(store)
     tables = {row[0] for row in store.db.execute('SHOW TABLES').fetchall()}
     version = store.db.execute('SELECT value FROM app_meta WHERE key=?', [FEATURE]).fetchone()
     present = 'announcement_evidence' in tables
@@ -195,6 +201,7 @@ def listing(store, after_id=None, limit=100):
 
 
 def register(store, paths):
+    require_known_outcome(store)
     store._require_writable()
     paths = [Path(path).resolve() for path in paths]
     origin_paths = [str(path) for path in paths]
@@ -236,7 +243,11 @@ def register(store, paths):
     except BaseException:
         if in_transaction:
             try: store.db.execute('ROLLBACK')
-            except Exception: pass
+            except Exception:
+                # A failed rollback leaves transaction visibility ambiguous.
+                # Never infer durability from this connection's visible rows.
+                store._announcement_outcome_unknown = True
+                fail('announcement_outcome_unavailable')
         try:
             if schema(store) and store.db.execute('SELECT 1 FROM announcement_evidence WHERE evidence_id=?', [identity]).fetchone():
                 read(store, identity)
