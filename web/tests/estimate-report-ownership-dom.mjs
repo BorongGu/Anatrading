@@ -5,13 +5,15 @@ import {readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {fixture as eventFixture} from './single-event-path-fixtures.mjs';
 import {createServer} from 'vite';
-import {createElement,act,Profiler} from 'react';
+import {createElement,act,Profiler,useState,useRef,useCallback} from 'react';
 const {JSDOM}=await import(process.env.ANATRADING_JSDOM_PATH?pathToFileURL(process.env.ANATRADING_JSDOM_PATH).href:'jsdom');
 const dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'http://localhost'});
 Object.assign(globalThis,{window:dom.window,document:dom.window.document,HTMLElement:dom.window.HTMLElement,IS_REACT_ACT_ENVIRONMENT:true});
 const {createRoot}=await import('react-dom/client');
 const server=await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom',optimizeDeps:{noDiscovery:true,include:[]}});
 const {SingleResearch}=await server.ssrLoadModule('/src/SingleResearch.tsx');
+const {RecordDetails}=await server.ssrLoadModule('/src/RecordDetails.tsx');
+const {bindSourceResearch}=await server.ssrLoadModule('/src/adjacent-source.ts');
 const {assertResearchReply,buildResearchRequest}=await server.ssrLoadModule('/src/research-model.ts');
 const root=createRoot(document.getElementById('root')),originalFetch=globalThis.fetch;
 after(async()=>{await act(()=>root.unmount());await server.close();dom.window.close();globalThis.fetch=originalFetch;});
@@ -132,4 +134,40 @@ test('same analysis ID and same object explicitly reaccepted redraw changed esti
  await submit();assert.equal(!!chart(),false);
  f.report.result.series.at(-1).kalman_price=4242; // Fixture mutation only after prior acceptance revoked.
  await settle(singleRequests().at(-1),f.report);assert.equal(f.report.analysis_id,id);assert.notEqual(chart().outerHTML,before);
+});
+
+// Same publication callback as App, with selected record retained to exercise
+// defensive same-ID prop changes. The normal App toolbar clears selection first.
+function PublishedResearch({query}) {
+ const [binding,setBinding]=useState(null),current=useRef(query);current.current=query;
+ const receive=useCallback((id,report)=>{
+  published.push([id,report]);const next=bindSourceResearch(current.current,id,report);
+  if(next!==undefined)setBinding(next);
+ },[]);
+ return createElement('div',null,...[0,1].map(key=>createElement(RecordDetails,{key,row:query.rows[1],sourceQuery:query,sourceResearch:binding,contract:query.manifest.contract})),query.metadata.period==='1d'?createElement(SingleResearch,{query,onReport:receive}):null);
+}
+const adjacency=()=>[...document.querySelectorAll('[aria-label="相邻来源变化核对"]')];
+const drawPublished=q=>act(()=>root.render(createElement(Profiler,{id:'published',onRender(){commits.push({adjacent:adjacency().map(el=>!!el.querySelector('.exact-grid')),chart:!!chart()});}},createElement(PublishedResearch,{query:q}))));
+for(const [name,mutate] of contexts)test('both published RecordDetails hide first commit after '+name+' and stay revoked on A-B-A',async()=>{
+ await act(()=>root.render(null));requests=[];published=[];
+ globalThis.fetch=(url,options={})=>new Promise((resolve,reject)=>requests.push({url:String(url),options,resolve,reject}));
+ const f=fixture(),q=f.reply.query,b={...q,metadata:{...q.metadata},manifest:{...q.manifest},selection:{...q.selection},batch_checks:[...q.batch_checks]};
+ await drawPublished(q);await settle(singleRequests().at(-1),f.report);
+ assert.equal(adjacency().length,2);assert.ok(adjacency().every(el=>el.querySelector('.exact-grid')));
+ const before=adjacency().map(el=>el.outerHTML),calls=requests.length;mutate(b);commits=[];
+ await drawPublished(b);assert.ok(commits.length);
+ for(const c of commits){assert.ok(c.adjacent.every(present=>!present),name+' published first/all commits');assert.equal(c.chart,false);}
+ commits=[];await drawPublished(q);assert.ok(commits.every(c=>c.adjacent.every(present=>!present)));
+ assert.equal(requests.length,calls+(name==='period'?1:0),'only daily remount reloads');
+ await submit();await settle(singleRequests().at(-1),f.report);assert.deepEqual(adjacency().map(el=>el.outerHTML),before);
+});
+test('daily owner unmount clears accepted publication once; late unmounted response cannot replace remount',async()=>{
+ await act(()=>root.render(null));requests=[];published=[];
+ globalThis.fetch=(url,options={})=>new Promise((resolve,reject)=>requests.push({url:String(url),options,resolve,reject}));
+ const f=fixture(),q=f.reply.query,b={...q,metadata:{...q.metadata,period:'1m'}};
+ await drawPublished(q);await settle(singleRequests().at(-1),f.report);const pubs=published.length;
+ await drawPublished(b);assert.equal(published.length,pubs+1);assert.equal(published.at(-1)[1],null);
+ await drawPublished(q);const old=singleRequests().at(-1);await drawPublished(b);await drawPublished(q);
+ await settle(singleRequests().at(-1),f.report);const before=adjacency().map(el=>el.outerHTML),count=published.length;
+ await settle(old,f.report);assert.deepEqual(adjacency().map(el=>el.outerHTML),before);assert.equal(published.length,count);assert.ok(old.options.signal.aborted);
 });

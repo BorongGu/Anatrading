@@ -1,6 +1,6 @@
 # 073 估计图与报告归属修复
 
-2026-10-14；编码前条件见[冻结研究计划](../research/073-estimate-report-ownership.md)。本次仅修复SingleResearch报告的展示当前性。
+2026-10-14；编码前条件见[冻结研究计划](../research/073-estimate-report-ownership.md)。本次修复SingleResearch及其发布到RecordDetails的报告当前性。以下保留各阶段证据，最后的消费者补漏为最新验收范围。
 
 ## 实现与已执行检查
 
@@ -45,3 +45,17 @@ jsdom使用已安装外部依赖，不改package/lockfile；无新网络取数�
 独立补充冻结5项隔离断言，修订前2通过/3失败，修订后5/5通过；原38项归属回归再次全部通过，独立编译通过。独审再次核对完整source_rejection两支均独立进入上下文；最终源码SHA256 `5c3b94e93af14e767e850033264ca039124cc3033136aaf238e68ee3b6e8afb7`。
 
 原性能NO-BUILD、未跑Python及原生浏览器/实源/Windows/预测边界保持。该补漏不引入其他界面功能或优化；最终精确提交复审及远端自动审查按PR68记录。
+
+## PR68 已发布报告消费者补漏
+
+第二轮远端审查指出，父App的sourceResearch只在子组件effect收到null后才清除；两个RecordDetails位置可在首提交继续显示旧相邻价格。完整引用审计确认只有App→两处RecordDetails→AdjacentSourceDetails→adjacentSource这一外部消费链。首版内部图形GO及隔离标记补漏均未覆盖此边界，失败结论保留。
+
+编码前补充原首提交条件后，实际SingleResearch＋两个RecordDetails和App等价发布回调的仓库父测试得到39通过/6失败，覆盖batch、两端序号、资格、known-negative及quarantined的首提交遗漏。将既有来源上下文捕获/匹配移至adjacent-source，SingleResearch与发布绑定复用；绑定只保存标量快照，消费者每次渲染同步校验。原快照/截止、记录成员及逐行链接检查保持，没有重算相邻值。
+
+独立实际App补查发现异常日线→分钟→日线的卸载返回边界；仓库测试改用与App一致的日线条件挂载后得到44通过/1失败，保留第一提交旧相邻值复活证据。最小修复为存在已接受activeView的owner清理时额外发布一次null；先撤销内部引用/Generation，再清外部绑定。无已接受报告的初始StrictMode清理不增加发布，旧query-ID清理仍由binder拒绝。原“所有发布次数保持”仅适用于先前未覆盖卸载的操作，不能据此免除永久撤销；新增这一次清理发布明确列为修复的一部分。
+
+最终仓库归属/消费者DOM46＋既有真实App2共48/48通过，完整Node957/957、TypeScript/build及diff检查通过，0跳过。新增纯绑定检查标量快照不引用可变metadata、等价上下文继续关联、两个独立负标记单独撤销；原accepted-report数学、精确值与DOM保持。另验证卸载已接受owner恰多一次null、未完成旧请求在重挂载新接受后不能再发布。产品仅SingleResearch与adjacent-source两文件；App、RecordDetails、SourceChart、EstimatePlot、后端/请求与DTO均未改。单个静态分页测试仅改为共享比较函数名。
+
+正常App工具栏会主动撤销来源和选中记录；合成同ID直接变更用于防御该异常输入，两者分列，不声称普通用户必经此错误路径。日志及本地执行产物仍不提交；性能NO-BUILD与所有真实浏览器/实源/Windows/预测限制不变。最终独立精确提交和远端新head复审按PR68记录。
+
+独立最终来源检查：实际App25/25与周期卸载2/2通过；StrictMode重复对应25/25与2/2通过。另有不可变prop消费者28/28、隔离5/5及原归属回归通过，31份稳定输出逐字节一致（共同SHA256仍为 `8ca5faf816c960b73308812b2aff09181cb6f6023e62286e9113b87a5701456e`）。各组重叠，不相加为独立样本。实际App测试仅适配SourceChart图形API，无原生图形/视觉资格；独立编译及作者最终日志已核对。最终两产品文件SHA256分别为SingleResearch `5eb59d9dc75dfd3d93d0ef3b52d21ef20afa8c2d6765c12ee643c1ab00ca3779`、adjacent-source `63e107db5e0faad12783992d7a6a2336d5b9dc936ff48328b5a24d343dd9fd5b`。

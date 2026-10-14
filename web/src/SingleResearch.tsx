@@ -1,6 +1,8 @@
+import { sourceResearchContext, sourceResearchContextMatches } from './adjacent-source.ts';
+import type { SourceResearchContext } from './adjacent-source.ts';
 import { CloseReversalRecords } from './CloseReversalRecords.tsx';
 import { captureReversalSource, reversalContextMatches } from './close-reversal.ts';
-import type { ReversalSource, ReversalContext } from './close-reversal.ts';
+import type { ReversalSource } from './close-reversal.ts';
 import { Fragment, useEffect, useId, useRef, useState } from 'react';
 import { SingleEventPath } from './SingleEventPath.tsx';
 import { acceptEventPath, captureEventPath, eventPathBelongs, EventPathError } from './single-event-path.ts';
@@ -14,11 +16,7 @@ import type { Query } from './types.ts';
 import type { Distribution, ResearchEnvelope, SingleResult } from './research-types.ts';
 
 const EVENT_PAGE_SIZE = 100;
-type ReportContext = ReversalContext & { period: string | undefined; qualification: string | undefined; knownNegative: boolean; quarantined: boolean };
-function sourceContextMatches(a: ReportContext, b: ReportContext) {
-  return a.period === b.period && a.qualification === b.qualification && a.knownNegative === b.knownNegative && a.quarantined === b.quarantined;
-}
-type EventLedgerView = { token: object; report: ResearchEnvelope<SingleResult>; generation: number; context: ReportContext; page: number };
+type EventLedgerView = { token: object; report: ResearchEnvelope<SingleResult>; generation: number; context: SourceResearchContext; page: number };
 
 export function SingleResearch({ query, onReport }: { query: Query; onReport?: (queryId: string, report: ResearchEnvelope<SingleResult> | null) => void }) {
   const [lookback, setLookback] = useState('20');
@@ -34,7 +32,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const [reversalSource, setReversalSource] = useState<ReversalSource | null>(null);
   const [reversalIssue, setReversalIssue] = useState('');
   const activeReversal = useRef<ReversalSource | null>(null);
-  const reversalContext: ReportContext = { quarantined: query.metadata.quarantined === true, period: query.metadata.period, qualification: query.manifest?.qualification, knownNegative: query.batch_checks?.some(check => check.name === 'known_negative_sample' && check.outcome === 'fail') ?? false, ownerQueryId: query.query_id, snapshotId: query.snapshot_id, batchId: query.batch_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
+  const reversalContext = sourceResearchContext(query);
   const currentReversalContext = useRef(reversalContext); currentReversalContext.current = reversalContext;
   type PathSelection = { token: object; position: number; projection: EventPathProjection | null; issue: string; trigger: HTMLButtonElement };
   const [selection, setSelection] = useState<PathSelection | null>(null);
@@ -49,8 +47,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const previousReversalContext = useRef(reversalContext);
   function viewIsCurrent() {
     return view !== null && activeView.current === view && view.report === report
-      && gate.current.isCurrent(view.generation) && reversalContextMatches(view.context, currentReversalContext.current)
-      && sourceContextMatches(view.context, currentReversalContext.current);
+      && gate.current.isCurrent(view.generation) && sourceResearchContextMatches(view.context, currentReversalContext.current);
   }
   function closePath() {
     if (!viewIsCurrent() || !accepted || active.current !== accepted || acceptedGeneration.current === null || !gate.current.isCurrent(acceptedGeneration.current)
@@ -68,8 +65,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
       const request = buildResearchRequest('single', [query.snapshot_id], query.selection.cutoff ?? '', Number(lookback), Number(horizon), testStart);
       const controller = new AbortController(); abort.current = controller; setPhase('loading');
       const result = await jsonRequest<ResearchEnvelope<SingleResult>>(request.path, { signal: controller.signal });
-      if (!gate.current.isCurrent(generation) || !reversalContextMatches(requestedReversalContext, currentReversalContext.current)
-        || !sourceContextMatches(requestedReversalContext, currentReversalContext.current)) return;
+      if (!gate.current.isCurrent(generation) || !sourceResearchContextMatches(requestedReversalContext, currentReversalContext.current)) return;
       assertResearchReply(result, request.expected);
       // Consumers must treat each published report as read-only. Every complete
       // acceptance is a new ownership generation, even for the same object/ID.
@@ -90,14 +86,23 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   }
   useEffect(() => {
     const previousReversal = previousReversalContext.current; previousReversalContext.current = reversalContext;
-    if (previousReversal.ownerQueryId === reversalContext.ownerQueryId && (!reversalContextMatches(previousReversal, reversalContext) || !sourceContextMatches(previousReversal, reversalContext))) invalidate();
+    if (previousReversal.ownerQueryId === reversalContext.ownerQueryId && !sourceResearchContextMatches(previousReversal, reversalContext)) invalidate();
     const previous = previousContext.current; previousContext.current = context;
     // A normal query-ID replacement is handled by load below. An abnormal
     // same-ID context change still permanently invalidates, with no auto-fetch.
     if (previous.ownerQueryId === context.ownerQueryId && (previous.snapshotId !== context.snapshotId || previous.cutoff !== context.cutoff
       || previous.ordinalStart !== context.ordinalStart || previous.ordinalEnd !== context.ordinalEnd)) invalidate();
   }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end, reversalContext.period, reversalContext.qualification, reversalContext.knownNegative, reversalContext.quarantined]);
-  useEffect(() => { void load(); return () => { activeView.current = null; activeReversal.current = null; active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
+  useEffect(() => {
+    void load();
+    return () => {
+      const hadReport = activeView.current !== null;
+      activeView.current = null; activeReversal.current = null; active.current = null; acceptedGeneration.current = null;
+      gate.current.invalidate(); abort.current?.abort();
+      // An unmounted daily owner cannot leave a publication for a later remount.
+      if (hadReport) onReport?.(query.query_id, null);
+    };
+  }, [query.query_id]);
   const viewCurrent = viewIsCurrent();
   const eventCount = viewCurrent ? report!.result.events.rows.length : 0;
   const pageCount = Math.ceil(eventCount / EVENT_PAGE_SIZE);

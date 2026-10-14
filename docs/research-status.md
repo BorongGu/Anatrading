@@ -1,6 +1,6 @@
 # 研究与验证记录
 
-2026-10-14限定修复：[073估计图与报告归属](qualification/073-estimate-report-ownership.md)复现并修复同query_id来源变更首个React提交仍显示旧SVG的问题。复用现有accepted view/Generation与完整局部来源上下文，统一门禁结果区、来源和空报告；A→B→A需重新接受。初版DOM34＋App2、独立38项首提交/10项App及31份输出对照通过；PR68远端审查随后发现独立隔离标记漏检，已先保留两项新红灯并补齐，最终DOM36＋App2、全Node955和TypeScript/build重跑通过。首轮fixture/断言诊断失败保留；最终复审及发布按PR68记录。旧估计图复用实验仍NO-BUILD，没有memoization或性能重跑，真实浏览器/实源/Windows/预测资格未新增。
+2026-10-14限定修复：[073估计图与报告归属](qualification/073-estimate-report-ownership.md)复现并修复同query_id来源变更首个React提交仍显示旧SVG的问题。复用现有accepted view/Generation与完整局部来源上下文，统一门禁结果区、来源和空报告；A→B→A需重新接受。PR68远端两轮审查补齐独立隔离标记及父RecordDetails绑定：共享标量上下文、同步外部门禁和已接受owner卸载清理，保留两项隔离/六项消费者/一项周期返回红灯。最终DOM46＋App2、全Node957和TypeScript/build重跑通过；正常App路由与异常同ID防御分列。原首版GO与fixture/诊断失败均保留；最终精确复审及发布按PR68记录。旧估计图复用实验仍NO-BUILD，没有memoization或性能重跑，真实浏览器/实源/Windows/预测资格未新增。
 
 
 2026-10-14研究自评：[072平滑可识别性与五步下探标签](research/072-noise-identification-and-downside-label.md)仅归档两项一次冻结合成研究的文档/协议，零新实验/产品改动。相同观测的粗糙度下降75%，两种潜在机制误差分别4→2与0→2，平滑本身无法认证去噪。复用056六槽，原记录报告精确五步起点锚定下探标签841项断言（含729条算术对照）通过，本次仅静态核对；原执行优化状态未核实，assert可被优化移除，公开材料不含执行器/输出、无法独立复跑；外部供给预测的未来变更检查仅证记录分离，不证模型因果性。067–071改善数学描述/工作流，无新金融增量；NO-BUILD新滤波器、产品或框架，待候选/先前信息基线/损失行动取舍/起点/未触碰合格数据/验收共同冻结。034/035/046/047/058 STOP及实采/旧历史NO-GO不变，独立复审与发布另记。
