@@ -1,3 +1,4 @@
+import { OhlcDeclineBounds } from './OhlcDeclineBounds.tsx';
 import { SelectedCloseDispersion } from './SelectedCloseDispersion.tsx';
 import { bindSourceResearch } from './adjacent-source.ts';
 import type { SourceResearchBinding } from './adjacent-source.ts';
@@ -298,6 +299,7 @@ export default function App() {
           <SourceChart key={q.query_id} reply={reply} onChoose={chooseRow} onError={chartError} visibleBars={q.metadata.period === '1d' ? 60 : undefined} channel={channelReport?.lookback === channelLookback ? channelReport : null} pivots={pivotReport?.radius === pivotRadius ? pivotReport : null} />
           {selected && <section className="panel detail-panel"><div className="section-heading"><h2>选中记录</h2><button className="quiet" onClick={() => setSelected(null)}>收起</button></div><RecordDetails row={selected} contract={q.manifest.contract} geometry={selectedGeometry} sourceQuery={q} sourceResearch={sourceResearch} /></section>}
           {q.metadata.period === '1d' && <SelectedCloseDispersion query={q} />}
+          <OhlcDeclineBounds query={q} />
           {q.metadata.period === '1d' && <SingleResearch key={q.query_id} query={q} onReport={receiveSourceResearch} />}
           {q.metadata.period === '1m' && <p className="inline-note">分钟线使用现有量能、聚合与日线背景研究；未应用日线趋势模型。</p>}
           <section className="panel expandable-section"><button className="section-toggle" aria-expanded={detailed} onClick={() => setDetailed(!detailed)}><span><strong>{q.metadata.period === '1m' ? '分钟研究与详细指标' : '展开详细指标'}</strong><small>价格通道、波动、量能、路径、缺口与拐点</small></span><span aria-hidden="true">{detailed ? '−' : '+'}</span></button></section>

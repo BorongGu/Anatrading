@@ -943,3 +943,14 @@ button, summary, a, tr[tabindex] { touch-action: manipulation; }
 .event-path-identity, .event-path-identity dd, .event-path-price { overflow-wrap: anywhere; white-space: normal; }
 .event-path-identity dd { margin: 0 0 .6rem; }
 .event-path-identity dt { font-weight: 600; }
+
+/* The exact-price panel keeps long evidence inside its own scroll region. */
+.ohlc-decline { min-width: 0; font-family: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', 'WenQuanYi Micro Hei', system-ui, sans-serif; }
+.ohlc-decline h2, .ohlc-decline h3 { font-family: 'Songti SC', SimSun, 'Noto Serif CJK SC', serif; }
+.ohlc-decline p, .ohlc-decline dd, .ohlc-decline li, .ohlc-decline pre { overflow-wrap: anywhere; white-space: pre-wrap; }
+.ohlc-decline form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
+.ohlc-decline label { display: grid; gap: 6px; max-width: 100%; }
+.ohlc-decline details { min-width: 0; margin-block: 10px; }
+.ohlc-decline .table-scroll { max-width: 100%; overflow-x: auto; }
+.ohlc-decline .section-heading { flex-wrap: wrap; gap: 10px; }
+.ohlc-decline pre { font-family: inherit; }

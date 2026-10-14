@@ -1,0 +1,192 @@
+{
+  "query": {
+    "snapshot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "query_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "metadata": {
+      "period": "1d",
+      "source_code": "600000",
+      "source_venue": "SH"
+    },
+    "rows": [
+      {
+        "ordinal": 0,
+        "label": "2026-01-01",
+        "tokens": {},
+        "values": {
+          "open": "100",
+          "high": "120",
+          "low": "80",
+          "close": "100"
+        }
+      }
+    ],
+    "unlocated": [],
+    "batch_id": "batch",
+    "manifest": {
+      "raw_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_contract_id": "synthetic",
+      "qualification": {
+        "kind": "synthetic"
+      }
+    },
+    "selection": {
+      "mode": "retrospective",
+      "cutoff": "2026-01-01"
+    }
+  },
+  "report": {
+    "method_id": "source-ohlc-compatible-max-decline-v1",
+    "adapter_id": "daily-bars-positive-selected-window-strict-coverage-v1",
+    "numeric_policy_id": "scaled18-rational-earliest-extremizer-v1",
+    "identity": {
+      "snapshot_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "batch_id": "batch",
+      "query_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "raw_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_contract_id": "synthetic",
+      "selection": {
+        "mode": "retrospective",
+        "cutoff": "2026-01-01",
+        "ordinal_start": null,
+        "ordinal_end": null
+      },
+      "symbol_identity": {
+        "symbol": "600000.SH",
+        "code": "600000",
+        "venue": "SH",
+        "market": "CN_A",
+        "qualification": "source_claim"
+      },
+      "source_qualification": {
+        "kind": "synthetic"
+      }
+    },
+    "window": {
+      "requested_start": "2026-01-01",
+      "requested_end": "2026-01-01",
+      "resolved_start": "2026-01-01",
+      "resolved_end": "2026-01-01",
+      "bar_count": 1,
+      "first_open_initialization": true
+    },
+    "coverage": {
+      "source_rows": 1,
+      "date_groups": 1,
+      "valid_groups": 1,
+      "invalid_groups": 0,
+      "duplicate_groups": 0,
+      "unlocated_rows": 0,
+      "unreadable_date_rows": 0,
+      "batch_unlocated_rows": 0,
+      "coverage_known": true
+    },
+    "source_qualification": {
+      "kind": "synthetic"
+    },
+    "calendar_completeness": "unverified",
+    "members": [
+      {
+        "index": 0,
+        "date": "2026-01-01",
+        "ordinal": "0",
+        "open": "100",
+        "high": "120",
+        "low": "80",
+        "close": "100",
+        "source_reason": null
+      }
+    ],
+    "price_evidence": "normalized_source_values",
+    "raw_token_status": "not_embedded",
+    "status": "computed",
+    "reason": null,
+    "reasons": [],
+    "invalid_members": [],
+    "missing_endpoints": [],
+    "source_rejected": false,
+    "source_conflict_counts": {},
+    "source_conflict_policy": "first_rejection_per_source_row",
+    "suppressed_source_predicates": "not_evaluated_after_first_rejection",
+    "limitations": [
+      "hypothetical_extremizers",
+      "window_pre_history_excluded",
+      "calendar_and_bar_finality_unverified",
+      "adjustment_and_corporate_actions_unverified",
+      "historical_availability_unverified",
+      "source_values_not_economic_wealth",
+      "upper_not_full_real_interval_bound_if_observations_missing",
+      "no_prediction_or_execution_claim"
+    ],
+    "lower": {
+      "value": {
+        "numerator": "1",
+        "denominator": "5"
+      },
+      "witness": {
+        "peak": {
+          "bar_index": 0,
+          "price_exact": "100",
+          "slot": "open",
+          "path_position": 0,
+          "date": "2026-01-01",
+          "ordinal": "0"
+        },
+        "trough": {
+          "bar_index": 0,
+          "price_exact": "80",
+          "slot": "low",
+          "path_position": 1,
+          "date": "2026-01-01",
+          "ordinal": "0"
+        },
+        "path_id": "olhc-extremizer-v1",
+        "hypothetical": true
+      }
+    },
+    "upper": {
+      "value": {
+        "numerator": "1",
+        "denominator": "3"
+      },
+      "witness": {
+        "peak": {
+          "bar_index": 0,
+          "price_exact": "120",
+          "slot": "high",
+          "path_position": 1,
+          "date": "2026-01-01",
+          "ordinal": "0"
+        },
+        "trough": {
+          "bar_index": 0,
+          "price_exact": "80",
+          "slot": "low",
+          "path_position": 2,
+          "date": "2026-01-01",
+          "ordinal": "0"
+        },
+        "path_id": "ohlc-extremizer-v1",
+        "hypothetical": true
+      }
+    },
+    "close_only": {
+      "value": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "witness": null
+    },
+    "identified": false,
+    "ambiguity_width": {
+      "numerator": "2",
+      "denominator": "15"
+    },
+    "path_ids": {
+      "lower": "olhc-extremizer-v1",
+      "upper": "ohlc-extremizer-v1"
+    },
+    "scope": "supplied_bars_compatible_paths",
+    "view_method_id": "selected-source-ohlc-decline-bounds-v1",
+    "analysis_id": "c47985d1088858f7d8aedf7410ad2d03f58adf82664e1e6754d1f88503fe7c74"
+  }
+}
