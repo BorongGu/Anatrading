@@ -292,3 +292,41 @@ def test_capture_sources_swapped_before_send(root):
             source.mkdir()
     with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
         acquire(root, capture_only=True, _transport=forbidden, _checkpoint=checkpoint)
+
+
+def test_v1_routing_root_swap_rejected_before_store(root, monkeypatch):
+    result = acquire(root)
+    original = module._read_plan
+    calls = []
+    def swapped(directory, run):
+        plan = original(directory, run)
+        calls.append(1)
+        if len(calls) == 1:
+            import shutil
+            moved = root.with_name('original-v1')
+            root.rename(moved)
+            shutil.copytree(moved / 'public_acquisition', root / 'public_acquisition')
+        return plan
+    monkeypatch.setattr(module, '_read_plan', swapped)
+    monkeypatch.setattr(module, 'EvidenceStore', forbidden)
+    with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
+        module.resume_public(root, result['run_id'], _transport=forbidden)
+
+
+@pytest.mark.parametrize('status', [200, 401, 403, 429])
+def test_capture_source_swap_during_transport_rejected(root, monkeypatch, status):
+    guard(monkeypatch)
+    def transport(*args, **kwargs):
+        source = root / 'public_acquisition' / 'sources'
+        source.rename(source.with_name('original-sources'))
+        source.mkdir()
+        if status != 200:
+            raise public_transport.PublicTransportError('transport_http_blocked', status=status)
+        return response(*args, **kwargs)
+    with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
+        acquire(root, capture_only=True, _transport=transport)
+    assert not list((root / 'public_acquisition' / 'sources').iterdir())
+    assert not list((root / 'public_acquisition' / 'original-sources').iterdir())
+    assert not list(root.rglob('capture.json'))
+    reservations = list(root.rglob('reservation.json'))
+    assert len(reservations) == 1

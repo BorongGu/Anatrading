@@ -860,6 +860,10 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
         capture_only = _capture_only(plan)
         done = {'captured', 'empty_result'} if capture_only else {'committed', 'empty_result'}
         safe_root = stack.enter_context(_Directory.root(root, create=not resuming and not capture_only))
+        if resuming:
+            current_identity = os.fstat(safe_root.fd)
+            if (routing_identity.st_dev, routing_identity.st_ino) != (current_identity.st_dev, current_identity.st_ino):
+                _fail('unsafe_path')
         if capture_only:
             # Existing authority directories must be available before any lock/run write.
             with safe_root.child('public_acquisition') as checked_public:
@@ -870,15 +874,16 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
             _verify_capture_root(root, safe_root, guard)
             public = stack.enter_context(safe_root.child('public_acquisition'))
             source_dir = stack.enter_context(public.child('sources'))
-            if resuming:
-                current_identity = os.fstat(safe_root.fd)
-                if (routing_identity.st_dev, routing_identity.st_ino) != (current_identity.st_dev, current_identity.st_ino):
-                    _fail('unsafe_path')
             store = None
         else:
             store = stack.enter_context(EvidenceStore(root, checkpoint=lambda stage: checkpoint('store.' + stage)))
             if safe_root.path != store.root or os.fstat(safe_root.fd).st_ino != os.stat(store.root).st_ino:
                 _fail('unsafe_path')
+            if resuming:
+                with _Directory.root(root, create=False) as current_root:
+                    current_identity = os.fstat(current_root.fd)
+                    if (routing_identity.st_dev, routing_identity.st_ino) != (current_identity.st_dev, current_identity.st_ino):
+                        _fail('unsafe_path')
             public = stack.enter_context(safe_root.child('public_acquisition', create=True))
             source_dir = stack.enter_context(public.child('sources', create=True))
         if resuming:
@@ -934,6 +939,8 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                     if capture_only:
                         _verify_capture_root(root, safe_root, guard, public, source_dir)
                     received = transport(block['request'], deadline=min(deadline, time.monotonic()+_ATTEMPT_SECONDS), cancelled=cancelled)
+                    if capture_only:
+                        _verify_capture_root(root, safe_root, guard, public, source_dir)
                     next_send = time.monotonic() + _SEND_INTERVAL
                     attempt['transport'] = dict(status=received['status'], byte_count=len(received['body']),
                                                 body_sha256=_hash(received['body']), complete=True)
@@ -951,6 +958,8 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                     (_finalize_capture if _capture_only(plan) else _commit)(
                         store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled)
                 except PublicTransportError as error:
+                    if capture_only:
+                        _verify_capture_root(root, safe_root, guard, public, source_dir)
                     code = error.code
                     attempt['transport'] = dict(status=getattr(error, 'status', None), byte_count=getattr(error, 'byte_count', 0),
                                                 body_sha256=getattr(error, 'body_sha256', None), complete=getattr(error, 'complete', False))
