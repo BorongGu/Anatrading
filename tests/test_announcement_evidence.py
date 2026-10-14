@@ -242,3 +242,35 @@ def test_invalid_source_path_hints_rejected(tmp_path, hints):
         store.db.execute('UPDATE announcement_evidence SET manifest_json=?', [json.dumps(value)])
         with pytest.raises(StoreError, match='announcement_corrupt'):
             store.announcement(identity)
+
+
+def test_long_origin_path_rejected_before_read_or_write(tmp_path, monkeypatch):
+    from anatrading import announcement_evidence as module
+    with EvidenceStore(tmp_path / 'root') as store:
+        class LongOrigin:
+            def resolve(self): return self
+            def is_relative_to(self, root): return False
+            def __str__(self): return 'C:/' + 'x' * 4096
+        monkeypatch.setattr(module, 'Path', lambda path: LongOrigin())
+        def unexpected_read(*args): raise AssertionError('input read before path validation')
+        monkeypatch.setattr(module, 'bounded', unexpected_read)
+        with pytest.raises(StoreError, match='invalid_announcement_evidence'):
+            store.register_announcement('pdf', 'receipt', 'extraction')
+        assert store.announcements() == []
+        assert store.db.execute('SELECT count(*) FROM raw_objects').fetchone() == (0,)
+
+
+@pytest.mark.parametrize('bad', ['null', 'empty_text', 'empty_list', 'empty_object', 'anchor', 'pages'])
+def test_asserted_nonidentity_fields_need_value_and_evidence(tmp_path, bad):
+    paths = sample(tmp_path)
+    field = dict(value='3.50', status='document_asserted', source_pages_1based=[1], source_anchor='dividend paragraph')
+    values = dict(null=None, empty_text='  ', empty_list=[], empty_object={})
+    if bad in values: field['value'] = values[bad]
+    if bad == 'anchor': field['source_anchor'] = ''
+    if bad == 'pages': field['source_pages_1based'] = []
+    change(paths[2], lambda v: v['fields'].update(dividend=field))
+    with EvidenceStore(tmp_path / 'root') as store:
+        with pytest.raises(StoreError, match='invalid_announcement_evidence'):
+            store.register_announcement(*paths)
+        assert store.announcements() == []
+        assert store.db.execute('SELECT count(*) FROM raw_objects').fetchone() == (0,)

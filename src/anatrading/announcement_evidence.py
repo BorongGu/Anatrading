@@ -68,6 +68,17 @@ def text(value, maximum=4096):
     return type(value) is str and bool(value.strip()) and len(value) <= maximum
 
 
+def valid_origin_paths(paths):
+    return type(paths) is list and len(paths) == 3 and all(text(path) for path in paths)
+
+
+def asserted_value(value):
+    if value is None: return False
+    if type(value) is str: return bool(value.strip())
+    if type(value) in (list, dict): return bool(value)
+    return type(value) in (int, bool)
+
+
 def timestamp(value):
     try:
         result = datetime.fromisoformat(value)
@@ -104,6 +115,8 @@ def manifest(raws):
                 or type(field.get('source_pages_1based')) is not list
                 or len(field['source_pages_1based']) > 100
                 or any(type(page) is not int or not 1 <= page <= source['pages'] for page in field['source_pages_1based'])): fail()
+        if field['status'] == 'document_asserted' and (not asserted_value(field['value'])
+                or not text(field['source_anchor']) or not field['source_pages_1based']): fail()
     identity = {}
     patterns = dict(security_code=r'[0-9]{6}', venue=r'SZSE', announcement_id=r'[0-9]{4}-[0-9]{3,}',
                     document_date=r'[0-9]{4}-[0-9]{2}-[0-9]{2}')
@@ -166,7 +179,7 @@ def read(store, identity):
     saved = obj(row[3].encode('utf-8'))
     paths = saved.pop('original_paths', None)
     # Origin-host path syntax is provenance only; managed hashes locate originals.
-    if type(paths) is not list or len(paths) != 3 or any(not text(p) for p in paths): fail('announcement_corrupt')
+    if not valid_origin_paths(paths): fail('announcement_corrupt')
     expected = manifest(raws)
     if saved != expected or evidence_id(expected) != identity: fail('announcement_corrupt')
     timestamp(row[4])
@@ -184,6 +197,8 @@ def listing(store, after_id=None, limit=100):
 def register(store, paths):
     store._require_writable()
     paths = [Path(path).resolve() for path in paths]
+    origin_paths = [str(path) for path in paths]
+    if not valid_origin_paths(origin_paths): fail()
     if any(path.is_relative_to(store.root) for path in paths): fail('announcement_input_inside_store')
     raws = [bounded(path, limit) for path, limit in zip(paths, LIMITS)]
     value = manifest(raws)
@@ -211,7 +226,7 @@ def register(store, paths):
         for raw, sha in zip(raws, hashes):
             store.db.execute('INSERT INTO raw_objects VALUES (?,?) ON CONFLICT DO NOTHING', [sha, len(raw)])
             if store.db.execute('SELECT byte_length FROM raw_objects WHERE sha=?', [sha]).fetchone() != (len(raw),): fail('announcement_corrupt')
-        value['original_paths'] = [str(path) for path in paths]
+        value['original_paths'] = origin_paths
         store.db.execute('INSERT INTO announcement_evidence VALUES (?,?,?,?,?,?)', [identity, *hashes, _json(value), _utcnow()])
         store._checkpoint('announcement_before_commit')
         store.db.execute('COMMIT')
