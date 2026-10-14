@@ -9,6 +9,6 @@ test('full ledger has native bounded navigation and exact no-event state',()=>{
 });
 test('page identity includes full context and independent synchronous active view',()=>{
  assert.match(source,/activeView\.current !== view/);
- assert.match(source,/reversalContextMatches\(view\.context, currentReversalContext\.current\)/);
+ assert.match(source,/sourceResearchContextMatches\(view\.context, currentReversalContext\.current\)/);
  assert.match(source,/view\.generation/);
 });

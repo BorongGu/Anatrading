@@ -71,3 +71,22 @@ test('minute and compact raw details do not acquire daily research', () => {
   f.query.metadata.period = '1d';
   assert.doesNotMatch(renderToStaticMarkup(createElement(RecordDetails, { row: f.row, sourceQuery: f.query, sourceResearch: f.binding, compact: true })), /相邻来源变化核对/);
 });
+
+test('published ownership captures scalar context rather than aliasing mutable source metadata', () => {
+  const changes = [
+    q => { q.batch_id = 'other-batch'; }, q => { q.selection.ordinal_start = 1; }, q => { q.selection.ordinal_end = 99; },
+    q => { q.metadata.period = '1m'; }, q => { q.metadata.source_code = 'other'; }, q => { q.metadata.source_adjustflag = '1'; }, q => { q.counts = { batch_unlocated_rows: 1 }; }, q => { q.manifest = { qualification: 'changed' }; },
+    q => { q.metadata.quarantined = true; }, q => { q.batch_checks = [{ name: 'known_negative_sample', outcome: 'fail' }]; },
+  ];
+  for (const change of changes) {
+    const f=fixture(),before={...f.binding.context};change(f.query);
+    assert.deepEqual(f.binding.context,before);assert.equal(inspect(f).current,null);assert.equal(inspect(f).value,null);
+  }
+});
+test('equivalent context retains exact report reference and independent negative flags revoke independently', () => {
+  const f=fixture(),before=inspect(f);f.query={...f.query,metadata:{...f.query.metadata},selection:{...f.query.selection}};
+  assert.deepEqual(inspect(f),before);assert.equal(f.binding.report,f.report);
+  f.query.batch_checks=[{name:'known_negative_sample',outcome:'fail'}];f.binding=bindSourceResearch(f.query,f.query.query_id,f.report);
+  f.query.metadata.quarantined=true;assert.equal(inspect(f).current,null);
+  f.binding=bindSourceResearch(f.query,f.query.query_id,f.report);f.query.batch_checks=[];assert.equal(inspect(f).current,null);
+});
