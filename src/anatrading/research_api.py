@@ -265,8 +265,77 @@ def _calculate_dispersion(store, sid, cutoff, selected_date, error):
     return _dispersion_bytes(result, error)
 
 
+
+def _decline_bytes(report, error):
+    """Final UTF-8 body cap. Root depth=0; keys and values each count as nodes.
+
+    Validate iteratively before identity hashing/recursive encoding. These same
+    depth/node semantics are enforced by the dedicated client. No truncation.
+    """
+    _decline_structure(report, error)
+    output = bytearray()
+    try:
+        for chunk in json.JSONEncoder(ensure_ascii=False, allow_nan=False, separators=(",", ":")).iterencode(report):
+            encoded = chunk.encode("utf-8")
+            if len(output) + len(encoded) > 262_144:
+                raise error("ohlc_result_limit")
+            output.extend(encoded)
+    except (TypeError, UnicodeError, RecursionError):
+        raise error("invalid_decline_query") from None
+    return bytes(output)
+
+
+def _decline_structure(value, error):
+    stack = [(value, 0)]
+    nodes = 0
+    while stack:
+        item, depth = stack.pop()
+        nodes += 1
+        if depth > 64 or nodes > 65_536 or isinstance(item, str) and len(item) > 262_144:
+            raise error("ohlc_result_limit")
+        if isinstance(item, dict):
+            if len(item) * 2 + nodes + len(stack) > 65_536:
+                raise error("ohlc_result_limit")
+            for key, child in item.items():
+                stack.extend(((key, depth + 1), (child, depth + 1)))
+        elif isinstance(item, (list, tuple)):
+            if len(item) + nodes + len(stack) > 65_536:
+                raise error("ohlc_result_limit")
+            stack.extend((child, depth + 1) for child in item)
+
+
+def _calculate_decline(store, sid, start, end, error):
+    from .ohlc_decline_bounds import decline_bounds_report
+
+    query = _load(store, [sid], end, error)[0]
+    try:
+        result = decline_bounds_report(query, start, end)
+    except ValueError as exc:
+        code = str(exc)
+        allowed = _SAFE_ERRORS | {"invalid_decline_query", "ordinal_window_not_supported",
+            "ohlc_window_limit", "ohlc_metadata_limit", "ohlc_result_limit", "invalid_research_date"}
+        raise error(code if code in allowed else "invalid_research_input") from None
+    result["view_method_id"] = "selected-source-ohlc-decline-bounds-v1"
+    # Reserve the final ID's structure before any recursive identity encoding.
+    result["analysis_id"] = "0" * 64
+    _decline_structure(result, error)
+    del result["analysis_id"]
+    result["analysis_id"] = _identity(result)
+    return _decline_bytes(result, error)
+
 def register_research_routes(app, owner, parse_parameters, error, safe_store_call):
     """Reuse the established local HTTP boundary and error mapping."""
+    @app.get("/api/research/ohlc-decline-bounds/{snapshot_id}")
+    async def ohlc_decline_bounds(snapshot_id: str, request: Request):
+        sid = _identifier(snapshot_id, error)
+        p = parse_parameters(request, {"start", "end"}, ("start", "end"))
+        start, end = _day(p["start"], error), _day(p["end"], error)
+        if start > end:
+            raise error("invalid_research_date")
+        body = await owner.call(lambda store: safe_store_call(
+            lambda: _calculate_decline(store, sid, start, end, error)))
+        return Response(body, media_type="application/json")
+
     @app.get("/api/research/close-dispersion/{snapshot_id}")
     async def close_dispersion(snapshot_id: str, request: Request):
         sid = _identifier(snapshot_id, error)
