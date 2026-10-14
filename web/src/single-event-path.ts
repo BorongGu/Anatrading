@@ -105,7 +105,7 @@ export interface EventPathProjection {
 }
 export function captureEventPath(accepted: AcceptedEventPath, eventPosition: number): EventPathProjection {
   const { report } = accepted, { series, events } = report.result;
-  check(integer(eventPosition, Math.max(0, events.rows.length - 100), events.rows.length - 1), 'event_link');
+  check(integer(eventPosition, 0, events.rows.length - 1), 'event_link');
   const e = events.rows[eventPosition], slots: EventPathSlot[] = [];
   for (let offset = 0; offset < 6; offset++) {
     const row = series[e.index + offset];

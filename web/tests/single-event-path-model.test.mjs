@@ -17,7 +17,7 @@ for (const name of names) test(`complete synthetic DTO: ${name}`, () => {
   assertResearchReply(f.reply, f.expected);
   if (f.expected.parameters.horizon !== 5) { assert.throws(() => accept(f)); return; }
   const a = accept(f);
-  for (let position = Math.max(0, f.reply.result.events.rows.length - 100); position < f.reply.result.events.rows.length; position++) {
+  for (let position = 0; position < f.reply.result.events.rows.length; position++) {
     const p = captureEventPath(a, position), e = f.reply.result.events.rows[position];
     assert.equal(p.slots.length, 6); assert.deepEqual(p.event, e);
     for (const slot of p.slots) {
@@ -28,7 +28,7 @@ for (const name of names) test(`complete synthetic DTO: ${name}`, () => {
     assert.notEqual(p.event, e); assert.notEqual(p.parameters, f.reply.parameters);
     assert.equal(Object.isFrozen(f.reply), false); assert.equal(Object.isFrozen(e), false);
   }
-  if (name === 'RECENT101') assert.throws(() => captureEventPath(a, 0), /event_path_inconsistent/);
+  if (name === 'RECENT101') assert.equal(captureEventPath(a, 0).event.index, f.reply.result.events.rows[0].index);
   if (name === 'RECENT0') assert.throws(() => captureEventPath(a, 0), /event_path_inconsistent/);
   assert.deepEqual(f.reply,before);
 });
@@ -77,3 +77,5 @@ test('graph Q can differ from research Q and request cutoff stays distinct from 
  assert.equal(p.parameters.requestedCutoff,null);assert.equal(p.parameters.evaluationAsOf,'2026-01-13');
  const g=fixture('EXPLICIT_GAP_CUTOFF'),q=captureEventPath(accept(g),0);assert.equal(q.parameters.evaluationAsOf,'2026-01-20');assert.equal(q.slots[5].date,'2026-01-13');
 });
+
+test('all ledger positions retain strict safe-integer bounds',()=>{const f=fixture('RECENT101'),a=accept(f),n=f.reply.result.events.rows.length; for(const p of [-1,n,n+1,0.5,NaN,Infinity])assert.throws(()=>captureEventPath(a,p),/event_path_inconsistent/);});
