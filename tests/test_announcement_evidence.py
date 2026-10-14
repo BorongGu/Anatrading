@@ -207,3 +207,38 @@ def test_market_snapshot_identity_unchanged(tmp_path):
         replay = store.import_bytes(text_bytes([record()]), 'tdx-public-text-v1')
         assert replay['snapshot_id'] == market['snapshot_id']
         assert store.query(market['snapshot_id']) == original
+
+
+@pytest.mark.parametrize('origin', [r'C:\evidence', r'\\server\share\evidence', '/source/evidence'])
+def test_source_path_hints_are_host_independent(tmp_path, origin):
+    paths = sample(tmp_path)
+    root = tmp_path / 'root'
+    with EvidenceStore(root) as store:
+        result = store.register_announcement(*paths)
+        identity = result['evidence_id']
+        value = store.announcement(identity)['manifest']
+        value['original_paths'] = [origin + '/' + name for name in ('source.pdf', 'receipt.json', 'event.json')]
+        store.db.execute('UPDATE announcement_evidence SET manifest_json=?', [json.dumps(value)])
+        expected = store.announcement(identity)
+        assert expected['manifest']['original_paths'] == value['original_paths']
+        assert store.announcements() == [expected]
+        assert store.register_announcement(*paths)['reused']
+        store.backup(tmp_path / 'backup')
+    shutil.rmtree(paths[0].parent)
+    with EvidenceStore(root, read_only=True) as store:
+        assert store.announcement(identity) == expected
+    EvidenceStore.restore(tmp_path / 'backup', tmp_path / 'restored')
+    with EvidenceStore(tmp_path / 'restored', read_only=True) as store:
+        assert store.announcements() == [expected]
+
+
+@pytest.mark.parametrize('hints', [None, [], ['', 'x', 'y'], [1, 'x', 'y'], ['x' * 4097, 'x', 'y']])
+def test_invalid_source_path_hints_rejected(tmp_path, hints):
+    paths = sample(tmp_path)
+    with EvidenceStore(tmp_path / 'root') as store:
+        identity = store.register_announcement(*paths)['evidence_id']
+        value = store.announcement(identity)['manifest']
+        value['original_paths'] = hints
+        store.db.execute('UPDATE announcement_evidence SET manifest_json=?', [json.dumps(value)])
+        with pytest.raises(StoreError, match='announcement_corrupt'):
+            store.announcement(identity)

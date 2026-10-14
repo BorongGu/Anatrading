@@ -165,7 +165,8 @@ def read(store, identity):
         raws.append(raw)
     saved = obj(row[3].encode('utf-8'))
     paths = saved.pop('original_paths', None)
-    if type(paths) is not list or len(paths) != 3 or any(not text(p) or not Path(p).is_absolute() for p in paths): fail('announcement_corrupt')
+    # Origin-host path syntax is provenance only; managed hashes locate originals.
+    if type(paths) is not list or len(paths) != 3 or any(not text(p) for p in paths): fail('announcement_corrupt')
     expected = manifest(raws)
     if saved != expected or evidence_id(expected) != identity: fail('announcement_corrupt')
     timestamp(row[4])
