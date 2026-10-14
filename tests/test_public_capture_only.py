@@ -330,3 +330,109 @@ def test_capture_source_swap_during_transport_rejected(root, monkeypatch, status
     assert not list(root.rglob('capture.json'))
     reservations = list(root.rglob('reservation.json'))
     assert len(reservations) == 1
+
+
+@pytest.mark.parametrize('which', ['public_acquisition', 'sources'])
+def test_capture_prelock_authority_replacement_rejected(root, monkeypatch, which):
+    original = module._DirectoryLock
+    def swapped(path):
+        public = root / 'public_acquisition'
+        target = public if which == 'public_acquisition' else public / 'sources'
+        target.rename(target.with_name('original-' + target.name))
+        if which == 'public_acquisition':
+            (target / 'sources').mkdir(parents=True)
+        else:
+            target.mkdir()
+        return original(path)
+    monkeypatch.setattr(module, '_DirectoryLock', swapped)
+    with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
+        acquire(root, capture_only=True, _transport=forbidden)
+    assert not list(root.rglob('reservation.json'))
+
+
+@pytest.mark.parametrize('which', ['run', 'attempts', 'slot'])
+@pytest.mark.parametrize('stage', ['before', 'success', 'blocked'])
+def test_capture_active_directory_chain_replacement(root, monkeypatch, which, stage):
+    guard(monkeypatch)
+    calls = []
+    def swap():
+        import shutil
+        run = next(p for p in (root / 'public_acquisition').iterdir() if len(p.name) == 32)
+        target = {'run': run, 'attempts': run / 'attempts', 'slot': run / 'attempts' / '000001'}[which]
+        moved = target.with_name('original-' + target.name)
+        target.rename(moved)
+        shutil.copytree(moved, target)
+    def checkpoint(point):
+        if stage == 'before' and point == 'attempt_requested':
+            swap()
+    def transport(*args, **kwargs):
+        calls.append(1)
+        if stage != 'before':
+            swap()
+        if stage == 'blocked':
+            raise public_transport.PublicTransportError('transport_http_blocked', status=429)
+        return response(*args, **kwargs)
+    with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
+        acquire(root, capture_only=True, _transport=transport, _checkpoint=checkpoint)
+    assert len(calls) == int(stage != 'before')
+    assert not list(root.rglob('capture.json'))
+    assert not (root / 'public_acquisition' / 'sources' / 'tencent.json').exists()
+
+
+@pytest.mark.parametrize('capture_only', [False, True])
+@pytest.mark.parametrize('which', ['public', 'run'])
+def test_resume_routing_observed_chain_replacement(root, monkeypatch, capture_only, which):
+    result = acquire(root, capture_only=capture_only)
+    original = module._read_plan
+    count = []
+    def replaced(directory, run_id):
+        import shutil
+        plan = original(directory, run_id)
+        count.append(1)
+        if len(count) == 1:
+            target = directory.path.parent if which == 'public' else directory.path
+            moved = target.with_name('original-' + target.name)
+            target.rename(moved)
+            shutil.copytree(moved, target)
+        return plan
+    monkeypatch.setattr(module, '_read_plan', replaced)
+    monkeypatch.setattr(module, 'EvidenceStore', forbidden)
+    with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
+        module.resume_public(root, result['run_id'], _transport=forbidden)
+
+
+@pytest.mark.parametrize('which', ['run', 'attempts', 'slot'])
+@pytest.mark.parametrize('stage', ['capture_recorded', 'source_block_published'])
+def test_capture_final_checkpoint_chain_replacement(root, monkeypatch, which, stage):
+    guard(monkeypatch)
+    def checkpoint(point):
+        if point != stage:
+            return
+        import shutil
+        run = next(p for p in (root / 'public_acquisition').iterdir() if len(p.name) == 32)
+        target = {'run': run, 'attempts': run / 'attempts', 'slot': run / 'attempts' / '000001'}[which]
+        moved = target.with_name('original-' + target.name)
+        target.rename(moved)
+        shutil.copytree(moved, target)
+    def transport(*args, **kwargs):
+        if stage == 'source_block_published':
+            raise public_transport.PublicTransportError('transport_http_blocked', status=429)
+        return response(*args, **kwargs)
+    with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
+        acquire(root, capture_only=True, _transport=transport, _checkpoint=checkpoint)
+
+
+def test_capture_recovery_slot_replacement_before_close(root, monkeypatch):
+    guard(monkeypatch)
+    result = acquire(root, capture_only=True)
+    original = module._finalize_capture
+    def replaced(*args, **kwargs):
+        import shutil
+        original(*args, **kwargs)
+        slot = root / 'public_acquisition' / result['run_id'] / 'attempts' / '000001'
+        moved = slot.with_name('original-slot')
+        slot.rename(moved)
+        shutil.copytree(moved, slot)
+    monkeypatch.setattr(module, '_finalize_capture', replaced)
+    with pytest.raises(module.PublicAcquisitionError, match='unsafe_path'):
+        module.resume_public(root, result['run_id'], _transport=forbidden)

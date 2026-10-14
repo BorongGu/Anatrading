@@ -655,7 +655,7 @@ def _commit(store, directory, journal, index, attempt, raw, plan, checkpoint, ca
         _save(directory, journal)
 
 
-def _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelled):
+def _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelled, *, verify=None):
     names = attempts_dir.names()
     if names != [f'{number:06d}' for number in range(1, len(names)+1)] or len(names) > _MAX_ATTEMPTS:
         _fail('reservation_sequence_mismatch')
@@ -664,6 +664,8 @@ def _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelle
     blocks = {block['block_id']: (index, block) for index, block in enumerate(plan['blocks'])}
     for number, name in enumerate(names, 1):
         with attempts_dir.child(name) as slot:
+            if verify:
+                verify(slot)
             try:
                 reservation = _document(slot.read('reservation.json', 16384), 'corrupt_reservation')
                 if (set(reservation) != {'version', 'plan_sha256', 'block_id', 'request_sha256', 'attempt_number', 'reserved_at_utc'}
@@ -688,6 +690,8 @@ def _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelle
                 _fail('reservation_journal_mismatch')
             try:
                 raw, recovered = _capture_at(slot, block)
+                if verify:
+                    verify(slot)
             except DecodeError:
                 _fail('corrupt_capture')
             if raw is not None:
@@ -713,6 +717,8 @@ def _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelle
                 _state(journal, index, 'interrupted', 'process_interrupted', attempt)
                 journal['events'].append(dict(kind='interrupted', attempt=number, at_utc=_utc()))
                 _save(directory, journal)
+            if verify:
+                verify(slot)
 
 
 def _source_blocked(source_dir, source):
@@ -819,25 +825,45 @@ class _CaptureLockPath:
             raise
 
 
-def _verify_capture_root(root, directory, guard, public=None, source_dir=None):
+def _directory_identity(directory):
+    info = os.fstat(directory.fd)
+    return info.st_dev, info.st_ino
+
+
+def _verify_routing_root(root, identities, run_id):
     with _Directory.root(root, create=False) as current:
-        expected, actual = os.fstat(directory.fd), os.fstat(current.fd)
-        if (expected.st_dev, expected.st_ino) != (actual.st_dev, actual.st_ino):
+        with current.child('public_acquisition') as public:
+            with public.child(run_id) as run:
+                if tuple(_directory_identity(item) for item in (current, public, run)) != identities:
+                    _fail('unsafe_path')
+
+
+def _verify_capture_root(root, directory, guard, public=None, source_dir=None,
+                         run=None, attempts=None, slot=None):
+    # Reopen every named ancestor from a fresh root, never from a detached fd.
+    with ExitStack() as stack:
+        current = stack.enter_context(_Directory.root(root, create=False))
+        if _directory_identity(directory) != _directory_identity(current):
             _fail('unsafe_path')
-    if public is not None:
-        with directory.child('public_acquisition') as current_public:
-            with current_public.child('sources') as current_sources:
-                for old, current in ((public, current_public), (source_dir, current_sources)):
-                    expected, actual = os.fstat(old.fd), os.fstat(current.fd)
-                    if (expected.st_dev, expected.st_ino) != (actual.st_dev, actual.st_ino):
-                        _fail('unsafe_path')
-    held = os.fstat(guard.stream.fileno())
-    named = os.stat('.operation.lock', dir_fd=directory.fd, follow_symlinks=False)
-    if (not stat.S_ISREG(named.st_mode) or named.st_nlink != 1
-            or (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)):
-        _fail('unsafe_path')
-    if '.restore-incomplete' in directory.names():
-        _fail('restore_incomplete')
+        held = os.fstat(guard.stream.fileno())
+        named = os.stat('.operation.lock', dir_fd=current.fd, follow_symlinks=False)
+        if (not stat.S_ISREG(named.st_mode) or named.st_nlink != 1
+                or (held.st_dev, held.st_ino) != (named.st_dev, named.st_ino)):
+            _fail('unsafe_path')
+        if '.restore-incomplete' in current.names():
+            _fail('restore_incomplete')
+        if public is not None:
+            current = stack.enter_context(current.child('public_acquisition'))
+            current_sources = stack.enter_context(current.child('sources'))
+            if (_directory_identity(public) != _directory_identity(current)
+                    or _directory_identity(source_dir) != _directory_identity(current_sources)):
+                _fail('unsafe_path')
+            for original in (run, attempts, slot):
+                if original is None:
+                    break
+                current = stack.enter_context(current.child(original.path.name))
+                if _directory_identity(original) != _directory_identity(current):
+                    _fail('unsafe_path')
 
 
 def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, cancelled=None):
@@ -852,42 +878,43 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
         if resuming:
             # Read-only routing: no recovery, source-state adoption, or Store access.
             with _Directory.root(root, create=False) as routing_root:
-                routing_identity = os.fstat(routing_root.fd)
                 with routing_root.child('public_acquisition') as routing_public:
                     with routing_public.child(run_id) as routing_run:
+                        routing_identities = tuple(_directory_identity(item) for item in
+                                                   (routing_root, routing_public, routing_run))
                         routed_plan = _read_plan(routing_run, run_id)
             plan = routed_plan
         capture_only = _capture_only(plan)
         done = {'captured', 'empty_result'} if capture_only else {'committed', 'empty_result'}
         safe_root = stack.enter_context(_Directory.root(root, create=not resuming and not capture_only))
         if resuming:
-            current_identity = os.fstat(safe_root.fd)
-            if (routing_identity.st_dev, routing_identity.st_ino) != (current_identity.st_dev, current_identity.st_ino):
-                _fail('unsafe_path')
+            _verify_routing_root(root, routing_identities, run_id)
         if capture_only:
             # Existing authority directories must be available before any lock/run write.
             with safe_root.child('public_acquisition') as checked_public:
-                with checked_public.child('sources'):
-                    pass
+                with checked_public.child('sources') as checked_sources:
+                    authority_identities = (_directory_identity(checked_public), _directory_identity(checked_sources))
             guard = stack.enter_context(_DirectoryLock(_CaptureLockPath(safe_root)))
             safe_root.sync()
             _verify_capture_root(root, safe_root, guard)
             public = stack.enter_context(safe_root.child('public_acquisition'))
             source_dir = stack.enter_context(public.child('sources'))
+            if (_directory_identity(public), _directory_identity(source_dir)) != authority_identities:
+                _fail('unsafe_path')
             store = None
         else:
             store = stack.enter_context(EvidenceStore(root, checkpoint=lambda stage: checkpoint('store.' + stage)))
             if safe_root.path != store.root or os.fstat(safe_root.fd).st_ino != os.stat(store.root).st_ino:
                 _fail('unsafe_path')
             if resuming:
-                with _Directory.root(root, create=False) as current_root:
-                    current_identity = os.fstat(current_root.fd)
-                    if (routing_identity.st_dev, routing_identity.st_ino) != (current_identity.st_dev, current_identity.st_ino):
-                        _fail('unsafe_path')
+                _verify_routing_root(root, routing_identities, run_id)
             public = stack.enter_context(safe_root.child('public_acquisition', create=True))
             source_dir = stack.enter_context(public.child('sources', create=True))
         if resuming:
             directory = stack.enter_context(public.child(run_id))
+            if (_directory_identity(safe_root), _directory_identity(public), _directory_identity(directory)) != routing_identities:
+                _fail('unsafe_path')
+            _verify_routing_root(root, routing_identities, run_id)
             plan = _read_plan(directory, run_id)
             if plan != routed_plan:
                 _fail('plan_identity_mismatch')
@@ -898,9 +925,19 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
             journal = _new_journal(plan)
             _save(directory, journal)
         attempts_dir = stack.enter_context(directory.child('attempts', create=True))
-        _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelled)
+        def verify(slot=None):
+            if capture_only:
+                _verify_capture_root(root, safe_root, guard, public, source_dir, directory, attempts_dir, slot)
+        def capture_checkpoint(stage, slot=None):
+            checkpoint(stage)
+            verify(slot)
+        verify()
+        _recover(store, directory, attempts_dir, plan, journal, checkpoint, cancelled,
+                 verify=verify if capture_only else None)
+        verify()
         next_send = time.monotonic() + (_SEND_INTERVAL if resuming else 0)
         for index, block in enumerate(plan['blocks']):
+            verify()
             current = journal['blocks'][index]
             if current['status'] in done:
                 continue
@@ -929,18 +966,16 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                 reservation = dict(version=_RESERVATION_VERSION, plan_sha256=plan['plan_sha256'], block_id=block['block_id'],
                                    request_sha256=block['request_sha256'], attempt_number=number, reserved_at_utc=_utc())
                 slot.publish('reservation.json', canonical_json(reservation), immutable=True)
-                checkpoint('reservation_published')
+                capture_checkpoint('reservation_published', slot)
                 attempt = _new_attempt(number, block)
                 journal['attempts'].append(attempt)
                 _state(journal, index, 'requested', attempt=attempt)
                 _save(directory, journal)
-                checkpoint('attempt_requested')
+                capture_checkpoint('attempt_requested', slot)
                 try:
-                    if capture_only:
-                        _verify_capture_root(root, safe_root, guard, public, source_dir)
+                    verify(slot)
                     received = transport(block['request'], deadline=min(deadline, time.monotonic()+_ATTEMPT_SECONDS), cancelled=cancelled)
-                    if capture_only:
-                        _verify_capture_root(root, safe_root, guard, public, source_dir)
+                    verify(slot)
                     next_send = time.monotonic() + _SEND_INTERVAL
                     attempt['transport'] = dict(status=received['status'], byte_count=len(received['body']),
                                                 body_sha256=_hash(received['body']), complete=True)
@@ -949,17 +984,16 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                                         body=received['body'])
                     _binding(raw, block)
                     slot.publish('capture.json', raw, immutable=True,
-                                 checkpoint=lambda: checkpoint('capture_temporary'))
-                    checkpoint('capture_published')
+                                 checkpoint=lambda: capture_checkpoint('capture_temporary', slot))
+                    capture_checkpoint('capture_published', slot)
                     attempt['capture_sha256'] = _hash(raw)
                     _state(journal, index, 'captured', attempt=attempt)
                     _save(directory, journal)
-                    checkpoint('capture_recorded')
+                    capture_checkpoint('capture_recorded', slot)
                     (_finalize_capture if _capture_only(plan) else _commit)(
                         store, directory, journal, index, attempt, raw, plan, checkpoint, cancelled)
                 except PublicTransportError as error:
-                    if capture_only:
-                        _verify_capture_root(root, safe_root, guard, public, source_dir)
+                    verify(slot)
                     code = error.code
                     attempt['transport'] = dict(status=getattr(error, 'status', None), byte_count=getattr(error, 'byte_count', 0),
                                                 body_sha256=getattr(error, 'body_sha256', None), complete=getattr(error, 'complete', False))
@@ -967,8 +1001,8 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                         status = 'blocked'
                         source_dir.publish(block['source']+'.json', canonical_json(dict(source=block['source'], status='blocked',
                                            error_code=code, at_utc=_utc(), retry_after=getattr(error, 'retry_after', None))), immutable=True,
-                                           checkpoint=lambda: checkpoint('source_block_temporary'))
-                        checkpoint('source_block_published')
+                                           checkpoint=lambda: capture_checkpoint('source_block_temporary', slot))
+                        capture_checkpoint('source_block_published', slot)
                     elif code == 'transport_cancelled':
                         status = 'cancelled'
                     elif code in _TRANSIENT:
@@ -988,8 +1022,10 @@ def _execute(root, plan=None, run_id=None, *, transport=None, checkpoint=None, c
                 except DecodeError as error:
                     _state(journal, index, 'failed_terminal', error.code, attempt)
                     _save(directory, journal)
+                verify(slot)
             if journal['blocks'][index]['status'] not in done:
                 break
+        verify()
         return _summary(store, plan, journal, time.monotonic()-started, transport_diagnostics)
 
 
