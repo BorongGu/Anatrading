@@ -262,6 +262,8 @@ class EvidenceStore:
             raise StoreError("unsupported_schema")
 
     def _require_writable(self):
+        if getattr(self, '_announcement_outcome_unknown', False):
+            raise StoreError('announcement_outcome_unavailable')
         if self.read_only:
             raise StoreError("read_only_store")
 
@@ -429,6 +431,21 @@ class EvidenceStore:
                         return result
                     raise StoreError("import_outcome_unavailable") from None
                 return self._resolve_attempt(attempt_id)
+
+    def register_announcement(self, pdf_path, receipt_path, extraction_path):
+        from .announcement_evidence import register
+        with self._mutex:
+            return register(self, (pdf_path, receipt_path, extraction_path))
+
+    def announcement(self, evidence_id):
+        from .announcement_evidence import read
+        with self._mutex:
+            return read(self, evidence_id)
+
+    def announcements(self, *, after_id=None, limit=100):
+        from .announcement_evidence import listing
+        with self._mutex:
+            return listing(self, after_id, limit)
 
     def attempts(self):
         with self._mutex:
