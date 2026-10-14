@@ -42,6 +42,7 @@ def _parser():
     public.add_argument("--start")
     public.add_argument("--end")
     public.add_argument("--count", type=int, help="仅新浪，默认10，最多240")
+    public.add_argument("--capture-only", action="store_true", help="仅保存未获研究资格的捕获，不打开数据库；要求原来源状态目录已存在")
     resume = commands.add_parser("resume-public", help="校验并恢复一个既有有界取数任务，不替换参数")
     resume.add_argument("run_id", help="原任务的32位小写十六进制ID")
     due = commands.add_parser("acquire-tdx-due", help="执行有限日线计划的到期槽或只读恢复")
@@ -103,7 +104,8 @@ def _run(arguments):
                 return resume_public(arguments.root, arguments.run_id, _cancelled=lambda: requested)
             return acquire_public(arguments.root, source=arguments.source, symbol=arguments.symbol,
                                   asset_type=arguments.asset_type, period=arguments.period, start=arguments.start,
-                                  end=arguments.end, count=arguments.count, _cancelled=lambda: requested)
+                                  end=arguments.end, count=arguments.count, capture_only=arguments.capture_only,
+                                  _cancelled=lambda: requested)
         finally:
             signal.signal(signal.SIGINT, previous)
     if arguments.command == "recover-tdx":
