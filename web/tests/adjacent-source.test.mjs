@@ -75,7 +75,7 @@ test('minute and compact raw details do not acquire daily research', () => {
 test('published ownership captures scalar context rather than aliasing mutable source metadata', () => {
   const changes = [
     q => { q.batch_id = 'other-batch'; }, q => { q.selection.ordinal_start = 1; }, q => { q.selection.ordinal_end = 99; },
-    q => { q.metadata.period = '1m'; }, q => { q.manifest = { qualification: 'changed' }; },
+    q => { q.metadata.period = '1m'; }, q => { q.metadata.source_code = 'other'; }, q => { q.metadata.source_adjustflag = '1'; }, q => { q.counts = { batch_unlocated_rows: 1 }; }, q => { q.manifest = { qualification: 'changed' }; },
     q => { q.metadata.quarantined = true; }, q => { q.batch_checks = [{ name: 'known_negative_sample', outcome: 'fail' }]; },
   ];
   for (const change of changes) {

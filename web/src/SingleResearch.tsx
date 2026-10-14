@@ -92,7 +92,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
     // same-ID context change still permanently invalidates, with no auto-fetch.
     if (previous.ownerQueryId === context.ownerQueryId && (previous.snapshotId !== context.snapshotId || previous.cutoff !== context.cutoff
       || previous.ordinalStart !== context.ordinalStart || previous.ordinalEnd !== context.ordinalEnd)) invalidate();
-  }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end, reversalContext.period, reversalContext.qualification, reversalContext.knownNegative, reversalContext.quarantined]);
+  }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end, reversalContext.period, reversalContext.qualification, reversalContext.knownNegative, reversalContext.quarantined, reversalContext.sourceCode, reversalContext.sourceAdjustflag, reversalContext.batchUnlocatedRows]);
   useEffect(() => {
     void load();
     return () => {

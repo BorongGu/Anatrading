@@ -61,6 +61,9 @@ const contexts=[
  ['ordinal end',q=>q.selection.ordinal_end=20],
  ['period',q=>q.metadata.period='1m'],
  ['qualification',q=>q.manifest.qualification='known_negative_sample'],
+ ['source code',q=>q.metadata.source_code='600001'],
+ ['source adjustment',q=>q.metadata.source_adjustflag='1'],
+ ['batch coverage',q=>q.counts.batch_unlocated_rows=1],
  ['quarantined',q=>q.metadata.quarantined=true],
  ['known negative',q=>q.batch_checks.push({name:'known_negative_sample',outcome:'fail'})],
 ];
@@ -151,7 +154,7 @@ const drawPublished=q=>act(()=>root.render(createElement(Profiler,{id:'published
 for(const [name,mutate] of contexts)test('both published RecordDetails hide first commit after '+name+' and stay revoked on A-B-A',async()=>{
  await act(()=>root.render(null));requests=[];published=[];
  globalThis.fetch=(url,options={})=>new Promise((resolve,reject)=>requests.push({url:String(url),options,resolve,reject}));
- const f=fixture(),q=f.reply.query,b={...q,metadata:{...q.metadata},manifest:{...q.manifest},selection:{...q.selection},batch_checks:[...q.batch_checks]};
+ const f=fixture(),q=f.reply.query,b={...q,metadata:{...q.metadata},manifest:{...q.manifest},selection:{...q.selection},counts:{...q.counts},batch_checks:[...q.batch_checks]};
  await drawPublished(q);await settle(singleRequests().at(-1),f.report);
  assert.equal(adjacency().length,2);assert.ok(adjacency().every(el=>el.querySelector('.exact-grid')));
  const before=adjacency().map(el=>el.outerHTML),calls=requests.length;mutate(b);commits=[];

@@ -5,17 +5,20 @@ import type { ReversalContext } from './close-reversal.ts';
 
 // The same small captured context owns both the panel and published consumers.
 export interface SourceResearchContext extends ReversalContext {
+  sourceCode: string | undefined; sourceAdjustflag: string | undefined; batchUnlocatedRows: number | undefined;
   period: string | undefined; qualification: string | undefined; knownNegative: boolean; quarantined: boolean;
 }
 export function sourceResearchContext(query: Query): SourceResearchContext {
   return { ownerQueryId: query.query_id, snapshotId: query.snapshot_id, batchId: query.batch_id,
     cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null,
+    sourceCode: query.metadata.source_code, sourceAdjustflag: query.metadata.source_adjustflag, batchUnlocatedRows: query.counts?.batch_unlocated_rows,
     period: query.metadata.period, qualification: query.manifest?.qualification, quarantined: query.metadata.quarantined === true,
     knownNegative: query.batch_checks?.some(check => check.name === 'known_negative_sample' && check.outcome === 'fail') ?? false };
 }
 export function sourceResearchContextMatches(a: SourceResearchContext, b: SourceResearchContext): boolean {
   return reversalContextMatches(a, b) && a.period === b.period && a.qualification === b.qualification
-    && a.knownNegative === b.knownNegative && a.quarantined === b.quarantined;
+    && a.knownNegative === b.knownNegative && a.quarantined === b.quarantined
+    && a.sourceCode === b.sourceCode && a.sourceAdjustflag === b.sourceAdjustflag && a.batchUnlocatedRows === b.batchUnlocatedRows;
 }
 export interface SourceResearchBinding { queryId: string; report: ResearchEnvelope<SingleResult>; context: SourceResearchContext }
 

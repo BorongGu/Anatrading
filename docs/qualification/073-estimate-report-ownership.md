@@ -59,3 +59,17 @@ jsdom使用已安装外部依赖，不改package/lockfile；无新网络取数�
 正常App工具栏会主动撤销来源和选中记录；合成同ID直接变更用于防御该异常输入，两者分列，不声称普通用户必经此错误路径。日志及本地执行产物仍不提交；性能NO-BUILD与所有真实浏览器/实源/Windows/预测限制不变。最终独立精确提交和远端新head复审按PR68记录。
 
 独立最终来源检查：实际App25/25与周期卸载2/2通过；StrictMode重复对应25/25与2/2通过。另有不可变prop消费者28/28、隔离5/5及原归属回归通过，31份稳定输出逐字节一致（共同SHA256仍为 `8ca5faf816c960b73308812b2aff09181cb6f6023e62286e9113b87a5701456e`）。各组重叠，不相加为独立样本。实际App测试仅适配SourceChart图形API，无原生图形/视觉资格；独立编译及作者最终日志已核对。最终两产品文件SHA256分别为SingleResearch `5eb59d9dc75dfd3d93d0ef3b52d21ef20afa8c2d6765c12ee643c1ab00ca3779`、adjacent-source `63e107db5e0faad12783992d7a6a2336d5b9dc936ff48328b5a24d343dd9fd5b`。
+
+## PR68 完整来源依赖补漏
+
+第三轮远端审查指出，前轮仅审全局source_rejection不足；_source_conflict还用metadata.source_code/source_adjustflag改变逐行资格。一次完整静态审计同时找出daily_coverage的counts.batch_unlocated_rows，影响coverage_known及signal_report资格。将三标量同时纳入共享捕获、匹配及失效依赖；原先把逐行元数据冲突完全交由snapshot边界的范围判断已纠正，失败历史保留。
+
+完整生产读取边界已核对：
+
+- research_series的元数据读取仅period、quarantined、source_code、source_adjustflag；known_negative_sample失败另来自batch_checks。均有独立上下文比较。
+- daily_bars读取selection cutoff和ordinal_start/end；daily_coverage另读取counts.batch_unlocated_rows。均有上下文比较；缺省与原值保持，未重算计数。
+- 行数组rows/unlocated、label、tokens中的source_date/date/code/adjustflag、checks name/outcome、OHLC及ordinal决定日期组、行有效性、价格和覆盖；这些既有源内容由不可变snapshot/query身份约束，不支持伪造同一身份后修改原行。无新逐render来源hash/扫描。
+- signal_report读取规范化bars/coverage、全局rejection及evaluation cutoff，event_report只接收bars和显式lookback/horizon/test_start参数。当前参数编辑同步invalidate，请求代次及既有validator继续绑定响应；无其他元数据依赖。
+- 单股API的_load只额外检查日线period，_envelope依snapshot/query IDs与参数构造身份；双股/多股的symbol/market准备不在该单股入口。owner query/snapshot/batch及manifest资格的既有保守匹配保持。
+
+先保留两个元数据标量六项红灯；加入完整审计发现的覆盖计数后，产品修订前55项中46通过/9失败（内部首提交、迟到成功、外部消费者各三项）。最小修订后归属DOM55＋既有App2共57/57、全Node957/957及TypeScript/build通过，0失败/跳过。三字段纯绑定矩阵亦通过；数学/DTO/API/后端未改，未重跑完整Python套件或性能，旧NO-BUILD保持。独立审查另用极小纯合成signal_report探针确认两个元数据冲突会令估计不可用、批次未定位计数会改变覆盖资格；无Store/网络/真实数据。独立新标量直接矩阵20/20及实际App13/13通过，原基线分别保留6项/9项预期红灯；此前App25＋周期2、StrictMode25＋2、消费者28、归属38、隔离5全部回归通过，31份稳定输出哈希不变。最终精确来源/依赖审查及新远端head结果按PR68记录。
