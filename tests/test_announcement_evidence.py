@@ -244,13 +244,14 @@ def test_invalid_source_path_hints_rejected(tmp_path, hints):
             store.announcement(identity)
 
 
-def test_long_origin_path_rejected_before_read_or_write(tmp_path, monkeypatch):
+@pytest.mark.parametrize('hint', ['C:/' + 'x' * 4096, 'C:/\ud800'])
+def test_long_origin_path_rejected_before_read_or_write(tmp_path, monkeypatch, hint):
     from anatrading import announcement_evidence as module
     with EvidenceStore(tmp_path / 'root') as store:
         class LongOrigin:
             def resolve(self): return self
             def is_relative_to(self, root): return False
-            def __str__(self): return 'C:/' + 'x' * 4096
+            def __str__(self): return hint
         monkeypatch.setattr(module, 'Path', lambda path: LongOrigin())
         def unexpected_read(*args): raise AssertionError('input read before path validation')
         monkeypatch.setattr(module, 'bounded', unexpected_read)
@@ -276,7 +277,8 @@ def test_asserted_nonidentity_fields_need_value_and_evidence(tmp_path, bad):
         assert store.db.execute('SELECT count(*) FROM raw_objects').fetchone() == (0,)
 
 
-def test_failed_rollback_never_confirms_uncommitted_row(tmp_path):
+@pytest.mark.parametrize('rollback_error', [RuntimeError, KeyboardInterrupt, SystemExit])
+def test_failed_rollback_never_confirms_uncommitted_row(tmp_path, rollback_error):
     paths = sample(tmp_path)
     def checkpoint(point):
         if point == 'announcement_before_commit': raise RuntimeError('before commit')
@@ -284,12 +286,13 @@ def test_failed_rollback_never_confirms_uncommitted_row(tmp_path):
         real = store.db
         class RollbackFailure:
             def execute(self, sql, *args):
-                if sql == 'ROLLBACK': raise RuntimeError('rollback failed')
+                if sql == 'ROLLBACK': raise rollback_error('rollback failed')
                 return real.execute(sql, *args)
             def __getattr__(self, name): return getattr(real, name)
         store.db = RollbackFailure()
         try:
-            with pytest.raises(StoreError, match='announcement_outcome_unavailable'):
+            error = StoreError if rollback_error is RuntimeError else rollback_error
+            with pytest.raises(error):
                 store.register_announcement(*paths)
             for operation in (lambda: store.register_announcement(*paths), store.announcements,
                               lambda: store.announcement('0' * 64),
@@ -302,8 +305,8 @@ def test_failed_rollback_never_confirms_uncommitted_row(tmp_path):
         assert store.announcements() == []
 
 
-@pytest.mark.parametrize('commit_effect,rollback_fails', [('before', False), ('before', True), ('after', True)])
-def test_commit_error_outcomes(tmp_path, commit_effect, rollback_fails):
+@pytest.mark.parametrize('commit_effect,rollback_fails,rollback_error', [('before', False, RuntimeError), ('before', True, RuntimeError), ('after', True, RuntimeError), ('after', True, KeyboardInterrupt), ('after', True, SystemExit)])
+def test_commit_error_outcomes(tmp_path, commit_effect, rollback_fails, rollback_error):
     paths = sample(tmp_path)
     root = tmp_path / 'root'
     with EvidenceStore(root) as store:
@@ -313,13 +316,13 @@ def test_commit_error_outcomes(tmp_path, commit_effect, rollback_fails):
                 if sql == 'COMMIT':
                     if commit_effect == 'after': real.execute(sql, *args)
                     raise RuntimeError('commit outcome uncertain')
-                if sql == 'ROLLBACK' and rollback_fails: raise RuntimeError('rollback failed')
+                if sql == 'ROLLBACK' and rollback_fails: raise rollback_error('rollback failed')
                 return real.execute(sql, *args)
             def __getattr__(self, name): return getattr(real, name)
         store.db = CommitFailure()
         try:
-            error = StoreError if rollback_fails else RuntimeError
-            message = 'announcement_outcome_unavailable' if rollback_fails else 'commit outcome uncertain'
+            error = (StoreError if rollback_error is RuntimeError else rollback_error) if rollback_fails else RuntimeError
+            message = ('announcement_outcome_unavailable' if rollback_error is RuntimeError else 'rollback failed') if rollback_fails else 'commit outcome uncertain'
             with pytest.raises(error, match=message): store.register_announcement(*paths)
             if rollback_fails:
                 for operation in (lambda: store.register_announcement(*paths), store.announcements,
@@ -332,3 +335,78 @@ def test_commit_error_outcomes(tmp_path, commit_effect, rollback_fails):
     # Only a new connection resolves durable presence; no automatic re-registration.
     with EvidenceStore(root, read_only=True) as store:
         assert len(store.announcements()) == int(commit_effect == 'after')
+
+
+@pytest.mark.parametrize('began,rollback_fails', [(True, False), (True, True), (False, False)])
+def test_begin_return_failure_is_rolled_back_or_quarantined(tmp_path, began, rollback_fails):
+    paths = sample(tmp_path)
+    root = tmp_path / 'root'
+    with EvidenceStore(root) as store:
+        real = store.db
+        calls = []
+        class BeginFailure:
+            def execute(self, sql, *args):
+                if sql == 'BEGIN TRANSACTION':
+                    if began: real.execute(sql, *args)
+                    raise RuntimeError('begin interrupted')
+                if sql == 'ROLLBACK':
+                    calls.append(sql)
+                    if rollback_fails: raise RuntimeError('rollback interrupted')
+                return real.execute(sql, *args)
+            def __getattr__(self, name): return getattr(real, name)
+        store.db = BeginFailure()
+        try:
+            unknown = rollback_fails or not began
+            with pytest.raises(StoreError if unknown else RuntimeError): store.register_announcement(*paths)
+            assert calls == ['ROLLBACK']
+            if unknown:
+                with pytest.raises(StoreError, match='outcome_unavailable'): store.announcements()
+            else:
+                real.execute('BEGIN TRANSACTION')
+                real.execute('ROLLBACK')
+        finally: store.db = real
+    with EvidenceStore(root, read_only=True) as store: assert store.announcements() == []
+
+
+def test_reordered_extension_columns_preserve_binding(tmp_path):
+    from anatrading import announcement_evidence as module
+    paths = sample(tmp_path)
+    with EvidenceStore(tmp_path / 'root') as store:
+        module.initialize(store)
+        store.db.execute('DROP TABLE announcement_evidence')
+        columns = ','.join(name + ' VARCHAR' for name in reversed(module.COLUMNS))
+        store.db.execute('CREATE TABLE announcement_evidence (' + columns + ')')
+        result = store.register_announcement(*paths)
+        assert store.announcement(result['evidence_id'])['manifest']['qualification'] == 'pending'
+        assert store.register_announcement(*paths)['reused']
+
+
+@pytest.mark.parametrize('index,as_key', [(1, False), (1, True), (2, False), (2, True)])
+def test_surrogate_json_rejected_before_original_publication(tmp_path, index, as_key):
+    paths = sample(tmp_path)
+    change(paths[index], lambda v: v.update({'\ud800' if as_key else 'nested': {'value': '\udfff'}}))
+    with EvidenceStore(tmp_path / 'root') as store:
+        with pytest.raises(StoreError, match='invalid_announcement_evidence'):
+            store.register_announcement(*paths)
+        assert store.announcements() == []
+        assert store.db.execute('SELECT count(*) FROM raw_objects').fetchone() == (0,)
+        assert not [p for p in (store.root / 'raw').rglob('*') if p.is_file()]
+
+
+def test_module_metadata_sql_uses_names_not_column_order(tmp_path):
+    import duckdb
+    paths = sample(tmp_path)
+    with EvidenceStore(tmp_path / 'root') as store:
+        original = store.db
+        isolated = duckdb.connect(':memory:')
+        isolated.execute('CREATE TABLE app_meta (value VARCHAR, key VARCHAR, extra VARCHAR)')
+        isolated.execute('CREATE TABLE raw_objects (byte_length BIGINT, sha VARCHAR PRIMARY KEY, extra VARCHAR)')
+        store.db = isolated
+        try:
+            result = store.register_announcement(*paths)
+            assert store.announcement(result['evidence_id'])['manifest']['qualification'] == 'pending'
+            assert isolated.execute('SELECT key,value,extra FROM app_meta').fetchall() == [('announcement_evidence_schema', '1', None)]
+            assert isolated.execute('SELECT count(*) FROM raw_objects WHERE extra IS NULL').fetchone() == (3,)
+        finally:
+            store.db = original
+            isolated.close()

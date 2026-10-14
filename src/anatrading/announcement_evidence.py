@@ -61,11 +61,18 @@ def obj(raw):
     except (UnicodeError, ValueError, RecursionError):
         fail()
     if type(value) is not dict: fail()
+    try:
+        # Check every string/key, including nested and otherwise unconsumed data.
+        json.dumps(value, ensure_ascii=False).encode('utf-8')
+    except (UnicodeError, ValueError, RecursionError): fail()
     return value
 
 
 def text(value, maximum=4096):
-    return type(value) is str and bool(value.strip()) and len(value) <= maximum
+    if type(value) is not str or not value.strip() or len(value) > maximum: return False
+    try: value.encode('utf-8')
+    except UnicodeError: return False
+    return True
 
 
 def valid_origin_paths(paths):
@@ -167,7 +174,7 @@ def initialize(store):
         receipt_sha256 VARCHAR NOT NULL REFERENCES raw_objects(sha),
         extraction_sha256 VARCHAR NOT NULL REFERENCES raw_objects(sha),
         manifest_json VARCHAR NOT NULL, registered_at VARCHAR NOT NULL)''')
-    store.db.execute('INSERT INTO app_meta VALUES (?,?)', [FEATURE, '1'])
+    store.db.execute('INSERT INTO app_meta (key,value) VALUES (?,?)', [FEATURE, '1'])
 
 
 def read(store, identity):
@@ -226,15 +233,15 @@ def register(store, paths):
         store._checkpoint('announcement_raw_published')
         if any(digest(bounded(path, limit)) != sha for path, limit, sha in zip(paths, LIMITS, hashes)):
             fail('announcement_source_changed')
-        store.db.execute('BEGIN TRANSACTION')
         in_transaction = True
+        store.db.execute('BEGIN TRANSACTION')
         store._checkpoint('announcement_transaction_open')
         if not present: initialize(store)
         for raw, sha in zip(raws, hashes):
-            store.db.execute('INSERT INTO raw_objects VALUES (?,?) ON CONFLICT DO NOTHING', [sha, len(raw)])
+            store.db.execute('INSERT INTO raw_objects (sha,byte_length) VALUES (?,?) ON CONFLICT DO NOTHING', [sha, len(raw)])
             if store.db.execute('SELECT byte_length FROM raw_objects WHERE sha=?', [sha]).fetchone() != (len(raw),): fail('announcement_corrupt')
         value['original_paths'] = origin_paths
-        store.db.execute('INSERT INTO announcement_evidence VALUES (?,?,?,?,?,?)', [identity, *hashes, _json(value), _utcnow()])
+        store.db.execute('INSERT INTO announcement_evidence (evidence_id,pdf_sha256,receipt_sha256,extraction_sha256,manifest_json,registered_at) VALUES (?,?,?,?,?,?)', [identity, *hashes, _json(value), _utcnow()])
         store._checkpoint('announcement_before_commit')
         store.db.execute('COMMIT')
         in_transaction = False
@@ -242,12 +249,14 @@ def register(store, paths):
         store._checkpoint('announcement_after_commit')
     except BaseException:
         if in_transaction:
+            # Interrupted rollback must also quarantine this instance.
+            store._announcement_outcome_unknown = True
             try: store.db.execute('ROLLBACK')
             except Exception:
                 # A failed rollback leaves transaction visibility ambiguous.
                 # Never infer durability from this connection's visible rows.
-                store._announcement_outcome_unknown = True
                 fail('announcement_outcome_unavailable')
+            store._announcement_outcome_unknown = False
         try:
             if schema(store) and store.db.execute('SELECT 1 FROM announcement_evidence WHERE evidence_id=?', [identity]).fetchone():
                 read(store, identity)
