@@ -430,6 +430,21 @@ class EvidenceStore:
                     raise StoreError("import_outcome_unavailable") from None
                 return self._resolve_attempt(attempt_id)
 
+    def register_announcement(self, pdf_path, receipt_path, extraction_path):
+        from .announcement_evidence import register
+        with self._mutex:
+            return register(self, (pdf_path, receipt_path, extraction_path))
+
+    def announcement(self, evidence_id):
+        from .announcement_evidence import read
+        with self._mutex:
+            return read(self, evidence_id)
+
+    def announcements(self, *, after_id=None, limit=100):
+        from .announcement_evidence import listing
+        with self._mutex:
+            return listing(self, after_id, limit)
+
     def attempts(self):
         with self._mutex:
             cursor = self.db.execute("SELECT attempt_id,started_at,status,format_id,filename,raw_sha256,batch_id,snapshot_id,error_code FROM attempts ORDER BY started_at,attempt_id")

@@ -61,6 +61,16 @@ def _parser():
     all_daily.add_argument("--client-directory", type=Path, default=Path(r"D:\tdx_64"))
     all_daily.add_argument("--port", type=_port, default=8765)
     all_daily.add_argument("--start-at", help="从当前来源池指定代码开始，跳过其前面的代码；例如300565.SZ")
+    announcement = commands.add_parser("register-announcement", help="登记本地公告原件与接收、抽取证据，资格待定")
+    for name in ("pdf", "receipt", "extraction"):
+        announcement.add_argument("--" + name, type=Path, required=True)
+    announcements = commands.add_parser("announcements", help="只读校验公告证据，每页最多100条")
+    announcements.add_argument("--after-id")
+    announcements.add_argument("--limit", type=int, default=100)
+    announcements.set_defaults(read_only=True)
+    announcement_read = commands.add_parser("announcement", help="只读校验一份公告证据")
+    announcement_read.add_argument("evidence_id")
+    announcement_read.set_defaults(read_only=True)
     ingest = commands.add_parser("import", help="保存原件并建立不可变快照")
     ingest.add_argument("source", type=Path)
     ingest.add_argument("--format", choices=FORMAT_IDS, required=True)
@@ -139,6 +149,12 @@ def _run(arguments):
     if arguments.command == "restore":
         return EvidenceStore.restore(arguments.backup, arguments.destination)
     with EvidenceStore(arguments.root, read_only=getattr(arguments, "read_only", False)) as store:
+        if arguments.command == "register-announcement":
+            return store.register_announcement(arguments.pdf, arguments.receipt, arguments.extraction)
+        if arguments.command == "announcement":
+            return store.announcement(arguments.evidence_id)
+        if arguments.command == "announcements":
+            return store.announcements(after_id=arguments.after_id, limit=arguments.limit)
         if arguments.command == "read-tdx-daily-cache":
             from .tdx_daily import read_daily_cache
 
