@@ -59,6 +59,7 @@ const contexts=[
  ['ordinal end',q=>q.selection.ordinal_end=20],
  ['period',q=>q.metadata.period='1m'],
  ['qualification',q=>q.manifest.qualification='known_negative_sample'],
+ ['quarantined',q=>q.metadata.quarantined=true],
  ['known negative',q=>q.batch_checks.push({name:'known_negative_sample',outcome:'fail'})],
 ];
 for(const [name,mutate] of contexts)test(name+' first-commit and A-B-A ownership; explicit reacceptance',async()=>{
@@ -89,7 +90,7 @@ for(const mode of ['success','failure'])test('superseded request '+mode+' cannot
 for(const [name,mutate] of contexts)test('pending success after '+name+' A-B-A stays revoked',async()=>{
  const f=await mount();await submit();const old=singleRequests().at(-1),b=structuredClone(f.reply.query);mutate(b);
  await draw(b);await draw(f.reply.query);commits=[];await settle(old,f.report);
- assert.equal(chart(),null);assert.equal(snapshot().provenance,false);assert.ok(old.options.signal.aborted);
+ assert.equal(!!chart(),false);assert.equal(snapshot().provenance,false);assert.ok(old.options.signal.aborted);
 });
 function fromEvents(name){
  const f=eventFixture(name),base=fixture();base.report=f.reply;
@@ -128,7 +129,7 @@ test('empty accepted report is hidden on first mismatching commit',async()=>{
 
 test('same analysis ID and same object explicitly reaccepted redraw changed estimate content',async()=>{
  const f=await mount(),before=chart().outerHTML,id=f.report.analysis_id;
- await submit();assert.equal(chart(),null);
+ await submit();assert.equal(!!chart(),false);
  f.report.result.series.at(-1).kalman_price=4242; // Fixture mutation only after prior acceptance revoked.
  await settle(singleRequests().at(-1),f.report);assert.equal(f.report.analysis_id,id);assert.notEqual(chart().outerHTML,before);
 });

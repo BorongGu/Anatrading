@@ -14,9 +14,9 @@ import type { Query } from './types.ts';
 import type { Distribution, ResearchEnvelope, SingleResult } from './research-types.ts';
 
 const EVENT_PAGE_SIZE = 100;
-type ReportContext = ReversalContext & { period: string | undefined; qualification: string | undefined; knownNegative: boolean };
+type ReportContext = ReversalContext & { period: string | undefined; qualification: string | undefined; knownNegative: boolean; quarantined: boolean };
 function sourceContextMatches(a: ReportContext, b: ReportContext) {
-  return a.period === b.period && a.qualification === b.qualification && a.knownNegative === b.knownNegative;
+  return a.period === b.period && a.qualification === b.qualification && a.knownNegative === b.knownNegative && a.quarantined === b.quarantined;
 }
 type EventLedgerView = { token: object; report: ResearchEnvelope<SingleResult>; generation: number; context: ReportContext; page: number };
 
@@ -34,7 +34,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
   const [reversalSource, setReversalSource] = useState<ReversalSource | null>(null);
   const [reversalIssue, setReversalIssue] = useState('');
   const activeReversal = useRef<ReversalSource | null>(null);
-  const reversalContext: ReportContext = { period: query.metadata.period, qualification: query.manifest?.qualification, knownNegative: query.batch_checks?.some(check => check.name === 'known_negative_sample' && check.outcome === 'fail') ?? false, ownerQueryId: query.query_id, snapshotId: query.snapshot_id, batchId: query.batch_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
+  const reversalContext: ReportContext = { quarantined: query.metadata.quarantined === true, period: query.metadata.period, qualification: query.manifest?.qualification, knownNegative: query.batch_checks?.some(check => check.name === 'known_negative_sample' && check.outcome === 'fail') ?? false, ownerQueryId: query.query_id, snapshotId: query.snapshot_id, batchId: query.batch_id, cutoff: query.selection.cutoff ?? null, ordinalStart: query.selection.ordinal_start ?? null, ordinalEnd: query.selection.ordinal_end ?? null };
   const currentReversalContext = useRef(reversalContext); currentReversalContext.current = reversalContext;
   type PathSelection = { token: object; position: number; projection: EventPathProjection | null; issue: string; trigger: HTMLButtonElement };
   const [selection, setSelection] = useState<PathSelection | null>(null);
@@ -96,7 +96,7 @@ export function SingleResearch({ query, onReport }: { query: Query; onReport?: (
     // same-ID context change still permanently invalidates, with no auto-fetch.
     if (previous.ownerQueryId === context.ownerQueryId && (previous.snapshotId !== context.snapshotId || previous.cutoff !== context.cutoff
       || previous.ordinalStart !== context.ordinalStart || previous.ordinalEnd !== context.ordinalEnd)) invalidate();
-  }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end, reversalContext.period, reversalContext.qualification, reversalContext.knownNegative]);
+  }, [query.query_id, query.snapshot_id, query.batch_id, query.selection.cutoff, query.selection.ordinal_start, query.selection.ordinal_end, reversalContext.period, reversalContext.qualification, reversalContext.knownNegative, reversalContext.quarantined]);
   useEffect(() => { void load(); return () => { activeView.current = null; activeReversal.current = null; active.current = null; acceptedGeneration.current = null; gate.current.invalidate(); abort.current?.abort(); }; }, [query.query_id]);
   const viewCurrent = viewIsCurrent();
   const eventCount = viewCurrent ? report!.result.events.rows.length : 0;
