@@ -1,0 +1,12 @@
+Frozen before execution: 2026-10-14; repository untouched.
+Question: Can lower observed roughness alone establish meaningful noise removal without an identified latent target?
+One exhaustive synthetic demonstration, not financial validation or search for a predictor.
+256 length-eight paths y_t = 100 + 2*s_t, s_t in {-1,+1}. Uniform enumeration.
+World A: latent efficient value x_t=100; additive iid signs are measurement noise.
+World B: latent value x_t=y_t; no measurement noise. Genuine value may alternate. This world deliberately does not assume a latent random walk; that assumption is an identifying restriction, not a conclusion from smoothness.
+Identical observations and causal two-point trailing mean f_t=(y_(t-1)+y_t)/2 in both worlds. No fitting, no Kalman or forecast test.
+Pooled exact mean squared latent error over t=1..7. Mean squared first differences over t=2..7 for raw and filtered, matching support.
+Counterexample acceptance requires ALL: identical observed inputs; exact prefix invariance; >=50% roughness reduction; >=25% latent MSE reduction in A; strictly greater latent MSE than raw in B. Preserve failure without parameter changes/reruns.
+Acceptance means only smoothness cannot certify target recovery across these worlds. It does not identify the market world, show alpha, evaluate execution, estimate probabilities, or authorize product change.
+Stop after one execution; preserve preregistration, script, output, hashes and negatives.
+Pre-execution artifact setup attempt in /workspace/shared failed with read-only filesystem. No experiment executed there. Artifacts moved to writable cwd outside repository.
